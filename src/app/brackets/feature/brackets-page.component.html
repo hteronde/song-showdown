@@ -1,0 +1,327 @@
+<ng-template #sessionToastTemplate><div class="session-toast" [class.toast-error]="sessionToastType === 'error'" [attr.role]="sessionToastType === 'error' ? 'alert' : 'status'" aria-atomic="true" *ngIf="sessionToastMessage"><span>{{ sessionToastMessage }}</span><button type="button" aria-label="Dismiss notification" (click)="clearSessionToast()">×</button></div></ng-template>
+<ng-container *ngIf="!sessionModalOpen"><ng-container *ngTemplateOutlet="sessionToastTemplate"></ng-container></ng-container>
+<section>
+  <div class="head"><div><div class="muted">MANAGE</div><h1>{{ pageMode === 'list' ? 'Brackets' : pageMode === 'edit' || editingId ? 'Edit bracket' : 'Add bracket' }}</h1></div><button class="primary" *ngIf="pageMode === 'list'" (click)="newBracket()">＋ New bracket</button></div>
+  <button class="cancel" type="button" *ngIf="pageMode !== 'list'" (click)="closeForm()" [disabled]="saving || sessionsSaving">← Back to brackets</button>
+  <div class="form-error-banner" role="alert" *ngIf="formErrorMessage"><span>{{ formErrorMessage }}</span><button type="button" aria-label="Dismiss error" (click)="dismissFormError()">×</button></div>
+  <p class="success" role="status" *ngIf="success">{{ success }}</p>
+
+  <article class="form-card" *ngIf="formOpen">
+    <p class="hint">Commissioner changes save while the bracket is active. Existing votes are kept unless you explicitly confirm a tournament rebuild.</p>
+    <div class="form-head"><h2>{{ editingId ? 'Edit bracket' : 'Create bracket' }}</h2><div class="actions"><button class="cancel" type="button" *ngIf="editingId" (click)="duplicateCurrentBracket()" [disabled]="duplicatingId != null || saving || sessionsSaving">{{ duplicatingId === editingId ? 'Duplicating…' : 'Duplicate' }}</button><button class="cancel" type="button" *ngIf="canSaveDraft" (click)="saveAsDraft()" [disabled]="saving || sessionsSaving" title="Save your unfinished bracket">{{ savingDraft ? 'Saving draft…' : 'Save as draft' }}</button><button class="cancel" type="button" (click)="closeForm()" [disabled]="saving || sessionsSaving">Close</button></div></div>
+    <div class="form-grid">
+      <div class="field">
+        <label for="bracket-title">Title <span aria-hidden="true">*</span></label>
+        <input id="bracket-title" name="title" [(ngModel)]="title" (ngModelChange)="refreshFieldErrors()" [class.invalid-control]="!!fieldErrors.title" [attr.aria-invalid]="!!fieldErrors.title" aria-describedby="title-error" placeholder="Album or bracket title" required>
+        <p class="field-error" id="title-error" *ngIf="fieldErrors.title" role="alert">{{ fieldErrors.title }}</p>
+      </div>
+      <div class="field">
+        <label for="bracket-artist">Theme (Artist, Genre, etc.): <span aria-hidden="true">*</span></label>
+        <input id="bracket-artist" name="artist" [(ngModel)]="artist" (ngModelChange)="refreshFieldErrors()" [class.invalid-control]="!!fieldErrors.artist" [attr.aria-invalid]="!!fieldErrors.artist" aria-describedby="artist-error" placeholder="Artist, genre, or another theme" required>
+        <p class="field-error" id="artist-error" *ngIf="fieldErrors.artist" role="alert">{{ fieldErrors.artist }}</p>
+      </div>
+      <div class="field">
+        <label for="bracket-logo">Logo</label>
+        <input id="bracket-logo" name="logoUrl" type="url" maxlength="2048" [(ngModel)]="logoUrl" placeholder="https://example.com/logo.png">
+      </div>
+      <div class="field anonymous-field"><label for="bracket-anonymous"><input id="bracket-anonymous" type="checkbox" name="anonymous" [(ngModel)]="anonymous">Anonymous?</label><span class="hint">Members see results and totals, but only the commissioner can see individual votes.</span></div>
+      <div class="field wide">
+        <span class="participant-label">Sessions</span>
+        <div class="participant-summary"><span>{{ displayedSessionCount ? displayedSessionCount + ' sessions' : 'Set up the bracket schedule' }}<ng-container *ngIf="startAt"> · Starts {{ startAt | date:'medium' }}</ng-container><br><small>{{ songsPerSession }} matchups per session · {{ noSessionTimer ? 'No timer' : durationValue + ' ' + durationUnit }}</small></span><button class="cancel" type="button" aria-haspopup="dialog" aria-controls="session-settings-dialog" (click)="openSessionSettings()" [disabled]="editingStatus === 'complete' || saving || sessionsSaving" [title]="editingStatus === 'complete' ? 'Sessions cannot be edited after the bracket is complete.' : 'Manage session settings'">Manage Sessions</button></div>
+        <p class="field-error" id="session-settings-error" *ngIf="fieldErrors.startAt" role="alert">Set the start date in Manage Sessions.</p>
+      </div>
+      <div class="field wide">
+        <span class="participant-label">Participants <span aria-hidden="true">*</span></span>
+        <div class="participant-summary"><span>{{ participantIds.length }} {{ participantIds.length === 1 ? 'participant' : 'participants' }} assigned</span><button class="cancel" type="button" (click)="openParticipantsModal()">Manage Participants</button></div>
+        <p class="field-error" id="participants-error" *ngIf="fieldErrors.participants" role="alert">{{ fieldErrors.participants }}</p>
+      </div>
+
+    </div>
+    <section class="song-entry" aria-labelledby="albums-summary-heading">
+      <span class="stat-label">BRACKET ALBUMS</span><h3 id="albums-summary-heading">Albums</h3>
+      <div class="participant-summary"><span>{{ albums.length }} {{ albums.length === 1 ? 'album' : 'albums' }}</span><button class="cancel" type="button" aria-haspopup="dialog" aria-controls="albums-manager-dialog" (click)="openAlbumsManager()">Manage Albums</button></div>
+    </section>
+    <dialog #albumsManagerDialog id="albums-manager-dialog" class="song-dialog" aria-labelledby="bracket-albums-heading" (cancel)="(albumSaving || albumRemoving) && $event.preventDefault()">
+    <ng-container *ngTemplateOutlet="sessionToastTemplate"></ng-container>
+    <section class="song-entry" aria-labelledby="bracket-albums-heading">
+      <span class="stat-label">BRACKET ALBUMS</span><h3 id="bracket-albums-heading">Albums · {{ albums.length }}</h3>
+      <p class="hint">Enter the album title, year, and cover once. Songs assigned to an album share these details. Album changes save immediately.</p>
+      <p class="hint" *ngIf="!albums.length">Add an album to make it available in the song form.</p>
+      <ul class="added-songs"><li *ngFor="let album of albums"><div class="album-list-info"><img class="album-cover-thumb" *ngIf="album.albumCoverUrl" [src]="album.albumCoverUrl" alt="" loading="lazy" referrerpolicy="no-referrer"><div><strong>{{ album.title }}</strong><small>{{ album.year || 'Year not recorded' }}</small></div></div><div class="song-row-actions"><button class="cancel" type="button" (click)="openAlbumModal(album)" [attr.aria-label]="'Edit album ' + album.title">Edit</button><button class="cancel" type="button" (click)="removeAlbum(album)" [attr.aria-label]="'Remove album ' + album.title">Remove</button></div></li></ul>
+      <button class="add-song" type="button" (click)="openAlbumModal()">ADD ALBUM</button>
+    </section>
+      <div class="song-modal-actions"><button class="cancel" type="button" (click)="closeAlbumsManager()" [disabled]="albumSaving">Close</button></div>
+    </dialog>
+    <dialog #removeAlbumDialog class="song-dialog" aria-labelledby="remove-album-title" (cancel)="albumRemoving && $event.preventDefault()" (close)="albumToRemove=null">
+      <h3 id="remove-album-title">Remove album?</h3>
+      <p>Are you sure you want to remove “{{ albumToRemove?.title }}”?</p>
+      <p class="hint">Songs assigned to this album will stay in the bracket. Their album selection, year, and album art will be cleared.</p>
+      <p class="field-error" *ngIf="albumRemovalError" role="alert">{{ albumRemovalError }}</p>
+      <div class="song-modal-actions"><button class="add-song" type="button" (click)="confirmRemoveAlbum()" [disabled]="albumRemoving">{{ albumRemoving ? 'REMOVING…' : 'YES, REMOVE' }}</button><button class="cancel" type="button" (click)="closeAlbumRemoval()" [disabled]="albumRemoving" autofocus>No, keep album</button></div>
+    </dialog>
+    <dialog #albumDialog class="song-dialog" aria-labelledby="album-modal-title" (cancel)="albumSaving && $event.preventDefault()">
+      <span class="stat-label">{{ albumDraft.albumId ? 'EDIT ALBUM' : 'NEW ALBUM' }}</span><h3 id="album-modal-title">{{ albumDraft.albumId ? 'Edit album' : 'Add an album' }}</h3>
+      <form ngNativeValidate (ngSubmit)="saveAlbum()"><div class="song-fields">
+        <label>Album title<input name="albumTitle" [(ngModel)]="albumDraft.title" required maxlength="200" autofocus></label>
+        <label>Year<input name="albumYear" [(ngModel)]="albumDraft.year" type="number" min="1" max="9999" step="1"></label>
+        <label>Album cover URL<input name="albumCover" [(ngModel)]="albumDraft.albumCoverUrl" type="url" maxlength="2048" placeholder="https://example.com/album-cover.jpg"></label>
+      </div><p class="field-error" *ngIf="albumError" role="alert">{{ albumError }}</p><div class="song-modal-actions"><button class="add-song" type="submit" [disabled]="albumSaving">{{ albumSaving ? 'SAVING…' : 'SAVE CHANGES' }}</button><button class="cancel" type="button" (click)="closeAlbumModal()" [disabled]="albumSaving">Cancel</button></div></form>
+    </dialog>
+    <section class="song-entry" aria-labelledby="songs-summary-heading">
+      <span class="stat-label">BRACKET SONGS</span><h3 id="songs-summary-heading">Songs</h3>
+      <div class="participant-summary"><span>{{ enteredSongCount }} / {{ songCount }} songs</span><button class="cancel" type="button" aria-haspopup="dialog" aria-controls="songs-manager-dialog" (click)="openSongsManager()">Manage Songs</button></div>
+      <p class="field-error" *ngIf="fieldErrors.songList" role="alert">{{ fieldErrors.songList }}</p>
+    </section>
+    <section class="song-entry" aria-labelledby="playlists-summary-heading">
+      <span class="stat-label">SESSION MUSIC</span><h3 id="playlists-summary-heading">Playlists</h3>
+      <div class="participant-summary"><span>{{ assignedPlaylistCount }} {{ assignedPlaylistCount === 1 ? 'playlist assigned' : 'playlists assigned' }}</span><button class="cancel" type="button" aria-haspopup="dialog" aria-controls="playlists-dialog" (click)="openPlaylists()">Manage Playlists</button></div>
+      <p class="hint">Share a playlist containing each session’s songs so members can listen together.</p>
+    </section>
+    <dialog #playlistsDialog id="playlists-dialog" class="song-dialog" aria-labelledby="playlists-title" (cancel)="(playlistsSaving || !!modalSaving) && $event.preventDefault()">
+      <h3 id="playlists-title">Manage Playlists</h3>
+      <p class="hint">Add a Spotify, YouTube, or other playlist link for each session. {{ playlistsSaveImmediately ? 'Save Changes saves playlist links immediately without changing the bracket or its votes.' : 'Save Changes saves these links immediately.' }} Clear a URL to remove its playlist.</p>
+      <p class="hint" *ngIf="!playlistDraft.length">Set up your schedule in Manage Sessions first to assign session playlists.</p>
+      <p class="hint" *ngIf="playlistSongsLoading" role="status">Loading session songs…</p>
+      <p class="field-error" *ngIf="playlistSongsError" role="alert">Could not load saved matchups: {{ playlistSongsError }}</p>
+      <p class="hint">TBD means the advancing song or randomized matchup has not been determined yet.</p>
+      <p class="field-error" *ngIf="modalErrors['playlists']" role="alert">{{ modalErrors['playlists'] }}</p>
+      <p class="field-error" *ngIf="playlistsError" role="alert">{{ playlistsError }}</p>
+      <form ngNativeValidate (ngSubmit)="applyPlaylists()">
+        <section class="playlist-session" *ngFor="let row of playlistDraft"><h4>{{ row.label }}</h4><span class="hint">{{ row.matchupCount }} matchups · {{ row.matchupCount * 2 }} song appearances</span>
+          <ul class="playlist-song-list"><li *ngFor="let match of row.matchups"><small>{{ match.label }}</small><span>{{ match.songA || 'TBD' }}</span><span class="versus">vs.</span><span>{{ match.songB || 'TBD' }}</span></li></ul>
+          <div class="song-fields"><label>Playlist name<input [name]="'playlist-name-'+row.weekNumber" [(ngModel)]="row.playlistName" maxlength="160" placeholder="Optional playlist name"></label><label>Playlist URL<input [name]="'playlist-url-'+row.weekNumber" [(ngModel)]="row.playlistUrl" type="url" pattern="https?://.*" maxlength="2048" placeholder="https://open.spotify.com/playlist/…"></label></div>
+          <p *ngIf="row.playlistUrl"><a [href]="row.playlistUrl" target="_blank" rel="noopener noreferrer">Open playlist ↗</a></p>
+        </section>
+        <div class="song-modal-actions"><button class="add-song" type="submit" [disabled]="playlistsSaving || playlistSongsLoading || !!modalSaving">{{ playlistsSaving ? 'SAVING…' : 'Save Changes' }}</button><button class="cancel" type="button" (click)="closePlaylists()" [disabled]="playlistsSaving || !!modalSaving">Cancel</button></div>
+      </form>
+    </dialog>
+    <dialog #songsManagerDialog id="songs-manager-dialog" class="song-dialog" aria-labelledby="songs-manager-title" (cancel)="$event.preventDefault();closeSongsManager()">
+      <ng-container *ngTemplateOutlet="sessionToastTemplate"></ng-container>
+      <h3 id="songs-manager-title">Manage Songs</h3>
+      <p class="hint">Save Changes saves these settings immediately. Song, seed, and randomization dialogs also save their own changes.</p>
+      <div class="form-grid">
+      <div class="field">
+        <label for="song-count"># Songs</label>
+        <select id="song-count" [(ngModel)]="songCount" (ngModelChange)="songCountChanged()">
+          <option *ngFor="let count of songCounts" [ngValue]="count">{{ count }}</option>
+        </select>
+      </div>
+      <div class="field wide anonymous-field">
+        <div class="seed-heading"><label for="use-seeds"><input id="use-seeds" name="useSeeds" type="checkbox" [(ngModel)]="useSeeds" (ngModelChange)="toggleUseSeeds($event)">Use Seeds</label><button class="seed-help-link" type="button" aria-haspopup="dialog" aria-controls="seed-help-dialog" (click)="openSeedHelp()">What is this?</button></div>
+        <span class="hint">This would assign seeds to the songs included to avoid early elimination for big contenders.</span>
+        <ng-container *ngIf="useSeeds"><label for="seeding-size">Seed range</label><select id="seeding-size" name="seedingSize" [(ngModel)]="seedingSize" (ngModelChange)="changeSeedRange()"><option *ngFor="let size of seedingSizeOptions" [ngValue]="size">{{ size }}</option></select>
+          <span class="hint">Assign {{ songCount / seedingSize }} {{ songCount / seedingSize === 1 ? 'song' : 'songs' }} to each seed, from 1 through {{ seedingSize }}. Assign seeds beside each song below. Save Changes saves seed assignments. Randomization shuffles songs within equal seed groups.</span>
+          <div class="seed-distribution"><span *ngFor="let rank of seedRanks" [class.seed-incomplete]="seedAssignmentCount(rank) !== songCount / seedingSize">#{{ rank }}: {{ seedAssignmentCount(rank) }} / {{ songCount / seedingSize }}</span></div>
+        </ng-container>
+      </div>
+      <div class="field">
+        <label for="tiebreaker-option">Tiebreaker option</label>
+        <select id="tiebreaker-option" [(ngModel)]="tiebreakerOption">
+          <option value="random">Random</option>
+          <option *ngIf="useSeeds" value="seed">Seed (higher seed wins, #1 beats #2)</option><option *ngIf="useSeeds" value="seed_low">Seed (lower seed wins, #2 beats #1)</option>
+          <option value="admin_pick">Admin pick (the admin's choice advances)</option>
+        </select>
+        <span class="hint" *ngIf="useSeeds && (tiebreakerOption === 'seed' || tiebreakerOption === 'seed_low')">{{ tiebreakerOption === 'seed' ? 'Higher-ranked seed wins (#1 beats #2).' : 'Lower-ranked seed wins (#2 beats #1).' }} Equal seeds use a random draw.</span>
+      </div>
+      <div class="field anonymous-field"><label for="randomize-songs"><input id="randomize-songs" name="randomizeSongs" type="checkbox" [(ngModel)]="randomizeSongs" (ngModelChange)="toggleRandomization($event)">Randomize Songs</label><div class="randomization-summary" *ngIf="randomizationMode !== 'none'"><span class="hint">{{ randomizationMode === 'round1' ? 'Random Round 1 Only' : 'Randomize Each Round' }}</span><button class="cancel" type="button" (click)="openRandomizationOptions()">Change option</button></div></div>
+      </div>
+    <section class="song-entry" aria-labelledby="bracket-songs-heading">
+      <span class="stat-label">BRACKET SONGS</span>
+      <h3 id="bracket-songs-heading">Songs · {{ enteredSongCount }} / {{ songCount }}</h3>
+      <button class="cancel" type="button" aria-haspopup="dialog" aria-controls="seeding-dialog" (click)="openSeeding()" [disabled]="!useSeeds || !songs.length">Manage Seeding</button>
+      <p class="hint" *ngIf="!useSeeds">Select Use Seeds to manage song seeding.</p>
+      <button class="cancel" type="button" (click)="openSongOrder()" aria-haspopup="dialog" aria-controls="song-order-dialog" [disabled]="songs.length < 2">Reorder Songs</button>
+      <p class="hint">Song changes save immediately from their modal, independently of the bracket settings.</p>
+      <p class="field-error" role="alert" *ngIf="fieldErrors.songList">{{ fieldErrors.songList }}</p>
+      <p class="hint" *ngIf="!songs.length">Add songs to build your bracket. Songs use the bracket theme above.</p>
+      <p class="matchup-order-note" *ngIf="!useSeeds && !randomizeSongs">First-round matchups follow this order. Each pair below plays each other.</p>
+      <ol class="added-songs" [class.matchup-pairs]="!useSeeds && !randomizeSongs">
+        <li *ngFor="let song of songs; let i = index" [class.pair-start]="i % 2 === 0" [class.pair-end]="i % 2 === 1">
+          <span class="pair-label" *ngIf="!useSeeds && !randomizeSongs && i % 2 === 0">MATCHUP {{ i / 2 + 1 }}</span>
+          <span class="pair-versus" *ngIf="!useSeeds && !randomizeSongs && i % 2 === 1">VS.</span>
+          <div>{{ i + 1 }}. {{ song.title }}<small>{{ song.category }}<span *ngIf="song.album"> · {{ song.album }}</span><span *ngIf="song.year"> · {{ song.year }}</span></small></div>
+          <div class="song-row-actions">
+            <label class="seed-assignment" *ngIf="useSeeds">Seed<select [name]="'assigned-seed-' + i" [(ngModel)]="song.assignedSeed" [attr.aria-label]="'Seed for ' + song.title"><option [ngValue]="null">Choose seed</option><option *ngFor="let rank of seedRanks" [ngValue]="rank">{{ rank }}</option></select></label>
+            <button type="button" class="cancel" (click)="openSongModal(i)" [attr.aria-label]="'Edit ' + song.title">Edit</button>
+            <button type="button" class="cancel" (click)="removeSong(i)" [attr.aria-label]="'Remove ' + song.title">Remove</button>
+          </div>
+        </li>
+      </ol>
+      <button class="add-song" type="button" (click)="openSongModal()">ADD SONG</button>
+    </section>
+      <p class="field-error" *ngIf="modalErrors['songs']" role="alert">{{ modalErrors['songs'] }}</p><div class="song-modal-actions"><button class="add-song" type="button" (click)="saveSongSettings()" [disabled]="songSaving || !!modalSaving">{{ modalSaving === 'songs' ? 'SAVING…' : 'Save Changes' }}</button><button class="cancel" type="button" (click)="closeSongsManager()" [disabled]="songSaving || !!modalSaving">Close</button></div>
+    </dialog>
+    <dialog #songOrderDialog id="song-order-dialog" class="song-dialog" aria-labelledby="song-order-title" (cancel)="songOrderSaving && $event.preventDefault()">
+      <h3 id="song-order-title">Reorder Songs</h3>
+      <p class="hint">Move songs up or down, or choose a position. Without seeds or randomization, positions 1 and 2 face each other, then 3 and 4, and so on. Save Changes saves the song order immediately. Songs in current or past matchups are locked and cannot be moved or shifted.</p>
+      <p class="hint" *ngIf="useSeeds || randomizeSongs">Seeds or randomization are enabled. Those settings determine matchup placement instead of this list order.</p>
+      <p class="matchup-order-note" *ngIf="!useSeeds && !randomizeSongs">Each pair is a first-round matchup. Moving a song updates these pairings.</p>
+      <ol class="added-songs" [class.matchup-pairs]="!useSeeds && !randomizeSongs">
+        <li *ngFor="let song of songOrderDraft; let i=index" [class.pair-start]="i % 2 === 0" [class.pair-end]="i % 2 === 1"><span class="pair-label" *ngIf="!useSeeds && !randomizeSongs && i % 2 === 0">MATCHUP {{ i / 2 + 1 }}</span><span class="pair-versus" *ngIf="!useSeeds && !randomizeSongs && i % 2 === 1">VS.</span><div>{{ i + 1 }}. {{ song.title }}<small *ngIf="song.album">{{ song.album }}</small><small *ngIf="song.reorderLocked">Order locked · Current or past matchup</small></div>
+          <div class="song-row-actions">
+            <button class="cancel" type="button" (click)="moveSong(i,i-1)" [disabled]="!canMoveSong(i,i-1)" [attr.aria-label]="'Move ' + song.title + ' up'">↑ Up</button>
+            <button class="cancel" type="button" (click)="moveSong(i,i+1)" [disabled]="!canMoveSong(i,i+1)" [attr.aria-label]="'Move ' + song.title + ' down'">↓ Down</button>
+            <label class="seed-assignment">Position<select [ngModel]="i" [ngModelOptions]="{standalone:true}" (ngModelChange)="moveSong(i,+$event)" [disabled]="songOrderSaving || !!song.reorderLocked" [attr.aria-label]="'Position for ' + song.title"><option *ngFor="let position of songOrderPositions" [ngValue]="position" [disabled]="position !== i && !canMoveSong(i,position)">{{ position+1 }}</option></select></label>
+          </div>
+        </li>
+      </ol>
+      <p class="field-error" *ngIf="songOrderError" role="alert">{{ songOrderError }}</p>
+      <div class="song-modal-actions"><button class="add-song" type="button" (click)="saveSongOrder()" [disabled]="songOrderSaving">{{ songOrderSaving ? 'SAVING…' : 'Save Changes' }}</button><button class="cancel" type="button" (click)="closeSongOrder()" [disabled]="songOrderSaving">Cancel</button></div>
+    </dialog>
+    <dialog #seedingDialog id="seeding-dialog" class="song-dialog" aria-labelledby="seeding-title" (cancel)="!!modalSaving && $event.preventDefault()">
+      <h3 id="seeding-title">Manage Seeding</h3>
+      <p class="hint">Select songs across any groups, choose a seed, and click Assign selected. Each seed needs {{ songCount / seedingSize }} songs. Save Changes saves assignments immediately.</p>
+      <div class="seeding-toolbar">
+        <label>Search songs<input name="seedingSearch" type="search" [(ngModel)]="seedingSearch" placeholder="Song, album, or category"></label>
+        <button class="cancel" type="button" (click)="selectVisibleSeeding()">Select visible</button>
+        <button class="cancel" type="button" (click)="seedingSelected.clear()" [disabled]="!seedingSelected.size">Clear selection</button>
+        <label>Assign selected to<select name="seedingTarget" [(ngModel)]="seedingTarget"><option [ngValue]="null">Unassigned</option><option *ngFor="let rank of seedRanks" [ngValue]="rank">Seed {{ rank }}</option></select></label>
+        <button class="add-song" type="button" (click)="applyBulkSeed()" [disabled]="!seedingSelected.size || seedingAssignmentOverflow">Assign selected ({{ seedingSelected.size }})</button>
+      </div>
+      <p class="field-error" *ngIf="seedingAssignmentOverflow" role="status">Seed {{ seedingTarget }} has {{ seedingTargetRemaining }} {{ seedingTargetRemaining === 1 ? 'space' : 'spaces' }} remaining. Select fewer songs or choose another seed.</p>
+      <p class="field-error" *ngIf="seedingOverCapacity" role="alert">A seed group is over capacity. Move extra songs to another group or Unassigned before saving.</p>
+      <p class="seeding-warning" *ngIf="seedingIncomplete" role="status">Assignments are incomplete or uneven. Each seed needs {{ songCount / seedingSize }} songs before the bracket can be submitted.</p>
+      <div class="seeding-grid">
+        <section class="seeding-group" *ngFor="let rank of seedingGroups" [class.incomplete]="rank !== null && seedingGroupCount(rank) !== songCount / seedingSize" [attr.data-seed]="rank === null ? 'unassigned' : rank">
+          <h4>{{ rank === null ? 'Unassigned' : 'Seed ' + rank }} <small>{{ seedingGroupCount(rank) }}{{ rank === null ? ' songs' : ' / ' + songCount / seedingSize }}</small></h4>
+          <label class="seeding-song" *ngFor="let entry of seedingGroupSongs(rank); trackBy: trackSeedingSong"><input type="checkbox" [checked]="seedingSelected.has(entry.index)" (change)="toggleSeedingSong(entry.index,$any($event.target).checked)"><span>{{ entry.song.title }}<small *ngIf="entry.song.album">{{ entry.song.album }}</small></span></label>
+          <p class="hint" *ngIf="!seedingGroupSongs(rank).length">{{ seedingSearch ? 'No matching songs' : 'No songs assigned' }}</p>
+        </section>
+      </div>
+      <p class="field-error" *ngIf="modalErrors['seeding']" role="alert">{{ modalErrors['seeding'] }}</p><div class="song-modal-actions"><button class="add-song" type="button" (click)="saveSeeding()" [disabled]="seedingOverCapacity || !!modalSaving">{{ modalSaving === 'seeding' ? 'SAVING…' : 'Save Changes' }}</button><button class="cancel" type="button" (click)="closeSeeding()" [disabled]="!!modalSaving">Cancel</button></div>
+    </dialog>
+    <dialog #seedHelpDialog id="seed-help-dialog" class="song-dialog seed-help-dialog" aria-labelledby="seed-help-title">
+      <span class="stat-label">BRACKET SEEDING</span><h3 id="seed-help-title">How seeds work</h3>
+      <p>Seeds rank songs to help avoid eliminating big contenders early. A #1 seed is ranked higher than a #2 seed.</p>
+      <p>Choose a seed range, then assign a seed to every song. Each seed must have the same number of songs. For example, a 16-song bracket with a range of 4 has four #1 seeds, four #2 seeds, four #3 seeds, and four #4 seeds.</p>
+      <h4>Randomizing songs within each seed</h4>
+      <p>When Use Seeds and Randomize Songs are both selected, songs are shuffled within their seed groups: the four #1 seeds are randomized among themselves, then the four #2 seeds, and so on. Songs keep their assigned seed.</p>
+      <p>The opening matchups pair the highest seeds against the lowest seeds. With seeds 1–8, the pairings are <strong>1 vs. 8, 2 vs. 7, 3 vs. 6, and 4 vs. 5.</strong> Higher seeds are spread across the bracket. If you choose Randomize Each Round, advancing songs are shuffled within equal seed groups and the highest remaining seeds face the lowest remaining seeds.</p>
+      <h4>Using seeds to break ties</h4>
+      <p>Seeds can also decide a tied vote automatically. In Tiebreaker option, choose <strong>Seed (higher seed wins, #1 beats #2)</strong> or <strong>Seed (lower seed wins, #2 beats #1)</strong>. If both songs have the same seed, a random draw breaks the tie. You can still choose Random or Admin pick instead.</p>
+      <p>If you aren’t randomizing songs and don’t want to use seeds as tiebreakers, you probably don’t need to use seeds.</p>
+      <div class="song-modal-actions"><button class="add-song" type="button" (click)="closeSeedHelp()" autofocus>GOT IT</button></div>
+    </dialog>
+    <dialog #randomizationDialog class="song-dialog participants-dialog" aria-labelledby="randomization-title" (cancel)="$event.preventDefault();cancelRandomizationOptions()">
+      <span class="stat-label">SONG ORDER & MATCHUPS</span><h3 id="randomization-title">Randomize Songs</h3>
+      <label class="randomization-choice"><input type="radio" name="randomizationOption" [(ngModel)]="randomizationDraft" value="round1"><span><strong>Random Round 1 Only</strong><small>Shuffle the first-round song order and matchups once. Later rounds follow those winners through the bracket. If seeding is used, the order is randomized within each seed group.</small></span></label>
+      <label class="randomization-choice"><input type="radio" name="randomizationOption" [(ngModel)]="randomizationDraft" value="each_round"><span><strong>Randomize Each Round</strong><small>Shuffle Round 1, then shuffle each later round only after every winner from the preceding round is known. Pairings are saved once drawn. If seeding is used, the order is randomized within each seed group.</small></span></label>
+      <p class="hint">Save Changes saves this option immediately. Changing it after votes exist requires confirming a tournament rebuild.</p>
+      <p class="field-error" *ngIf="modalErrors['randomization']" role="alert">{{ modalErrors['randomization'] }}</p><div class="song-modal-actions"><button class="add-song" type="button" (click)="saveRandomizationOptions()" [disabled]="!!modalSaving">{{ modalSaving === 'randomization' ? 'SAVING…' : 'Save Changes' }}</button><button class="cancel" type="button" (click)="cancelRandomizationOptions()" [disabled]="!!modalSaving">Cancel</button></div>
+    </dialog>
+    <dialog #participantsDialog class="song-dialog participants-dialog" aria-labelledby="participants-modal-title" (cancel)="participantSaving && $event.preventDefault()">
+      <span class="stat-label">BRACKET PARTICIPANTS</span>
+      <h3 id="participants-modal-title">Participants</h3>
+      <div class="participant-summary"><span aria-live="polite">{{ participantDraftIds.length }} selected</span><button class="cancel" type="button" (click)="selectAllParticipants()" [disabled]="!members.length || participantSaving">{{ allParticipantsSelected ? 'Deselect all' : 'Select all' }}</button></div>
+      <div class="participants" role="group" aria-label="Participants">
+        <div class="participant-email-row" *ngFor="let member of members">
+          <label><input type="checkbox" [disabled]="participantSaving" [checked]="participantDraftIds.includes(member.userId)" (change)="toggleParticipant(member.userId,$any($event.target).checked)"> {{ member.displayName }}</label>
+          <input type="email" [id]="'participant-email-' + member.userId" [name]="'participant-email-' + member.userId" [(ngModel)]="participantEmails[member.userId]" [disabled]="participantSaving" maxlength="254" [attr.aria-label]="member.displayName + ' email'" autocomplete="off">
+        </div>
+      </div>
+      <p class="hint" *ngIf="!members.length">No family members are available.</p>
+      <p class="field-error" *ngIf="participantModalError" role="alert">{{ participantModalError }}</p>
+      <p class="hint">Save Changes saves participant selections and email updates together immediately.</p>
+      <div class="song-modal-actions"><button class="add-song" type="button" [disabled]="participantSaving" (click)="saveParticipants()">{{ participantSaving ? 'SAVING…' : 'SAVE CHANGES' }}</button><button class="cancel" type="button" [disabled]="participantSaving" (click)="closeParticipantsModal()">Cancel</button></div>
+    </dialog>
+    <dialog #songDialog class="song-dialog" aria-labelledby="song-dialog-title" (close)="onSongModalClosed()" (cancel)="songSaving && $event.preventDefault()">
+      <span class="stat-label">{{ editingSongIndex === null ? 'NEW SONG' : 'EDIT SONG' }}</span>
+      <h3 id="song-dialog-title">{{ editingSongIndex === null ? 'Add a song' : 'Edit song' }}</h3>
+      <form ngNativeValidate (ngSubmit)="addSong()">
+        <div class="song-fields">
+          <label>Song title<input name="songTitle" [(ngModel)]="songDraft.title" required maxlength="200"></label>
+          <label>Album<select name="songAlbum" [(ngModel)]="songDraft.albumId"><option [ngValue]="null">No album</option><option *ngFor="let album of albums" [ngValue]="album.albumId">{{ album.title }}{{ album.year ? ' · ' + album.year : '' }}</option></select></label>
+          <label *ngIf="!useSeeds">Seed (optional)<input name="songSeed" [(ngModel)]="songDraft.seed" type="number" inputmode="numeric" min="1" max="16" step="1" (keydown)="seedKeydown($event)" (beforeinput)="seedBeforeInput($event)" (paste)="seedPaste($event)" placeholder="Auto" title="Whole number from 1 to 16; leave blank for automatic seeding"></label>
+          <label>YouTube URL<input name="songYoutube" [(ngModel)]="songDraft.youtubeUrl" type="url" maxlength="2048" placeholder="https://youtube.com/watch?v=…"></label>
+          <label>Spotify URL<input name="songSpotify" [(ngModel)]="songDraft.spotifyUrl" type="url" maxlength="2048" placeholder="https://open.spotify.com/track/…"></label>
+          <label>Category<input name="songCategory" [(ngModel)]="songDraft.category" maxlength="255" autofocus></label>
+        </div>
+        <p class="field-error" role="alert" *ngIf="songError">{{ songError }}</p>
+        <div class="song-modal-actions">
+          <button class="add-song" type="submit" [disabled]="songSaving">{{ songSaving ? 'SAVING…' : 'SAVE CHANGES' }}</button>
+          <button class="cancel" type="button" (click)="closeSongModal()" [disabled]="songSaving">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog #removeSongDialog class="song-dialog" aria-labelledby="remove-song-title" (cancel)="songSaving && $event.preventDefault()">
+      <h3 id="remove-song-title">Remove song?</h3>
+      <p>Are you sure you want to remove “{{ removalIndex !== null ? songs[removalIndex]?.title : '' }}” from this bracket?</p>
+      <p class="field-error" role="alert" *ngIf="removalError">{{ removalError }}</p>
+      <div class="song-modal-actions">
+        <button class="add-song" type="button" [disabled]="songSaving" (click)="confirmRemoveSong()">{{ songSaving ? 'REMOVING…' : 'YES, REMOVE' }}</button>
+        <button class="cancel" type="button" [disabled]="songSaving" (click)="closeRemovalModal()" autofocus>No, keep song</button>
+      </div>
+    </dialog>
+    <dialog #sessionSettingsDialog id="session-settings-dialog" class="song-dialog session-settings-dialog" aria-labelledby="session-settings-title" (close)="sessionModalOpen=false" (cancel)="(sessionsSaving || saving) && $event.preventDefault()">
+      <ng-container *ngIf="sessionModalOpen"><ng-container *ngTemplateOutlet="sessionToastTemplate"></ng-container></ng-container>
+      <h3 id="session-settings-title">Manage Sessions</h3>
+      <p class="hint">The individual sessions update automatically as you change these settings. Save session dates saves the scheduling settings and individual dates together. Drafts remain drafts.</p>
+      <div class="form-grid">
+      <div class="field">
+        <label for="start-date">Start date and time <span aria-hidden="true">*</span></label>
+        <input id="start-date" name="startAt" type="datetime-local" [(ngModel)]="startAt" (ngModelChange)="refreshFieldErrors(); updateSessionPreview()" [class.invalid-control]="!!fieldErrors.startAt" [attr.aria-invalid]="!!fieldErrors.startAt" aria-describedby="start-date-error" required>
+        <p class="field-error" id="start-date-error" *ngIf="fieldErrors.startAt" role="alert">{{ fieldErrors.startAt }}</p>
+      </div>
+      <div class="field"><label for="finale-date">Finale Date</label><input id="finale-date" name="finaleDate" type="date" [(ngModel)]="finaleDate" (ngModelChange)="updateSessionPreview()"><span class="hint">Optional: the day the group will meet. The admin starts Finale Mode manually.</span></div>
+      <div class="field"><label for="finale-start-round">Round Finale Begins</label><select id="finale-start-round" name="finaleStartRound" [(ngModel)]="finaleStartRound" (ngModelChange)="updateSessionPreview()"><option [ngValue]="null">No scheduled finale</option><option *ngFor="let round of finaleRoundOptions; trackBy: trackFinaleRound" [ngValue]="round.roundNumber">{{ round.name }}</option></select><span class="hint">Online voting ends after the preceding round. The selected round and later rounds are reserved for the finale.</span></div>
+      <div class="field">
+        <label for="session-matchups">Matchups per session</label>
+        <select id="session-matchups" [(ngModel)]="songsPerSession" (ngModelChange)="updateSessionPreview()">
+          <option [ngValue]="2">2 matchups (4 songs)</option>
+          <option [ngValue]="4">4 matchups (8 songs)</option>
+          <option [ngValue]="8">8 matchups (16 songs)</option>
+        </select>
+        <span class="hint">Each session opens for voting as scheduled.</span>
+      </div>
+      <div class="field">
+        <label for="session-timer-mode">Time per session</label>
+        <select id="session-timer-mode" name="noSessionTimer" [ngModel]="noSessionTimer" (ngModelChange)="changeSessionTimerMode($event)"><option [ngValue]="false">Set a session timer</option><option [ngValue]="true">No timer — advance when all votes are cast</option></select>
+        <span class="hint" *ngIf="noSessionTimer">The next week opens automatically once every participant has submitted a vote for each matchup. Admins can also advance the week manually.</span>
+        <div *ngIf="!noSessionTimer" style="display:flex;gap:8px">
+          <input id="duration-value" aria-label="Session duration" type="number" min="1" step="1" [ngModel]="durationValue" (ngModelChange)="changeSessionDuration($event)" style="width:100px">
+          <select aria-label="Duration unit" [ngModel]="durationUnit" (ngModelChange)="changeSessionDurationUnit($event)">
+            <option value="minutes">Minutes</option>
+            <option value="hours">Hours</option>
+            <option value="days">Days</option>
+            <option value="weeks">Weeks</option>
+          </select>
+        </div>
+      </div>
+      </div>
+    <section class="manage-sessions" aria-labelledby="manage-sessions-title">
+      <span class="stat-label">BRACKET SCHEDULE</span><h3 id="manage-sessions-title">Individual sessions</h3>
+      <p class="hint" *ngIf="!sessions.length">Choose the bracket size and session settings to preview its schedule.</p>
+      <ng-container *ngIf="sessions.length"><p class="hint" *ngIf="sessionSettingsNeedSaving">The session list below updates automatically. Click Save session dates to keep these settings and date edits.</p>
+        <p class="hint">You can edit the previewed start and end of each session. Sessions cannot overlap. Moving an undecided session’s end into the past closes its voting when saved.</p>
+        <p class="hint" *ngIf="sessionsNoTimer">Untimed sessions can have no end date. Leave a future start blank to open it automatically after the preceding session is decided.</p>
+        <p class="hint" *ngIf="sessionsPaused">This bracket is on hold. Scheduled dates will shift forward by the hold duration when it resumes.</p>
+        <div class="session-list"><div class="session-row" *ngFor="let session of onlineSessions">
+          <div><strong>Week {{ session.weekNumber }}</strong><small>{{ session.roundName }} · {{ session.matchupCount }} {{ session.matchupCount === 1 ? 'matchup' : 'matchups' }}</small><small>{{ session.state }}</small></div>
+          <label>Starts<input type="datetime-local" step="1" [name]="'session-start-' + session.weekId" [(ngModel)]="session.startInput" [disabled]="sessionsSaving" [attr.aria-label]="'Week ' + session.weekNumber + ' start'"><small *ngIf="!session.startInput && sessionsNoTimer">After the previous session</small></label>
+          <label>Ends<input type="datetime-local" step="1" [name]="'session-end-' + session.weekId" [(ngModel)]="session.endInput" [disabled]="sessionsSaving" [attr.aria-label]="'Week ' + session.weekNumber + ' end'"><small *ngIf="!session.endInput && sessionsNoTimer">No timer</small></label>
+        </div></div>
+        <section class="finale-session-summary" *ngIf="finaleSessionSummary as finale" aria-label="Finale Week">
+          <div><strong>Finale Week</strong><small>{{ finale.roundRange }}</small><small>{{ finale.matchupCount }} {{ finale.matchupCount === 1 ? 'matchup' : 'matchups' }}</small></div>
+          <div class="finale-session-date"><span>Finale Date</span><strong>{{ finaleDate ? (finaleDate | date:'mediumDate') : 'Choose a Finale Date above' }}</strong></div>
+        </section>
+      </ng-container>
+    </section>
+      <div class="session-date-actions"><button class="save" type="button" *ngIf="sessions.length" (click)="saveSessionDates()" [disabled]="sessionsSaving || saving || !canSaveSessionDates">{{ sessionsSaving ? 'Saving…' : 'Save session dates' }}</button><button class="cancel" type="button" (click)="closeSessionSettings()" [disabled]="sessionsSaving || saving">Close</button></div>
+    </dialog>
+    <p class="hint" *ngIf="canSaveDraft">Save as draft only requires Title and Theme. You can finish the remaining fields later.</p>
+    <div class="footer"><button class="save" type="button" (click)="save()" [disabled]="saving || sessionsSaving">{{ saving && !savingDraft ? 'Saving…' : editingId ? 'Save changes' : 'Create bracket' }}</button><button class="cancel" type="button" *ngIf="canSaveDraft" (click)="saveAsDraft()" [disabled]="saving || sessionsSaving" title="Save your unfinished bracket">{{ savingDraft ? 'Saving draft…' : 'Save as draft' }}</button><button class="cancel" type="button" (click)="closeForm()" [disabled]="saving || sessionsSaving">Cancel</button></div>
+  </article>
+
+  <div class="empty" *ngIf="loading">Loading brackets…</div>
+  <div class="empty" *ngIf="pageMode === 'list' && !loading && brackets.length===0">No brackets yet. Create one to get started.</div>
+  <div class="list" *ngIf="pageMode === 'list' && !loading && brackets.length">
+    <article class="card" *ngFor="let bracket of brackets"><div><h2>{{ bracket.title }}</h2><div class="muted">{{ bracket.artist }} · {{ bracket.songCount }} songs · {{ bracket.pausedAt ? 'on hold' : bracket.status }}<span *ngIf="bracket.startAt && bracket.status !== 'complete'"> · starts {{ bracket.startAt | date:'medium' }}</span></div><div class="muted">Tiebreaker option: {{ tiebreakerLabels[bracket.tiebreakerOption] }}</div></div><div class="actions"><button *ngIf="bracket.status === 'active'" [disabled]="pauseSavingId === bracket.bracketId" (click)="togglePaused(bracket)">{{ pauseSavingId === bracket.bracketId ? 'Saving…' : bracket.pausedAt ? 'Resume' : 'Pause' }}</button><button (click)="edit(bracket)">Edit</button><button (click)="duplicateBracket(bracket)" [disabled]="duplicatingId != null">{{ duplicatingId === bracket.bracketId ? 'Duplicating…' : 'Duplicate' }}</button><button (click)="remove(bracket)" [disabled]="deletingBracketIds.has(bracket.bracketId)">{{ deletingBracketIds.has(bracket.bracketId) ? 'Deleting…' : 'Delete' }}</button></div></article>
+  </div>
+</section>
+
+<dialog #historyResetDialog class="song-dialog" aria-labelledby="history-reset-title">
+  <h3 id="history-reset-title">Rebuild bracket and clear voting history?</h3>
+  <p class="error">{{ resetWarning }}</p>
+  <p>This cannot be undone. Everyone will need to vote again. Cancel keeps the existing bracket and votes.</p>
+  <div class="song-modal-actions"><button class="add-song" type="button" (click)="confirmHistoryReset()">Rebuild and clear history</button><button class="cancel" type="button" (click)="cancelHistoryReset()" autofocus>Cancel</button></div>
+</dialog>

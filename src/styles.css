@@ -1,0 +1,3 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import './app/site.css';
+:root{font-family:'DM Sans',sans-serif;color:#282922;background:#f7f6f2;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;font-optical-sizing:auto;font-weight:400}*{box-sizing:border-box}body{margin:0;min-width:320px}button{font:inherit}button:focus-visible,[tabindex]:focus-visible{outline:2px solid #bd7050;outline-offset:3px}::selection{background:#e6c8a7;color:#282922}

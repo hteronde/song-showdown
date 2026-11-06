@@ -1,0 +1,1 @@
+ALTER TABLE brackets MODIFY COLUMN start_at DATETIME(6) NULL;

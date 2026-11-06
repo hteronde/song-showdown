@@ -1,0 +1,127 @@
+<div class="page-wrap history-page">
+  <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">◷</span> THE FAMILY ARCHIVE <span class="eyebrow-divider">·</span> PAST & PRESENT</div><h1>Every bracket<br><em>has a story.</em></h1><p class="hero-subtitle">Look back at the songs, surprises, and family champions.</p></section>
+  <div class="history-heading"><div><span class="stat-label">YOUR COLLECTION</span><h2>Bracket history</h2></div><span class="history-count">{{ historyBrackets.length + 1 }} BRACKETS</span></div>
+  <div class="notice-bar" *ngIf="historyLoading"><span class="notice-icon">◌</span><span>Loading bracket history from the database…</span></div>
+  <div class="notice-bar" *ngIf="historyError"><span class="notice-icon">!</span><span>{{ historyError }}</span></div>
+  <section class="history-list" *ngIf="!isBracketDetailOpen">
+    <article class="history-card current-history"><div class="history-card-top"><div class="history-band-icon fleetwood-icon">FM</div><div class="history-card-title"><span>FLEETWOOD MAC</span><strong>Song Showdown</strong><small>2025 · 8 songs · Week 1 of 2</small></div><span class="archive-status ongoing"><i></i> IN PROGRESS</span></div><div class="history-card-bottom"><span>Two matchups open this week</span><button (click)="returnToBracket.emit()">Return to bracket ↗</button></div></article>
+    <article class="history-card" *ngFor="let bracket of historyBrackets">
+      <div class="history-card-top">
+        <img class="history-bracket-logo" *ngIf="bracket.logoUrl && !failedAlbumCovers.has(bracket.logoUrl!)" [src]="bracket.logoUrl" [alt]="bracket.artist + ' logo'" loading="lazy" referrerpolicy="no-referrer" (error)="albumCoverFailed(bracket.logoUrl!)">
+        <div class="history-band-icon" *ngIf="!bracket.logoUrl || failedAlbumCovers.has(bracket.logoUrl!)" [class.beatles-icon]="bracket.artist === 'The Beatles'" [class.cake-icon]="bracket.artist === 'Cake'">{{ bracket.artist === 'The Beatles' ? '♫' : (bracket.artist | slice:0:2 | uppercase) }}</div>
+        <div class="history-card-title">
+          <span>{{ bracket.artist | uppercase }}</span>
+          <strong>{{ bracket.title }}</strong>
+          <small>{{ bracket.bracketYear ? bracket.bracketYear + ' · ' : '' }}{{ bracket.songCount }} songs · {{ bracket.roundCount }} rounds · {{ bracket.status | uppercase }}</small>
+        </div>
+        <span class="archive-status" [class.complete]="bracket.status === 'complete'" [class.ongoing]="bracket.status === 'active'"><i></i> {{ bracket.status | uppercase }}</span>
+      </div>
+      <div class="history-card-bottom"><span>{{ bracket.songCount }} song field</span><button (click)="openBracket(bracket)">View bracket ↗</button></div>
+    </article>
+    <div class="notice-bar" *ngIf="!historyLoading && !historyBrackets.length && !historyError"><span class="notice-icon">◉</span><span>No database brackets have been added yet.</span></div>
+  </section>
+  <section class="history-detail" *ngIf="isBracketDetailOpen">
+    <button class="back-link" (click)="showAllBrackets()">← All brackets</button>
+    <div class="history-detail-head"><div><div class="eyebrow small-eyebrow">{{ selectedBracket?.artist | uppercase }} <span class="eyebrow-divider">·</span> {{ selectedBracket?.status | uppercase }} BRACKET</div><h2>{{ selectedBracket?.songCount || 0 }} songs. Family favorite.</h2></div><button class="finale-action" *ngIf="isAdmin && (finaleSessionActive || finaleSessionPaused)" [disabled]="finaleSaving" (click)="openParticipantEditor()">Edit participants</button><button class="finale-action" *ngIf="isAdmin && finaleSessionActive" [disabled]="finaleSaving" (click)="exitFinale()">Exit finale mode</button><button class="finale-action" *ngIf="isAdmin && finaleSessionPaused" [disabled]="finaleSaving" (click)="resumeFinale()">Resume finale mode</button><button class="finale-action" *ngIf="isAdmin && !finaleSessionActive && !finaleSessionPaused" (click)="finaleSetupOpen = !finaleSetupOpen">Run finale mode</button><span class="archive-status" [class.complete]="selectedBracket?.status === 'complete'"><i></i> {{ finaleSessionActive ? 'FINALE MODE' : (finaleSessionPaused ? 'FINALE PAUSED' : (selectedBracket?.status | uppercase)) }}</span></div>
+    <section class="finale-setup" *ngIf="isAdmin && editParticipantsOpen && finaleOptions">
+      <div><span class="stat-label">FINALE ROSTER</span><h3>Edit participants</h3></div>
+      <p>Choose eligibility for earlier rounds and for the finale independently. Changing either flag keeps general bracket membership. Removed participants have their ballots cleared from those rounds; decided winners stay as recorded.</p>
+      <div class="finale-participants roster-editor">
+        <div class="roster-line" *ngFor="let person of bracketMembers">
+          <strong>{{ person.displayName }}</strong>
+          <label><input type="checkbox" [checked]="nonFinaleParticipantIds.includes(person.userId)" (change)="toggleNonFinaleParticipant(person.userId)"><span>Earlier rounds</span></label>
+          <label><input type="checkbox" [checked]="finaleParticipantIds.includes(person.userId)" (change)="toggleParticipant(person.userId)"><span>Finale</span></label>
+        </div>
+      </div>
+      <div class="finale-editor-actions"><button class="finale-secondary" [disabled]="finaleSaving" (click)="cancelParticipantEdits()">Cancel</button><button class="finale-action" [disabled]="finaleSaving || !finaleParticipantIds.length" (click)="saveParticipantEdits()">{{ finaleSaving ? 'Saving…' : 'Save participants' }}</button></div>
+    </section>
+    <section class="finale-setup" *ngIf="isAdmin && finaleSetupOpen && finaleOptions">
+      <div><span class="stat-label">FINALE SETUP</span><h3>Choose where in-person voting begins</h3></div>
+      <label class="finale-round">Starting round<select [(ngModel)]="finaleRoundNumber"><option *ngFor="let round of finaleOptions.rounds" [ngValue]="round.roundNumber">{{ round.name }} ({{ round.roundNumber }})</option></select></label>
+      <p>Select everyone who voted in the finale. Prior voters are preselected when available.</p>
+      <div class="finale-participants"><label *ngFor="let person of finaleOptions.participants"><input type="checkbox" [checked]="finaleParticipantIds.includes(person.userId)" (change)="toggleParticipant(person.userId)"><span>{{ person.displayName }}</span><small>{{ person.voteCount }} prior votes</small></label></div>
+      <button class="finale-action" [disabled]="finaleSaving || !finaleParticipantIds.length" (click)="beginFinale()">{{ finaleSaving ? 'Starting…' : 'Start finale mode' }}</button>
+    </section>
+    <div class="finale-notice" *ngIf="finaleNotice">{{ finaleNotice }}</div>
+    <app-bracket-champion [bracketId]="selectedBracket?.bracketId || 0" [champion]="bracketChampion" [celebrate]="celebrateChampion"></app-bracket-champion>
+    <div class="notice-bar" *ngIf="!bracketChampion && selectedBracket"><span class="notice-icon">◉</span><span>The database does not have a championship winner recorded yet.</span></div>
+    <section class="playlist-section" *ngIf="bracketPlaylists.length && !finaleSessionActive && !finaleSessionPaused" aria-label="Bracket playlists">
+      <div class="history-subhead"><div><span class="stat-label">LISTEN ALONG</span><h3>Bracket playlists</h3></div></div>
+      <div class="playlist-links">
+        <a class="playlist-link" *ngFor="let playlist of bracketPlaylists" [href]="playlist.playlistUrl" target="_blank" rel="noopener noreferrer">
+          <span class="playlist-scope">{{ playlist.weekNumber === null ? 'WHOLE BRACKET' : 'WEEK ' + playlist.weekNumber }}</span>
+          <span class="playlist-name">{{ playlist.playlistName }}</span>
+          <span class="playlist-open">OPEN PLAYLIST ↗</span>
+        </a>
+      </div>
+    </section>
+    <div class="history-subhead"><div><span class="stat-label">TOURNAMENT HISTORY</span><h3>Every recorded matchup</h3></div><span class="history-count">{{ selectedBracket?.songCount || 0 }} SONGS · {{ historyRounds.length }} ROUNDS</span></div>
+    <p class="no-vote-history" *ngIf="selectedBracket?.randomizationMode === 'each_round'">Matchups were redrawn between rounds. Each round shows its saved pairings.</p>
+    <label class="bracket-round-filter">Show from round
+      <select [(ngModel)]="firstVisibleRound" [ngModelOptions]="{standalone:true}"><option *ngFor="let round of historyRounds" [ngValue]="round.roundNumber">{{ round.roundNumber === 1 ? 'All rounds' : round.name }}</option></select>
+    </label>
+    <section #bracketBoard class="history-tournament" [class.redrawn-rounds]="selectedBracket?.randomizationMode === 'each_round'" aria-label="Complete tournament bracket" *ngIf="matchupCount" [style.grid-template-columns]="'repeat(' + visibleRounds.length + ', minmax(220px, 1fr))'" [style.--history-row-count]="visibleRounds[0]?.matches?.length || 1">
+      <div [appBracketConnectors]="connectorMatches"></div>
+      <div class="history-round" *ngFor="let round of visibleRounds; let roundIndex = index">
+        <h3>{{ round.name }}</h3>
+        <div class="history-round-games">
+          <article class="history-match" [attr.data-matchup-id]="match.matchupId" *ngFor="let match of round.matches" [style.grid-row]="'span ' + visibleRoundSpan(round.roundNumber)" [style.--feeder-offset]="visibleRoundSpan(round.roundNumber) * 60 + 'px'" [class.admin-editable]="canEditHistoryBallots(match)" [class.finale-ready]="canOpenMatch(match.roundNumber)" role="button" tabindex="0" [attr.aria-label]="(canViewBallots ? 'View votes for ' : 'View result for ') + match.left + ' versus ' + match.right" (click)="openHistoryVotes(match)" (keydown.enter)="openHistoryVotes(match)" (keydown.space)="$event.preventDefault(); openHistoryVotes(match)">
+            <div class="history-game-label">{{ matchupWeekLabel(match) }} · MATCHUP {{ match.matchupNumber }}</div>
+            <div class="history-team" [class.game-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId"><span>{{ match.left }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId">✓</b></div>
+            <div class="history-team" [class.game-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId"><span>{{ match.right }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId">✓</b></div>
+            <div class="history-result" *ngIf="match.selectedEntryId != null">Your vote: {{ match.selectedEntryId === match.leftEntryId ? match.left : match.right }}</div>
+            <div class="history-result" *ngIf="match.winnerEntryId">{{ match.winner }} {{ round.roundNumber === historyRounds[historyRounds.length - 1].roundNumber ? 'wins the championship' : 'advances' }}<ng-container *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null"> · {{ matchTally(match) }}</ng-container> <span class="random-tie-badge" *ngIf="match.randomTiebreakerVoteEntryId">TIE</span></div>
+            <p class="random-tie-note" *ngIf="match.randomTiebreakerVoteEntryId">The participants voting ended in a tie. Tie was broken randomly.</p>
+            <div class="history-result pending" *ngIf="!match.winnerEntryId">Winner pending</div>
+            <div class="view-votes-hint">{{ canViewBallots ? 'View votes ↗' : 'View result ↗' }}</div>
+          </article>
+        </div>
+      </div>
+    </section>
+    <div class="notice-bar" *ngIf="selectedBracket && !matchupCount"><span class="notice-icon">◉</span><span>The bracket songs are linked, but no matchups have been recorded yet.</span></div>
+    <div class="bracket-key"><span><i></i> Advances to the next round</span><span>Scroll horizontally to follow the bracket</span></div>
+  </section>
+  <footer class="page-footer"><span>THE SONGS WE STILL ARGUE ABOUT <b>✳</b></span><span>FAMILY BRACKET ARCHIVE</span></footer>
+</div>
+
+<app-admin-ballot-editor *ngIf="isAdmin" (saved)="historyBallotsSaved()"></app-admin-ballot-editor>
+
+<dialog #historyVotesDialog class="history-votes-dialog" aria-labelledby="history-votes-title">
+  <ng-container *ngIf="voteHistoryMatch as match">
+    <span class="history-votes-label">{{ matchupWeekLabel(match) }} · MATCHUP {{ match.matchupNumber }}</span>
+    <p class="no-vote-history" *ngIf="match.selectedEntryId != null">Your vote: {{ match.selectedEntryId === match.leftEntryId ? match.left : match.right }}</p>
+    <h2 id="history-votes-title">{{ canViewBallots ? 'Who voted for each song' : 'Matchup result' }}</h2>
+    <div class="history-vote-tally" *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null">{{ matchTally(match) }} <span class="random-tie-badge" *ngIf="match.randomTiebreakerVoteEntryId">TIE</span></div>
+    <p class="random-tie-note" *ngIf="match.randomTiebreakerVoteEntryId">The participants voting ended in a tie. Tie was broken randomly.</p>
+    <p class="no-vote-history" *ngIf="!canViewBallots">Voting is anonymous. You can see your own vote; other participants’ votes are hidden.</p>
+    <p class="no-vote-history" *ngIf="canViewBallots && match.reportedVoteCountA != null">Historical totals are preserved. Only voters whose choices are known are listed below.</p>
+    <p class="no-vote-history" *ngIf="canViewBallots && !match.ballots.length && match.reportedVoteCountA == null">No submitted votes were recorded for this matchup.</p>
+    <div class="history-vote-columns">
+      <section class="history-vote-song" [class.history-vote-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId">
+        <app-song-album-art [url]="match.leftAlbumCoverUrl" [title]="match.left"></app-song-album-art>
+        <h3>{{ match.left }} <span *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId">✓</span></h3>
+        <div class="history-vote-tally" *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null">{{ matchVotes(match,match.leftEntryId) }} votes</div>
+        <ul *ngIf="canViewBallots"><li *ngFor="let ballot of votersFor(match,match.leftEntryId)" [class.system-vote]="ballot.userId === null">{{ voterLabel(ballot) }}</li></ul>
+        <p *ngIf="canViewBallots && matchVotes(match,match.leftEntryId) > votersFor(match,match.leftEntryId).length">Voter names are unavailable for {{ matchVotes(match,match.leftEntryId) - votersFor(match,match.leftEntryId).length }} additional votes.</p>
+        <p *ngIf="match.ballots.length && matchVotes(match,match.leftEntryId) === 0">No votes for this song.</p>
+      </section>
+      <section class="history-vote-song" [class.history-vote-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId">
+        <app-song-album-art [url]="match.rightAlbumCoverUrl" [title]="match.right"></app-song-album-art>
+        <h3>{{ match.right }} <span *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId">✓</span></h3>
+        <div class="history-vote-tally" *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null">{{ matchVotes(match,match.rightEntryId) }} votes</div>
+        <ul *ngIf="canViewBallots"><li *ngFor="let ballot of votersFor(match,match.rightEntryId)" [class.system-vote]="ballot.userId === null">{{ voterLabel(ballot) }}</li></ul>
+        <p *ngIf="canViewBallots && matchVotes(match,match.rightEntryId) > votersFor(match,match.rightEntryId).length">Voter names are unavailable for {{ matchVotes(match,match.rightEntryId) - votersFor(match,match.rightEntryId).length }} additional votes.</p>
+        <p *ngIf="match.ballots.length && matchVotes(match,match.rightEntryId) === 0">No votes for this song.</p>
+      </section>
+    </div>
+    <section class="unknown-voters" *ngIf="isAdmin" aria-labelledby="unknown-voters-heading">
+      <h3 id="unknown-voters-heading">Unknown votes · {{ unknownVoters(match).length }}</h3>
+      <ng-container *ngIf="unknownVoters(match).length; else allVotesRecorded">
+        <ul><li *ngFor="let person of unknownVoters(match)">{{ person.displayName }}</li></ul>
+        <p>These eligible participants have no recorded vote for this matchup. They may not have voted, or their historical vote may be missing.</p>
+      </ng-container>
+      <ng-template #allVotesRecorded><p>Every eligible participant has a recorded vote.</p></ng-template>
+    </section>
+    <div class="history-votes-actions"><button type="button" class="primary" *ngIf="canEditHistoryBallots(match)" (click)="editViewedVotes(match)">Edit participant votes</button><button type="button" (click)="closeHistoryVotes()" autofocus>Close</button></div>
+  </ng-container>
+</dialog>

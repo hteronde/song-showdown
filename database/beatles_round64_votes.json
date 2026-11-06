@@ -1,0 +1,634 @@
+{
+  "source": "User-supplied partial Beatles Round of 64 voting table, 2026-11-04",
+  "notes": [
+    "Blank cells mean unknown or unrecorded, not a vote.",
+    "Existing matchup winners are authoritative and must not be recalculated.",
+    "Original vote timestamps are unknown; database submitted_at records import time.",
+    "Scott has no supplied votes and is not included in this import."
+  ],
+  "participants": [
+    "Brett",
+    "Dave",
+    "Holden",
+    "Isa",
+    "Jeff",
+    "Jim",
+    "Lennon",
+    "Lina",
+    "Marcia",
+    "Roy",
+    "Sharon",
+    "Teresa",
+    "Tori"
+  ],
+  "matchups": [
+    {
+      "songA": "Come Together",
+      "songB": "Things We Said Today",
+      "votes": {
+        "Brett": "Come Together",
+        "Dave": "Come Together",
+        "Holden": "Come Together",
+        "Isa": "Come Together",
+        "Jeff": "Come Together",
+        "Jim": "Come Together",
+        "Lennon": "Come Together",
+        "Lina": "Come Together",
+        "Marcia": "Come Together",
+        "Roy": "Come Together",
+        "Sharon": "Come Together",
+        "Teresa": "Things We Said Today",
+        "Tori": "Come Together"
+      }
+    },
+    {
+      "songA": "I’ve Got a Feeling",
+      "songB": "I’m Looking Through You",
+      "votes": {
+        "Brett": "I’ve Got a Feeling",
+        "Dave": "I’ve Got a Feeling",
+        "Holden": "I’ve Got a Feeling",
+        "Isa": "I’ve Got a Feeling",
+        "Jeff": "I’ve Got a Feeling",
+        "Jim": "I’ve Got a Feeling",
+        "Lennon": null,
+        "Lina": "I’m Looking Through You",
+        "Marcia": "I’m Looking Through You",
+        "Roy": "I’ve Got a Feeling",
+        "Sharon": "I’ve Got a Feeling",
+        "Teresa": "I’ve Got a Feeling",
+        "Tori": "I’m Looking Through You"
+      }
+    },
+    {
+      "songA": "Rain",
+      "songB": "Penny Lane",
+      "votes": {
+        "Brett": "Rain",
+        "Dave": "Penny Lane",
+        "Holden": "Rain",
+        "Isa": "Rain",
+        "Jeff": "Rain",
+        "Jim": "Rain",
+        "Lennon": "Rain",
+        "Lina": "Penny Lane",
+        "Marcia": "Penny Lane",
+        "Roy": "Rain",
+        "Sharon": "Penny Lane",
+        "Teresa": "Rain",
+        "Tori": "Penny Lane"
+      }
+    },
+    {
+      "songA": "I Feel Fine",
+      "songB": "Across the Universe",
+      "votes": {
+        "Brett": "I Feel Fine",
+        "Dave": "Across the Universe",
+        "Holden": "Across the Universe",
+        "Isa": "I Feel Fine",
+        "Jeff": "Across the Universe",
+        "Jim": "Across the Universe",
+        "Lennon": "Across the Universe",
+        "Lina": "Across the Universe",
+        "Marcia": "I Feel Fine",
+        "Roy": "Across the Universe",
+        "Sharon": "Across the Universe",
+        "Teresa": "I Feel Fine",
+        "Tori": "I Feel Fine"
+      }
+    },
+    {
+      "songA": "Ob-La-Di, Ob-La-Da",
+      "songB": "I Am the Walrus",
+      "votes": {
+        "Brett": "I Am the Walrus",
+        "Dave": "I Am the Walrus",
+        "Holden": "I Am the Walrus",
+        "Isa": "I Am the Walrus",
+        "Jeff": "I Am the Walrus",
+        "Jim": "I Am the Walrus",
+        "Lennon": "I Am the Walrus",
+        "Lina": "I Am the Walrus",
+        "Marcia": "I Am the Walrus",
+        "Roy": "I Am the Walrus",
+        "Sharon": "I Am the Walrus",
+        "Teresa": "I Am the Walrus",
+        "Tori": "Ob-La-Di, Ob-La-Da"
+      }
+    },
+    {
+      "songA": "Let It Be",
+      "songB": "Can’t Buy Me Love",
+      "votes": {
+        "Brett": "Let It Be",
+        "Dave": "Let It Be",
+        "Holden": "Let It Be",
+        "Isa": "Let It Be",
+        "Jeff": "Let It Be",
+        "Jim": "Let It Be",
+        "Lennon": "Let It Be",
+        "Lina": "Let It Be",
+        "Marcia": "Let It Be",
+        "Roy": "Let It Be",
+        "Sharon": "Let It Be",
+        "Teresa": "Let It Be",
+        "Tori": "Can’t Buy Me Love"
+      }
+    },
+    {
+      "songA": "The Fool on the Hill",
+      "songB": "Hey Jude",
+      "votes": {
+        "Brett": "The Fool on the Hill",
+        "Dave": "Hey Jude",
+        "Holden": "Hey Jude",
+        "Isa": "Hey Jude",
+        "Jeff": "Hey Jude",
+        "Jim": "Hey Jude",
+        "Lennon": "The Fool on the Hill",
+        "Lina": "Hey Jude",
+        "Marcia": "Hey Jude",
+        "Roy": "The Fool on the Hill",
+        "Sharon": "Hey Jude",
+        "Teresa": "The Fool on the Hill",
+        "Tori": "Hey Jude"
+      }
+    },
+    {
+      "songA": "Day Tripper",
+      "songB": "All You Need Is Love",
+      "votes": {
+        "Brett": "Day Tripper",
+        "Dave": "Day Tripper",
+        "Holden": "All You Need Is Love",
+        "Isa": "All You Need Is Love",
+        "Jeff": "Day Tripper",
+        "Jim": "Day Tripper",
+        "Lennon": null,
+        "Lina": null,
+        "Marcia": "Day Tripper",
+        "Roy": "Day Tripper",
+        "Sharon": "Day Tripper",
+        "Teresa": "Day Tripper",
+        "Tori": "All You Need Is Love"
+      }
+    },
+    {
+      "songA": "A Day in the Life",
+      "songB": "Honey Pie",
+      "votes": {
+        "Brett": "Honey Pie",
+        "Dave": "A Day in the Life",
+        "Holden": "A Day in the Life",
+        "Isa": "Honey Pie",
+        "Jeff": "A Day in the Life",
+        "Jim": "A Day in the Life",
+        "Lennon": "A Day in the Life",
+        "Lina": "A Day in the Life",
+        "Marcia": "A Day in the Life",
+        "Roy": "A Day in the Life",
+        "Sharon": "A Day in the Life",
+        "Teresa": "A Day in the Life",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "You Never Give Me Your Money",
+      "songB": "Because",
+      "votes": {
+        "Brett": "You Never Give Me Your Money",
+        "Dave": "Because",
+        "Holden": "Because",
+        "Isa": "Because",
+        "Jeff": "Because",
+        "Jim": "Because",
+        "Lennon": "Because",
+        "Lina": "Because",
+        "Marcia": "You Never Give Me Your Money",
+        "Roy": "You Never Give Me Your Money",
+        "Sharon": "You Never Give Me Your Money",
+        "Teresa": "Because",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "While My Guitar Gently Weeps",
+      "songB": "You’ve Got to Hide Your Love Away",
+      "votes": {
+        "Brett": "While My Guitar Gently Weeps",
+        "Dave": "While My Guitar Gently Weeps",
+        "Holden": "While My Guitar Gently Weeps",
+        "Isa": "You’ve Got to Hide Your Love Away",
+        "Jeff": "While My Guitar Gently Weeps",
+        "Jim": "While My Guitar Gently Weeps",
+        "Lennon": "While My Guitar Gently Weeps",
+        "Lina": "While My Guitar Gently Weeps",
+        "Marcia": "You’ve Got to Hide Your Love Away",
+        "Roy": "You’ve Got to Hide Your Love Away",
+        "Sharon": "While My Guitar Gently Weeps",
+        "Teresa": "While My Guitar Gently Weeps",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "I Saw Her Standing There",
+      "songB": "Girl",
+      "votes": {
+        "Brett": "I Saw Her Standing There",
+        "Dave": "I Saw Her Standing There",
+        "Holden": "Girl",
+        "Isa": "I Saw Her Standing There",
+        "Jeff": "Girl",
+        "Jim": "Girl",
+        "Lennon": "Girl",
+        "Lina": "I Saw Her Standing There",
+        "Marcia": "Girl",
+        "Roy": "Girl",
+        "Sharon": "Girl",
+        "Teresa": "Girl",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Hello Goodbye",
+      "songB": "Got to Get You Into My Life",
+      "votes": {
+        "Brett": "Got to Get You Into My Life",
+        "Dave": "Hello Goodbye",
+        "Holden": "Got to Get You Into My Life",
+        "Isa": "Hello Goodbye",
+        "Jeff": "Got to Get You Into My Life",
+        "Jim": "Got to Get You Into My Life",
+        "Lennon": "Got to Get You Into My Life",
+        "Lina": "Got to Get You Into My Life",
+        "Marcia": "Hello Goodbye",
+        "Roy": "Hello Goodbye",
+        "Sharon": "Got to Get You Into My Life",
+        "Teresa": "Got to Get You Into My Life",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Norwegian Wood",
+      "songB": "For No One",
+      "votes": {
+        "Brett": "Norwegian Wood",
+        "Dave": "Norwegian Wood",
+        "Holden": "Norwegian Wood",
+        "Isa": "Norwegian Wood",
+        "Jeff": null,
+        "Jim": "Norwegian Wood",
+        "Lennon": "For No One",
+        "Lina": "Norwegian Wood",
+        "Marcia": "Norwegian Wood",
+        "Roy": "Norwegian Wood",
+        "Sharon": "Norwegian Wood",
+        "Teresa": "For No One",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "In My Life",
+      "songB": "You’re Going to Lose That Girl",
+      "votes": {
+        "Brett": "In My Life",
+        "Dave": "You’re Going to Lose That Girl",
+        "Holden": "In My Life",
+        "Isa": "You’re Going to Lose That Girl",
+        "Jeff": null,
+        "Jim": "In My Life",
+        "Lennon": "In My Life",
+        "Lina": "In My Life",
+        "Marcia": "In My Life",
+        "Roy": "In My Life",
+        "Sharon": "You’re Going to Lose That Girl",
+        "Teresa": "In My Life",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Paperback Writer",
+      "songB": "Revolution",
+      "votes": {
+        "Brett": "Revolution",
+        "Dave": "Revolution",
+        "Holden": "Revolution",
+        "Isa": "Revolution",
+        "Jeff": null,
+        "Jim": "Revolution",
+        "Lennon": "Revolution",
+        "Lina": "Revolution",
+        "Marcia": "Revolution",
+        "Roy": "Paperback Writer",
+        "Sharon": "Revolution",
+        "Teresa": "Revolution",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Blackbird",
+      "songB": "And Your Bird Can Sing",
+      "votes": {
+        "Brett": "Blackbird",
+        "Dave": null,
+        "Holden": "And Your Bird Can Sing",
+        "Isa": "Blackbird",
+        "Jeff": null,
+        "Jim": "And Your Bird Can Sing",
+        "Lennon": "Blackbird",
+        "Lina": "Blackbird",
+        "Marcia": "Blackbird",
+        "Roy": "Blackbird",
+        "Sharon": "Blackbird",
+        "Teresa": "And Your Bird Can Sing",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Everybody’s Got Something to Hide Except Me and My Monkey",
+      "songB": "Ticket to Ride",
+      "votes": {
+        "Brett": "Everybody’s Got Something to Hide Except Me and My Monkey",
+        "Dave": null,
+        "Holden": "Everybody’s Got Something to Hide Except Me and My Monkey",
+        "Isa": "Ticket to Ride",
+        "Jeff": null,
+        "Jim": "Ticket to Ride",
+        "Lennon": "Ticket to Ride",
+        "Lina": "Ticket to Ride",
+        "Marcia": "Ticket to Ride",
+        "Roy": "Ticket to Ride",
+        "Sharon": "Everybody’s Got Something to Hide Except Me and My Monkey",
+        "Teresa": "Ticket to Ride",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Revolution 1",
+      "songB": "The Inner Light",
+      "votes": {
+        "Brett": "Revolution 1",
+        "Dave": null,
+        "Holden": "The Inner Light",
+        "Isa": "Revolution 1",
+        "Jeff": null,
+        "Jim": "Revolution 1",
+        "Lennon": "Revolution 1",
+        "Lina": "The Inner Light",
+        "Marcia": "Revolution 1",
+        "Roy": "Revolution 1",
+        "Sharon": "Revolution 1",
+        "Teresa": "Revolution 1",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Help!",
+      "songB": "This Boy",
+      "votes": {
+        "Brett": "Help!",
+        "Dave": null,
+        "Holden": "This Boy",
+        "Isa": "Help!",
+        "Jeff": null,
+        "Jim": "This Boy",
+        "Lennon": "Help!",
+        "Lina": "Help!",
+        "Marcia": "Help!",
+        "Roy": "Help!",
+        "Sharon": "Help!",
+        "Teresa": "This Boy",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Oh! Darling",
+      "songB": "Free as a Bird",
+      "votes": {
+        "Brett": "Oh! Darling",
+        "Dave": null,
+        "Holden": "Oh! Darling",
+        "Isa": "Free as a Bird",
+        "Jeff": null,
+        "Jim": "Oh! Darling",
+        "Lennon": "Free as a Bird",
+        "Lina": "Oh! Darling",
+        "Marcia": "Oh! Darling",
+        "Roy": "Oh! Darling",
+        "Sharon": "Oh! Darling",
+        "Teresa": "Oh! Darling",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Here, There and Everywhere",
+      "songB": "I’ll Cry Instead",
+      "votes": {
+        "Brett": "I’ll Cry Instead",
+        "Dave": null,
+        "Holden": "Here, There and Everywhere",
+        "Isa": "I’ll Cry Instead",
+        "Jeff": null,
+        "Jim": "Here, There and Everywhere",
+        "Lennon": "Here, There and Everywhere",
+        "Lina": "Here, There and Everywhere",
+        "Marcia": "Here, There and Everywhere",
+        "Roy": "I’ll Cry Instead",
+        "Sharon": "Here, There and Everywhere",
+        "Teresa": "Here, There and Everywhere",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Strawberry Fields Forever",
+      "songB": "Helter Skelter",
+      "votes": {
+        "Brett": "Helter Skelter",
+        "Dave": null,
+        "Holden": "Strawberry Fields Forever",
+        "Isa": "Helter Skelter",
+        "Jeff": null,
+        "Jim": "Strawberry Fields Forever",
+        "Lennon": "Strawberry Fields Forever",
+        "Lina": "Strawberry Fields Forever",
+        "Marcia": "Strawberry Fields Forever",
+        "Roy": "Strawberry Fields Forever",
+        "Sharon": "Helter Skelter",
+        "Teresa": "Strawberry Fields Forever",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Abbey Road Medley 2",
+      "songB": "Tomorrow Never Knows",
+      "votes": {
+        "Brett": "Abbey Road Medley 2",
+        "Dave": null,
+        "Holden": "Tomorrow Never Knows",
+        "Isa": "Tomorrow Never Knows",
+        "Jeff": null,
+        "Jim": "Tomorrow Never Knows",
+        "Lennon": "Tomorrow Never Knows",
+        "Lina": "Tomorrow Never Knows",
+        "Marcia": "Abbey Road Medley 2",
+        "Roy": "Tomorrow Never Knows",
+        "Sharon": "Abbey Road Medley 2",
+        "Teresa": "Abbey Road Medley 2",
+        "Tori": null
+      }
+    },
+    {
+      "songA": "Here Comes the Sun",
+      "songB": "And I Love Her",
+      "votes": {
+        "Brett": null,
+        "Dave": "Here Comes the Sun",
+        "Holden": "Here Comes the Sun",
+        "Isa": "Here Comes the Sun",
+        "Jeff": "Here Comes the Sun",
+        "Jim": "Here Comes the Sun",
+        "Lennon": "And I Love Her",
+        "Lina": "Here Comes the Sun",
+        "Marcia": "Here Comes the Sun",
+        "Roy": null,
+        "Sharon": "Here Comes the Sun",
+        "Teresa": "And I Love Her",
+        "Tori": "Here Comes the Sun"
+      }
+    },
+    {
+      "songA": "She’s Leaving Home",
+      "songB": "Happiness Is a Warm Gun",
+      "votes": {
+        "Brett": null,
+        "Dave": "She’s Leaving Home",
+        "Holden": "Happiness Is a Warm Gun",
+        "Isa": "She’s Leaving Home",
+        "Jeff": "Happiness Is a Warm Gun",
+        "Jim": "She’s Leaving Home",
+        "Lennon": "She’s Leaving Home",
+        "Lina": "Happiness Is a Warm Gun",
+        "Marcia": "She’s Leaving Home",
+        "Roy": null,
+        "Sharon": "Happiness Is a Warm Gun",
+        "Teresa": "She’s Leaving Home",
+        "Tori": "She’s Leaving Home"
+      }
+    },
+    {
+      "songA": "I Me Mine",
+      "songB": "Back in the U.S.S.R.",
+      "votes": {
+        "Brett": null,
+        "Dave": "Back in the U.S.S.R.",
+        "Holden": "Back in the U.S.S.R.",
+        "Isa": "I Me Mine",
+        "Jeff": "I Me Mine",
+        "Jim": "Back in the U.S.S.R.",
+        "Lennon": "I Me Mine",
+        "Lina": "Back in the U.S.S.R.",
+        "Marcia": "Back in the U.S.S.R.",
+        "Roy": null,
+        "Sharon": "Back in the U.S.S.R.",
+        "Teresa": "Back in the U.S.S.R.",
+        "Tori": "Back in the U.S.S.R."
+      }
+    },
+    {
+      "songA": "Dear Prudence",
+      "songB": "Eight Days a Week",
+      "votes": {
+        "Brett": null,
+        "Dave": "Eight Days a Week",
+        "Holden": "Dear Prudence",
+        "Isa": "Eight Days a Week",
+        "Jeff": "Eight Days a Week",
+        "Jim": "Dear Prudence",
+        "Lennon": "Dear Prudence",
+        "Lina": "Dear Prudence",
+        "Marcia": "Eight Days a Week",
+        "Roy": null,
+        "Sharon": "Dear Prudence",
+        "Teresa": "Dear Prudence",
+        "Tori": "Eight Days a Week"
+      }
+    },
+    {
+      "songA": "Eleanor Rigby",
+      "songB": "Something",
+      "votes": {
+        "Brett": null,
+        "Dave": "Something",
+        "Holden": "Something",
+        "Isa": "Eleanor Rigby",
+        "Jeff": "Eleanor Rigby",
+        "Jim": "Something",
+        "Lennon": "Something",
+        "Lina": "Something",
+        "Marcia": "Eleanor Rigby",
+        "Roy": null,
+        "Sharon": "Something",
+        "Teresa": "Something",
+        "Tori": "Eleanor Rigby"
+      }
+    },
+    {
+      "songA": "Abbey Road Medley 1",
+      "songB": "If I Needed Someone",
+      "votes": {
+        "Brett": null,
+        "Dave": "Abbey Road Medley 1",
+        "Holden": "Abbey Road Medley 1",
+        "Isa": "If I Needed Someone",
+        "Jeff": "Abbey Road Medley 1",
+        "Jim": "Abbey Road Medley 1",
+        "Lennon": "If I Needed Someone",
+        "Lina": "If I Needed Someone",
+        "Marcia": "Abbey Road Medley 1",
+        "Roy": null,
+        "Sharon": "Abbey Road Medley 1",
+        "Teresa": "Abbey Road Medley 1",
+        "Tori": "Abbey Road Medley 1"
+      }
+    },
+    {
+      "songA": "If I Fell",
+      "songB": "She Loves You",
+      "votes": {
+        "Brett": null,
+        "Dave": "She Loves You",
+        "Holden": "If I Fell",
+        "Isa": "She Loves You",
+        "Jeff": "She Loves You",
+        "Jim": "If I Fell",
+        "Lennon": "If I Fell",
+        "Lina": "If I Fell",
+        "Marcia": "If I Fell",
+        "Roy": null,
+        "Sharon": "She Loves You",
+        "Teresa": "If I Fell",
+        "Tori": "She Loves You"
+      }
+    },
+    {
+      "songA": "Lady Madonna",
+      "songB": "Yesterday",
+      "votes": {
+        "Brett": null,
+        "Dave": "Yesterday",
+        "Holden": "Yesterday",
+        "Isa": "Yesterday",
+        "Jeff": "Yesterday",
+        "Jim": "Yesterday",
+        "Lennon": "Yesterday",
+        "Lina": "Yesterday",
+        "Marcia": "Yesterday",
+        "Roy": null,
+        "Sharon": "Yesterday",
+        "Teresa": "Yesterday",
+        "Tori": "Lady Madonna"
+      }
+    }
+  ]
+}

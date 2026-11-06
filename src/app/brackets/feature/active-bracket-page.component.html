@@ -1,0 +1,154 @@
+<div class="page-wrap active-bracket-page" *ngIf="!loading && data as bracketData">
+  <section class="upcoming-bracket-message" *ngIf="bracketData.isUpcoming; else startedBracket" aria-live="polite">
+    <h1>Thanks for joining this bracket!</h1>
+    <p>It is scheduled to begin on <time [attr.datetime]="bracketData.bracket.startAt">{{ bracketData.bracket.startAt | date:'fullDate' }}</time>. We'll see you then!</p>
+  </section>
+  <ng-template #startedBracket>
+  <section class="hero-row">
+    <div>
+      <div class="eyebrow"><span class="tiny-disc">◉</span> THE FAMILY BRACKET <span class="eyebrow-divider">·</span> {{ isComplete ? 'COMPLETE' : bracketData.bracket.bracketYear || 'ACTIVE' }}</div>
+      <h1>{{ bracketData.bracket.artist }}<br><em>{{ bracketData.bracket.title }}.</em></h1>
+      <p class="hero-subtitle">{{ isComplete ? 'This bracket is complete. Explore every matchup and the final results below.' : awaitingFinale ? 'The online rounds are complete. Follow the upcoming finale matchups below.' : finaleModeActive ? 'Follow the bracket live as the admin records your show-of-hands votes.' : 'Pick your winners and follow the matchups as the bracket unfolds.' }}</p>
+    </div>
+    <img class="bracket-hero-logo" *ngIf="bracketData.bracket.logoUrl && !failedCoverUrls.has(bracketData.bracket.logoUrl!)" [src]="bracketData.bracket.logoUrl" [alt]="bracketData.bracket.artist + ' logo'" referrerpolicy="no-referrer" (error)="coverFailed(bracketData.bracket.logoUrl!)">
+    <div class="hero-art" *ngIf="!bracketData.bracket.logoUrl || failedCoverUrls.has(bracketData.bracket.logoUrl!)" aria-label="Record illustration"><div class="vinyl"><div class="vinyl-ring"></div><div class="vinyl-ring ring-two"></div><div class="vinyl-center"><span>{{ bracketData.bracket.artist | slice:0:2 | uppercase }}</span></div><div class="vinyl-hole"></div></div><div class="art-caption">SIDE A <span>✳</span> {{ bracketData.bracket.bracketYear || 'NOW' }} — ∞</div></div>
+  </section>
+
+  <p class="page-error" *ngIf="error" role="alert">{{ error }}</p>
+  <p class="page-success" *ngIf="notice" role="status">{{ notice }}</p>
+
+  <div class="bracket-hold-banner" *ngIf="paused && !isComplete" role="status"><span class="hold-icon" aria-hidden="true">Ⅱ</span><div><strong>This bracket is on hold.</strong><p>You can still view the current matchups and listen to the songs. Voting is paused and the session timer is frozen until the admin resumes the bracket.</p></div></div>
+  <div class="finale-view-banner" *ngIf="finaleModeActive && !isComplete" role="status"><strong>Finale Mode · Vote together in person</strong><p>Follow the bracket here. The admin counts everyone’s votes and records them. Online voting is disabled.</p></div>
+  <div class="finale-view-banner" *ngIf="awaitingFinale && !isComplete" role="status"><strong>We'll see you at the finale!</strong><p><time [attr.datetime]="bracketData.bracket.finaleAt">{{ bracketData.bracket.finaleAt | date:'fullDate' }}</time></p><p>Online voting is finished. View the bracket and upcoming matchups below. Votes at the finale will be counted in person by the admin.</p></div>
+  <section class="stats-strip" *ngIf="!isComplete">
+    <div class="stat-cell"><span class="stat-label">THE FIELD</span><strong>{{ bracketData.bracket.songCount }} <small>songs</small></strong><span class="stat-detail">One champion</span></div>
+    <div class="stat-cell"><span class="stat-label">PLAYING NOW</span><strong>{{ paused ? 'On hold' : awaitingFinale ? 'Finale next' : finaleModeActive ? 'Finale Mode' : currentWeek ? currentWeek.roundName : 'Between rounds' }}</strong><span class="stat-detail">{{ currentWeek ? 'Round ' + currentWeek.roundNumber : 'Check back for the next session' }}</span></div>
+    <div class="stat-cell"><span class="stat-label">{{ finaleModeActive || awaitingFinale ? 'VOTING' : 'YOUR PICKS' }}</span><strong *ngIf="finaleModeActive || awaitingFinale">{{ awaitingFinale ? 'At the finale' : 'In person' }}</strong><strong *ngIf="!finaleModeActive && !awaitingFinale">{{ savedPicks }} <small>/ {{ currentWeek?.matchups?.length || 0 }}</small></strong><span class="stat-detail">{{ finaleModeActive || awaitingFinale ? 'Counted and recorded by the admin' : 'Votes saved this week' }}</span></div>
+    <div class="stat-cell"><span class="stat-label">{{ awaitingFinale ? 'FINALE DATE' : 'VOTING CLOSES' }}</span><strong>{{ awaitingFinale ? (bracketData.bracket.finaleAt | date:'fullDate') : finaleModeActive ? 'In person' : paused ? frozenTimeRemaining : currentWeek && !currentWeek.closesAt ? 'When everyone has voted' : currentWeek?.closesAt ? (currentWeek.closesAt | date:'short') : '—' }}</strong><span class="stat-detail">{{ awaitingFinale ? 'No more online voting' : finaleModeActive ? 'Follow the live bracket below' : paused ? 'Timer paused' : currentWeek ? 'Submit a pick for each matchup' : 'No open matchups right now' }}</span></div>
+  </section>
+
+  <div class="view-toggle active-view-toggle" *ngIf="hasOnlineVoting"><button type="button" *ngIf="!finaleModeActive && !awaitingFinale" [class.toggle-active]="viewMode === 'vote'" (click)="viewMode = 'vote'">Vote <span class="vote-count">{{ savedPicks }}/{{ currentWeek?.matchups?.length || 0 }}</span></button><button type="button" [class.toggle-active]="viewMode === 'bracket'" (click)="viewMode = 'bracket'">Bracket</button></div>
+  <div class="admin-finale-entry" *ngIf="isAdmin && !isComplete"><button type="button" *ngIf="canAdvanceWeek" (click)="openAdvanceWeek()">Advance week</button><button type="button" *ngIf="bracketData.bracket.status === 'active'" (click)="togglePaused()" [disabled]="pauseSaving">{{ pauseSaving ? 'Saving…' : paused ? 'Resume bracket' : 'Pause bracket' }}</button><button type="button" (click)="enterFinaleMode()" [disabled]="paused">{{ finaleModeActive ? 'Manage Finale Mode ↗' : 'Enter Finale Mode ↗' }}</button></div>
+
+  <div class="notice-bar" *ngIf="sessionPlaylists.length && !isComplete"><span class="notice-icon">♫</span><span>Listen to this session’s songs: <ng-container *ngFor="let playlist of sessionPlaylists; let last=last"><a [href]="playlist.playlistUrl" target="_blank" rel="noopener noreferrer">{{ playlist.playlistName }} ↗</a><span *ngIf="!last"> · </span></ng-container></span></div>
+  <app-bracket-champion [bracketId]="bracketData.bracket.bracketId" [champion]="champion"></app-bracket-champion>
+  <section class="week-section" *ngIf="hasOnlineVoting && viewMode === 'vote' && currentWeek as week">
+    <div class="section-heading"><div><div class="eyebrow small-eyebrow">ROUND {{ week.roundNumber }} <span class="eyebrow-divider">·</span> WEEK {{ week.weekNumber }}</div><h2>{{ paused ? 'Current week matchups.' : 'Pick your winners.' }}</h2></div></div>
+    <div class="notice-bar" *ngIf="finaleModeActive"><span class="notice-icon">◉</span><span>Online voting is paused while Finale Mode is active. You can still view the bracket and results.</span></div>
+    <div class="notice-bar" *ngIf="!finaleModeActive && !paused"><span class="notice-icon">✳</span><span>Choose a song in each matchup. Your vote stays private until voting closes.</span><span class="notice-lock">PRIVATE VOTING</span></div>
+    <div class="notice-bar" *ngIf="!week.closesAt && week.isReady"><span class="notice-icon">◷</span><span>No session timer. This week advances when every assigned participant has voted in every matchup.</span></div>
+    <div class="notice-bar" *ngIf="!week.isReady" role="status">This round is waiting for every winner from the previous round. Matchups will be drawn randomly before voting opens.</div>
+    <section class="matchups-grid" *ngIf="(!finaleModeActive || paused) && week.isReady">
+      <article class="matchup-card" *ngFor="let match of week.matchups; let i = index">
+        <div class="admin-ballot-entry"><button type="button" (click)="openMatchupDetails(match)">View matchup</button><button type="button" *ngIf="canEditBallots(match)" (click)="openBallotEditor(match)">Edit participant votes</button></div>
+        <div class="matchup-top"><span class="matchup-number">MATCHUP {{ (i + 1).toString().padStart(2, '0') }}</span><span class="matchup-status">{{ paused ? 'VOTING ON HOLD' : match.selectedEntryId ? 'VOTE SAVED' : 'YOUR PICK' }}</span></div>
+        <div class="song-choice" role="button" [attr.tabindex]="paused || finaleModeActive ? -1 : 0" [attr.aria-disabled]="paused || finaleModeActive" [class.voting-disabled]="paused || finaleModeActive" [class.chosen]="songPick(match) === match.songA.entryId" (click)="pick(match, match.songA.entryId)" (keydown.enter)="pick(match, match.songA.entryId)">
+          <div class="album-tile"><img *ngIf="match.songA.albumCoverUrl && !failedCoverUrls.has(match.songA.albumCoverUrl!)" [src]="match.songA.albumCoverUrl" alt="" loading="lazy" referrerpolicy="no-referrer" (error)="coverFailed(match.songA.albumCoverUrl!)"><span>{{ bracketData.bracket.artist | slice:0:2 | uppercase }}</span><i>✳</i></div><div class="song-meta"><span class="seed">#{{ match.songA.seed }}</span><strong>{{ match.songA.title }}</strong><small>{{ match.songA.album || 'Album not recorded' }}<span *ngIf="match.songA.year"> · {{ match.songA.year }}</span></small></div><span class="choice-mark">{{ songPick(match) === match.songA.entryId ? '✓' : '＋' }}</span>
+        </div>
+        <div class="listen-links" *ngIf="match.songA.youtubeUrl || match.songA.spotifyUrl">
+          <span>LISTEN</span>
+          <a *ngIf="match.songA.youtubeUrl" [href]="match.songA.youtubeUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Listen to ' + match.songA.title + ' on YouTube (opens in a new tab)'">YouTube ↗</a>
+          <a *ngIf="match.songA.spotifyUrl" [href]="match.songA.spotifyUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Listen to ' + match.songA.title + ' on Spotify (opens in a new tab)'">Spotify ↗</a>
+        </div>
+        <div class="versus"><span></span><b>VS</b><span></span></div>
+        <div class="song-choice" role="button" [attr.tabindex]="paused || finaleModeActive ? -1 : 0" [attr.aria-disabled]="paused || finaleModeActive" [class.voting-disabled]="paused || finaleModeActive" [class.chosen]="songPick(match) === match.songB.entryId" (click)="pick(match, match.songB.entryId)" (keydown.enter)="pick(match, match.songB.entryId)">
+          <div class="album-tile"><img *ngIf="match.songB.albumCoverUrl && !failedCoverUrls.has(match.songB.albumCoverUrl!)" [src]="match.songB.albumCoverUrl" alt="" loading="lazy" referrerpolicy="no-referrer" (error)="coverFailed(match.songB.albumCoverUrl!)"><span>{{ bracketData.bracket.artist | slice:0:2 | uppercase }}</span><i>✳</i></div><div class="song-meta"><span class="seed">#{{ match.songB.seed }}</span><strong>{{ match.songB.title }}</strong><small>{{ match.songB.album || 'Album not recorded' }}<span *ngIf="match.songB.year"> · {{ match.songB.year }}</span></small></div><span class="choice-mark">{{ songPick(match) === match.songB.entryId ? '✓' : '＋' }}</span>
+        </div>
+        <div class="listen-links" *ngIf="match.songB.youtubeUrl || match.songB.spotifyUrl">
+          <span>LISTEN</span>
+          <a *ngIf="match.songB.youtubeUrl" [href]="match.songB.youtubeUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Listen to ' + match.songB.title + ' on YouTube (opens in a new tab)'">YouTube ↗</a>
+          <a *ngIf="match.songB.spotifyUrl" [href]="match.songB.spotifyUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Listen to ' + match.songB.title + ' on Spotify (opens in a new tab)'">Spotify ↗</a>
+        </div>
+        <div class="comment-field"><label [for]="'comment-' + match.matchupId">WHY THIS PICK? <span>OPTIONAL</span></label><textarea [disabled]="paused || finaleModeActive" [id]="'comment-' + match.matchupId" [value]="commentValue(match)" (input)="updateComment(match, $event)" maxlength="280" placeholder="A lyric, a memory, that guitar solo…"></textarea><small>SHARED WHEN THE WEEK’S VOTES ARE REVEALED</small></div>
+        <div class="vote-actions"><button type="button" [disabled]="paused || finaleModeActive || savingMatchupId === match.matchupId || !songPick(match)" (click)="saveVote(match)">{{ paused ? 'Voting on hold' : savingMatchupId === match.matchupId ? 'Saving…' : match.selectedEntryId ? 'Update vote' : 'Submit vote' }}</button></div>
+      </article>
+    </section>
+  </section>
+  <div class="no-matchups" *ngIf="!isComplete && viewMode === 'vote' && !currentWeek && !awaitingFinale">There are no open matchups right now. Select Bracket to view the results decided so far.</div>
+
+  <section class="week-section" *ngIf="!hasOnlineVoting || viewMode === 'bracket'">
+    <div class="section-heading"><div><div class="eyebrow small-eyebrow">THE TOURNAMENT SO FAR</div><h2>The full bracket.</h2></div></div>
+    <div class="notice-bar" *ngIf="!isComplete && !currentWeek && !paused && !finaleModeActive && !awaitingFinale"><span class="notice-icon">◉</span><span>We're between rounds. View the results decided so far below, and check back for the next voting session.</span></div>
+    <p class="bracket-visibility-note">{{ isComplete ? 'View every round, matchup, and recorded result from the completed bracket.' : isAdmin ? 'Admin view includes every round and matchup. Click any matchup to view its details. Participant votes can be edited in the current or immediately previous round. Undecided slots show which matchup will supply the winner.' : finaleModeActive ? 'Follow each matchup as the admin records the show-of-hands results. The bracket updates automatically.' : 'View every round and matchup. First-round songs stay TBD until their voting week opens.' }}</p>
+    <p class="bracket-visibility-note" *ngIf="bracketData.bracket.randomizationMode === 'each_round'">Each round gets a new draw after all preceding winners are known. Dashed lines show provisional paths until the next round is drawn.</p>
+    <label class="bracket-round-filter">Show from round
+      <select [(ngModel)]="firstVisibleRound" [ngModelOptions]="{standalone:true}"><option *ngFor="let round of revealedRounds; trackBy: trackRound" [ngValue]="round.roundNumber">{{ round.roundNumber === 1 ? 'All rounds' : round.roundName }}</option></select>
+    </label>
+    <div #bracketBoard class="revealed-bracket full-tournament-bracket" [class.redrawn-rounds]="bracketData.bracket.randomizationMode === 'each_round'" [style.--bracket-round-count]="visibleRounds.length" [style.--bracket-row-count]="visibleRounds[0]?.matchups?.length || 1" *ngIf="revealedRounds.length">
+      <div [appBracketConnectors]="connectorMatches"></div>
+      <section class="revealed-round" *ngFor="let round of visibleRounds; trackBy: trackRound">
+        <h3>{{ round.roundName }}</h3>
+        <div class="revealed-round-games">
+        <article class="revealed-game" role="button" tabindex="0" [attr.aria-label]="'View matchup: ' + item.matchup.bracketSongATitle + ' versus ' + item.matchup.bracketSongBTitle" (click)="openMatchupDetails(item.matchup)" (keydown.enter)="openMatchupDetails(item.matchup)" (keydown.space)="$event.preventDefault(); openMatchupDetails(item.matchup)" *ngFor="let item of round.matchups; trackBy: trackMatch" [attr.data-matchup-id]="item.matchup.matchupId" [style.grid-row]="'span ' + bracketRoundSpan(round.roundNumber)" [style.--feeder-offset]="bracketRoundSpan(round.roundNumber) * 60 + 'px'">
+          <div class="revealed-game-label">{{ matchupWeekLabel(round.roundNumber, item.weekNumber) }} · MATCHUP {{ item.matchup.matchupNumber }}</div>
+          <div class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId"><span>{{ item.matchup.bracketSongATitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId">✓</b></div>
+          <div class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId"><span>{{ item.matchup.bracketSongBTitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId">✓</b></div>
+          <div class="revealed-result" *ngIf="item.matchup.selectedEntryId != null">Your vote: {{ songName(item.matchup, item.matchup.selectedEntryId) }}</div>
+          <div class="revealed-result" *ngIf="item.matchup.winnerEntryId">{{ songName(item.matchup, item.matchup.winnerEntryId) }} advances · {{ resultTally(item.matchup) }} <span class="random-tie-badge" *ngIf="item.matchup.randomTiebreakerVoteEntryId">TIE</span></div>
+          <p class="random-tie-note" *ngIf="item.matchup.randomTiebreakerVoteEntryId">The participants voting ended in a tie. Tie was broken randomly.</p>
+          <div class="revealed-result pending" *ngIf="!item.matchup.winnerEntryId">{{ awaitingFinale && item.matchup.roundNumber >= (bracketData.bracket.finaleStartRound || 999) ? 'At the finale' : finaleModeActive ? 'Awaiting the admin’s count' : item.isUpcoming ? 'Upcoming' : paused && item.weekNumber === currentWeek?.weekNumber ? 'On hold' : item.weekNumber === currentWeek?.weekNumber ? 'Voting this week' : 'Winner pending' }}</div>
+        </article>
+        </div>
+      </section>
+    </div>
+    <div class="no-matchups" *ngIf="!revealedRounds.length">No matchups have been scheduled yet.</div>
+  </section>
+
+  <footer class="page-footer"><span>THE SONGS WE STILL ARGUE ABOUT <b>✳</b></span><span>{{ bracketData.bracket.artist | uppercase }} BRACKET</span></footer>
+  </ng-template>
+</div>
+<div class="page-wrap" *ngIf="loading"><div class="notice-bar">Loading this week's bracket…</div></div>
+<div class="page-wrap" *ngIf="!loading && !data && error"><p class="page-error" role="alert">{{ error }}</p></div>
+
+<app-admin-ballot-editor *ngIf="isAdmin" (saved)="ballotsSaved($event)"></app-admin-ballot-editor>
+
+<dialog #matchupDetailsDialog class="matchup-details-dialog" aria-labelledby="matchup-details-title">
+  <ng-container *ngIf="detailsMatch as match">
+    <span class="week-label">ROUND {{ match.roundNumber }} · {{ matchupWeekLabel(match.roundNumber, detailsWeek?.weekNumber) }} · MATCHUP {{ match.matchupNumber }}</span>
+    <h2 id="matchup-details-title">Matchup details</h2>
+    <p class="details-note" *ngIf="match.selectedEntryId != null">Your vote: {{ songName(match, match.selectedEntryId) }}</p>
+    <div class="details-tally" *ngIf="detailsResultsVisible">{{ resultTally(match) }} <span class="random-tie-badge" *ngIf="match.randomTiebreakerVoteEntryId">TIE</span></div>
+    <p class="random-tie-note" *ngIf="match.randomTiebreakerVoteEntryId">The participants voting ended in a tie. Tie was broken randomly.</p>
+    <p class="details-note" *ngIf="!detailsResultsVisible">{{ detailsWeek?.isUpcoming ? 'This matchup is upcoming. Unrevealed songs remain TBD.' : 'Votes remain private until this matchup’s results are released.' }}</p>
+    <p class="details-note" *ngIf="detailsResultsVisible && !data?.canViewBallots">Voting is anonymous. You can see your own vote; other participants’ votes are hidden.</p>
+    <div class="details-songs">
+      <section class="details-song" [class.winner]="match.winnerEntryId !== null && match.winnerEntryId === match.songA.entryId">
+        <app-song-album-art [url]="match.bracketSongATitle === match.songA.title ? match.songA.albumCoverUrl : null" [title]="match.bracketSongATitle"></app-song-album-art>
+        <h3>{{ match.bracketSongATitle }} <span *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.songA.entryId">✓</span></h3>
+        <p *ngIf="match.bracketSongATitle === match.songA.title && match.songA.album">{{ match.songA.album }}</p>
+        <div class="listen-links" *ngIf="match.bracketSongATitle === match.songA.title && (match.songA.youtubeUrl || match.songA.spotifyUrl)">
+          <span>LISTEN</span><a *ngIf="match.songA.youtubeUrl" [href]="match.songA.youtubeUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Listen to ' + match.songA.title + ' on YouTube (opens in a new tab)'">YouTube ↗</a><a *ngIf="match.songA.spotifyUrl" [href]="match.songA.spotifyUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Listen to ' + match.songA.title + ' on Spotify (opens in a new tab)'">Spotify ↗</a>
+        </div>
+        <div class="details-tally" *ngIf="detailsResultsVisible">{{ detailsVotes(match,'A') }} votes</div>
+        <ul *ngIf="detailsResultsVisible && data?.canViewBallots"><li *ngFor="let ballot of detailsVoters(match,'A')">{{ ballot.displayName }}</li></ul>
+      </section>
+      <section class="details-song" [class.winner]="match.winnerEntryId !== null && match.winnerEntryId === match.songB.entryId">
+        <app-song-album-art [url]="match.bracketSongBTitle === match.songB.title ? match.songB.albumCoverUrl : null" [title]="match.bracketSongBTitle"></app-song-album-art>
+        <h3>{{ match.bracketSongBTitle }} <span *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.songB.entryId">✓</span></h3>
+        <p *ngIf="match.bracketSongBTitle === match.songB.title && match.songB.album">{{ match.songB.album }}</p>
+        <div class="listen-links" *ngIf="match.bracketSongBTitle === match.songB.title && (match.songB.youtubeUrl || match.songB.spotifyUrl)">
+          <span>LISTEN</span><a *ngIf="match.songB.youtubeUrl" [href]="match.songB.youtubeUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Listen to ' + match.songB.title + ' on YouTube (opens in a new tab)'">YouTube ↗</a><a *ngIf="match.songB.spotifyUrl" [href]="match.songB.spotifyUrl" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Listen to ' + match.songB.title + ' on Spotify (opens in a new tab)'">Spotify ↗</a>
+        </div>
+        <div class="details-tally" *ngIf="detailsResultsVisible">{{ detailsVotes(match,'B') }} votes</div>
+        <ul *ngIf="detailsResultsVisible && data?.canViewBallots"><li *ngFor="let ballot of detailsVoters(match,'B')">{{ ballot.displayName }}</li></ul>
+      </section>
+    </div>
+    <div class="details-actions"><button class="primary" type="button" *ngIf="canEditBallots(match)" (click)="editDetailsVotes(match)">Edit participant votes</button><button type="button" (click)="closeMatchupDetails()" autofocus>Close</button></div>
+  </ng-container>
+</dialog>
+
+<dialog #advanceWeekDialog class="matchup-details-dialog" aria-labelledby="advance-week-title" (cancel)="advancing && $event.preventDefault()">
+  <h2 id="advance-week-title">Advance voting week</h2>
+  <p *ngIf="advanceLoading" role="status">Loading session details…</p>
+  <ng-container *ngIf="advancePlan as plan">
+    <p class="details-note">Close Week {{ plan.weekNumber }} now and decide its matchups using the votes received and the bracket’s tiebreaker. Missing votes will not be added.</p>
+    <ng-container *ngIf="plan.nextWeekId != null; else noNextSession">
+      <p class="details-note">Week {{ plan.nextWeekNumber }} will open immediately. Choose when its voting should end.</p>
+      <label *ngIf="plan.noTimer"><input type="checkbox" [(ngModel)]="nextSessionUntimed" [disabled]="advancing"> No timer — wait for everyone’s votes</label>
+      <label class="next-session-end" *ngIf="!nextSessionUntimed">Next session ends<input type="datetime-local" step="1" [(ngModel)]="nextSessionEnd" [disabled]="advancing"></label>
+    </ng-container>
+    <ng-template #noNextSession><p class="details-note">This is the last online session. The bracket will proceed to the finale or declare its champion.</p></ng-template>
+  </ng-container>
+  <p class="page-error" *ngIf="advanceError" role="alert">{{ advanceError }}</p>
+  <div class="details-actions"><button type="button" class="primary" (click)="confirmAdvanceWeek()" [disabled]="advancing || advanceLoading || !advancePlan">{{ advancing ? 'Advancing…' : 'Advance week' }}</button><button type="button" (click)="closeAdvanceWeek()" [disabled]="advancing">Cancel</button></div>
+</dialog>

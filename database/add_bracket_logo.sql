@@ -1,0 +1,1 @@
+ALTER TABLE brackets ADD COLUMN logo_url VARCHAR(2048) NULL AFTER artist;

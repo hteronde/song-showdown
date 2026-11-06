@@ -1,0 +1,2 @@
+USE music_bracket;
+ALTER TABLE brackets ADD COLUMN anonymous BOOLEAN NOT NULL DEFAULT FALSE;

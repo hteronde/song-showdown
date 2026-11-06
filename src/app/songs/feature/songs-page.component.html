@@ -1,0 +1,27 @@
+<div class="page-wrap admin-page">
+  <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">♫</span> MUSIC CATALOG <span class="eyebrow-divider">·</span> SONGS</div><h1>Keep the catalog<br><em>in tune.</em></h1><p class="hero-subtitle">Manage songs used to build your family's brackets.</p></section>
+  <div class="admin-heading"><div><span class="stat-label">SHARED CATALOG</span><h2>{{ pageMode === 'list' ? 'Songs' : pageMode === 'add' ? 'Add song' : 'Edit song' }}</h2></div><span class="history-count">{{ songs.length }} SONGS</span></div>
+  <div class="admin-form-actions"><button class="admin-primary" type="button" *ngIf="pageMode === 'list'" (click)="add()">Add song</button><button class="admin-secondary" type="button" *ngIf="pageMode !== 'list'" (click)="cancelEdit()" [disabled]="saving">← Back to songs</button></div>
+  <div class="notice-bar" *ngIf="loading">Loading songs…</div>
+  <div class="notice-bar admin-error" *ngIf="error">{{ error }}</div>
+  <div class="notice-bar admin-success" *ngIf="success">{{ success }}</div>
+  <section class="admin-panel" *ngIf="pageMode !== 'list' && !loading && (pageMode === 'add' || editingId !== null)">
+    <div class="admin-panel-heading"><div><span class="stat-label">{{ editingId === null ? 'NEW SONG' : 'EDIT SONG' }}</span><h3>{{ editingId === null ? 'Add a song' : 'Update song details' }}</h3></div></div>
+    <form class="admin-form song-admin-form" (ngSubmit)="saveSong()">
+      <label>Artist<input name="artist" [(ngModel)]="draft.artist" required maxlength="160"></label>
+      <label>Song title<input name="title" [(ngModel)]="draft.title" required maxlength="200"></label>
+      <label>Album<input name="album" [(ngModel)]="draft.album" maxlength="200"></label>
+      <label>Year<input name="year" [(ngModel)]="draft.year" type="number" min="1" max="9999" inputmode="numeric"></label>
+      <label class="songwriter-field">Category<input name="category" [(ngModel)]="draft.category" maxlength="255"></label>
+      <label>YouTube URL<input name="youtubeUrl" [(ngModel)]="draft.youtubeUrl" type="url" maxlength="2048" placeholder="https://youtube.com/watch?v=…"></label>
+      <label>Spotify URL<input name="spotifyUrl" [(ngModel)]="draft.spotifyUrl" type="url" maxlength="2048" placeholder="https://open.spotify.com/track/…"></label>
+      <div class="admin-form-actions"><button class="admin-primary" type="submit" [disabled]="saving">{{ saving ? 'SAVING…' : editingId === null ? 'ADD SONG' : 'SAVE CHANGES' }}</button><button class="admin-secondary" type="button" (click)="cancelEdit()">CANCEL</button></div>
+    </form>
+  </section>
+  <section class="admin-panel admin-table-panel" *ngIf="pageMode === 'list'">
+    <div class="admin-panel-heading catalog-heading"><div><span class="stat-label">AVAILABLE FOR BRACKETS</span><h3>Catalog</h3></div><label class="catalog-search">Search<input name="searchTerm" [(ngModel)]="searchTerm" (ngModelChange)="filterSongs()" placeholder="Title, artist, album…"></label></div>
+    <div class="admin-empty" *ngIf="!loading && !filteredSongs.length && !error">No matching songs found.</div>
+    <div class="admin-table-wrap" *ngIf="filteredSongs.length"><table class="admin-table"><thead><tr><th>Song</th><th>Artist</th><th>Album</th><th>Year</th><th>Category</th><th>Listen</th><th>Actions</th></tr></thead><tbody><tr *ngFor="let song of filteredSongs"><td>{{ song.title }}</td><td>{{ song.artist }}</td><td>{{ song.album || '—' }}</td><td>{{ song.year || '—' }}</td><td>{{ song.category || '—' }}</td><td class="song-links"><a *ngIf="song.youtubeUrl" [href]="song.youtubeUrl" target="_blank" rel="noopener noreferrer">YouTube ↗</a><a *ngIf="song.spotifyUrl" [href]="song.spotifyUrl" target="_blank" rel="noopener noreferrer">Spotify ↗</a><span *ngIf="!song.youtubeUrl && !song.spotifyUrl">—</span></td><td class="admin-row-actions"><button type="button" (click)="edit(song)">Edit</button><button type="button" class="danger-action" (click)="deleteSong(song)">Delete</button></td></tr></tbody></table></div>
+  </section>
+  <footer class="page-footer" *ngIf="pageMode === 'list'"><span>SONG CATALOG <b>✳</b></span><span>{{ filteredSongs.length }} SHOWN</span></footer>
+</div>

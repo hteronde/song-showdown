@@ -1,0 +1,34 @@
+<div class="page-wrap admin-page">
+  <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">♫</span> LISTEN ALONG <span class="eyebrow-divider">·</span> PLAYLISTS</div><h1>Set the<br><em>soundtrack.</em></h1><p class="hero-subtitle">Share playlists for a full bracket or a specific week.</p></section>
+  <div class="admin-heading"><div><span class="stat-label">BRACKET MUSIC</span><h2>{{ pageMode === 'list' ? 'Playlists' : pageMode === 'add' ? 'Add playlist' : 'Edit playlist' }}</h2></div><span class="history-count">{{ playlists.length }} PLAYLISTS</span></div>
+  <div class="admin-form-actions"><button class="admin-primary" type="button" *ngIf="pageMode === 'list'" (click)="add()">Add playlist</button><button class="admin-secondary" type="button" *ngIf="pageMode !== 'list'" (click)="cancelEdit()" [disabled]="saving">← Back to playlists</button></div>
+  <div class="notice-bar" *ngIf="loading">Loading playlists…</div>
+  <div class="notice-bar admin-error" *ngIf="error">{{ error }}</div>
+  <div class="notice-bar admin-success" *ngIf="success">{{ success }}</div>
+  <section class="admin-panel" *ngIf="pageMode !== 'list' && !loading && (pageMode === 'add' || editingId !== null)">
+    <div class="admin-panel-heading"><div><span class="stat-label">{{ editingId === null ? 'NEW PLAYLIST' : 'EDIT PLAYLIST' }}</span><h3>{{ editingId === null ? 'Add a playlist' : 'Update playlist details' }}</h3></div></div>
+    <form class="admin-form playlist-admin-form" (ngSubmit)="savePlaylist()">
+      <label>Bracket
+        <select name="bracketId" [(ngModel)]="draft.bracketId" (ngModelChange)="onBracketChange()" required>
+          <option *ngFor="let bracket of brackets" [ngValue]="bracket.bracketId">{{ bracket.title }} — {{ bracket.artist }}</option>
+        </select>
+      </label>
+      <label>Playlist applies to
+        <select name="weekId" [(ngModel)]="draft.weekId">
+          <option [ngValue]="null">Entire bracket</option>
+          <option *ngFor="let week of selectedBracket?.weeks" [ngValue]="week.weekId">Week {{ week.weekNumber }}</option>
+        </select>
+      </label>
+      <label>Playlist name<input name="playlistName" [(ngModel)]="draft.playlistName" required maxlength="160"></label>
+      <label class="playlist-url-field">Playlist URL<input name="playlistUrl" [(ngModel)]="draft.playlistUrl" type="url" required maxlength="2048" placeholder="https://open.spotify.com/playlist/…"></label>
+      <div class="admin-form-actions"><button class="admin-primary" type="submit" [disabled]="saving || !brackets.length">{{ saving ? 'SAVING…' : editingId === null ? 'ADD PLAYLIST' : 'SAVE CHANGES' }}</button><button class="admin-secondary" type="button" (click)="cancelEdit()">CANCEL</button></div>
+    </form>
+    <div class="admin-empty" *ngIf="!loading && !brackets.length">Create a bracket before adding playlists.</div>
+  </section>
+  <section class="admin-panel admin-table-panel" *ngIf="pageMode === 'list'">
+    <div class="admin-panel-heading"><div><span class="stat-label">SHARED WITH BRACKET MEMBERS</span><h3>Playlist links</h3></div></div>
+    <div class="admin-empty" *ngIf="!loading && !playlists.length && !error">No playlists added yet.</div>
+    <div class="admin-table-wrap" *ngIf="playlists.length"><table class="admin-table playlist-table"><thead><tr><th>Name</th><th>Bracket</th><th>Scope</th><th>Spotify link</th><th>Actions</th></tr></thead><tbody><tr *ngFor="let playlist of playlists"><td>{{ playlist.playlistName }}</td><td>{{ playlist.bracketTitle }} — {{ playlist.bracketArtist }}</td><td>{{ playlist.weekNumber === null ? 'Entire bracket' : 'Week ' + playlist.weekNumber }}</td><td><a [href]="playlist.playlistUrl" target="_blank" rel="noopener noreferrer">Open ↗</a></td><td class="admin-row-actions"><button type="button" (click)="edit(playlist)">Edit</button><button type="button" class="danger-action" (click)="deletePlaylist(playlist)">Delete</button></td></tr></tbody></table></div>
+  </section>
+  <footer class="page-footer" *ngIf="pageMode === 'list'"><span>BRACKET PLAYLISTS <b>✳</b></span><span>{{ playlists.length }} SHOWN</span></footer>
+</div>
