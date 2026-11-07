@@ -1,19 +1,11 @@
-import { apiRequest, ApiError, isApiCancelled } from '../../shared/data-access/api-client';
+import { AdminBallotsApiService } from '../data-access/admin-ballots-api.service';
+import { AdminBallotEditorData, TieBreakSelection } from '../data-access/admin-ballots.model';
+import { ApiError, isApiCancelled } from '../../shared/data-access/api-client';
 import { SongAlbumArtComponent } from './song-album-art.component';
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, EventEmitter, OnDestroy, Output, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-interface BallotPerson { userId: number; displayName: string; selectedEntryId: number | null; }
-interface EditorData {
-  matchupId: number; weekNumber: number; matchupNumber: number;
-  songAEntryId: number; songBEntryId: number; songATitle: string; songBTitle: string;
-  songAYoutubeUrl: string|null; songASpotifyUrl: string|null; songBYoutubeUrl: string|null; songBSpotifyUrl: string|null;
-  songAYear: number|null; songBYear: number|null;
-  songAAlbum: string|null; songBAlbum: string|null; songAAlbumCoverUrl: string|null; songBAlbumCoverUrl: string|null;
-  tieBreakEntryId: number|null;
-  participants: BallotPerson[]; revision: string; canEdit: boolean; editRestriction: string; inFinale: boolean; seedingSize: number|null; tiebreakerOption: 'random'|'seed'|'seed_low'|'admin_pick';
-}
 @Component({
   selector:'app-admin-ballot-editor', standalone:true, imports:[CommonModule,FormsModule,SongAlbumArtComponent],
   template:`
@@ -74,13 +66,13 @@ interface EditorData {
   `]
 })
 export class AdminBallotEditorComponent implements OnDestroy {
-  constructor(private readonly changeDetector:ChangeDetectorRef) {}
+  constructor(private readonly changeDetector:ChangeDetectorRef, private readonly ballotsApi:AdminBallotsApiService) {}
   @ViewChild('dialog') dialog?:ElementRef<HTMLDialogElement>;
   @Output() saved=new EventEmitter<number>();
-  data:EditorData|null=null;
+  data:AdminBallotEditorData|null=null;
   picks:Record<number,number|null>={};
   loading=false; saving=false; error=''; confirmReset=false; resetMessage='';
-  tiePick:number|'admin_vote'|'random'|'seed'|'seed_low'|null=null;
+  tiePick:TieBreakSelection=null;
   revealing=false;
   revealedWinner='';
   unresolvedTie=false;
@@ -100,7 +92,7 @@ export class AdminBallotEditorComponent implements OnDestroy {
     this.bracketId=bracketId;this.data=null;this.picks={};this.error='';this.confirmReset=false;this.tiePick=null;this.loading=true;
     if (!this.dialog?.nativeElement.open) this.dialog?.nativeElement.showModal();
     try {
-      const payload=await apiRequest<EditorData>(`/api/admin/brackets/${bracketId}/matchups/${matchupId}/ballots`,{signal:this.requestController.signal});
+      const payload=await this.ballotsApi.get(bracketId,matchupId,this.requestController.signal);
       if(requestVersion !== this.requestVersion) return;
       this.data=payload;
       this.tiePick=payload.inFinale
@@ -120,10 +112,12 @@ export class AdminBallotEditorComponent implements OnDestroy {
     if(!this.data||!this.data.canEdit||this.saving) return;
     this.saving=true;this.error='';
     try {
-      const payload=await apiRequest<{winnerEntryId:number|null;randomTiebreakerVoteEntryId:number|null;participantVotesA:number;participantVotesB:number;voteCountA:number;voteCountB:number}>(`/api/admin/brackets/${this.bracketId}/matchups/${this.data.matchupId}/ballots`,{
-        method:'PUT',signal:this.requestController?.signal,
-        json:{revision:this.data.revision,ballots:this.data.participants.filter(p=>this.picks[p.userId]!==p.selectedEntryId).map(p=>({userId:p.userId,selectedEntryId:this.picks[p.userId]})),tieBreakEntryId:this.tiePick,resetLaterRounds:this.confirmReset}
-      });
+      const payload=await this.ballotsApi.save(this.bracketId,this.data.matchupId,{
+        revision:this.data.revision,
+        ballots:this.data.participants.filter(p=>this.picks[p.userId]!==p.selectedEntryId).map(p=>({userId:p.userId,selectedEntryId:this.picks[p.userId]})),
+        tieBreakEntryId:this.tiePick,
+        resetLaterRounds:this.confirmReset
+      },this.requestController?.signal);
       const matchupId = this.data.matchupId;
       if (this.data.inFinale) {
         const version = this.requestVersion;
