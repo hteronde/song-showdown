@@ -49,7 +49,7 @@
           <button class="bracket-link" [class.active]="activePage === 'playlists'" routerLink="/manage/playlists"><span class="bracket-icon">▤</span><span>Playlists</span></button>
         </ng-container>
         <div class="sidebar-bottom">
-          <div class="help-card" *ngIf="isAdmin"><span class="help-icon">✳</span><div><strong>Make it a family thing.</strong><p>Invite everyone to your next showdown.</p></div><button class="invite-button" (click)="copyInvite()">{{ inviteCopied ? 'Copied!' : 'Invite family ↗' }}</button></div>
+          <div class="help-card" *ngIf="isAdmin"><span class="help-icon">✳</span><div><strong>Family invitations</strong><p>Preview a sample link. Joining by invitation is not available yet.</p></div><button class="invite-button" (click)="copyInvite()">{{ inviteCopied ? 'Demo link copied!' : 'Copy demo invite link ↗' }}</button></div>
           <div class="profile-switch">
             <span class="avatar" [style.background]="currentMember.color">{{ currentMember.initials }}</span>
             <span class="profile-name"><strong>{{ currentMember.name }}</strong><small>{{ isAdmin ? 'Admin' : 'Family member' }}</small></span>

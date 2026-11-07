@@ -207,7 +207,7 @@ export class AppComponent {
     this.inviteCopied = true;
     try {
       await navigator.clipboard.writeText(inviteLink.toString());
-      this.showToast('Invite link copied to clipboard.');
+      this.showToast('Demo invite link copied. Joining by invitation is not available yet.');
     } catch {
       this.inviteCopied = false;
       this.showToast('Clipboard access is unavailable in this browser.');
