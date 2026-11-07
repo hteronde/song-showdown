@@ -138,7 +138,9 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
   }
   pauseSaving = false;
   private refreshTimer?: ReturnType<typeof setInterval>;
-  private refreshInFlight = false;
+  private refreshInFlightVersion: number | null = null;
+  private loadVersion = 0;
+  private routeSubscription?: { unsubscribe(): void };
   private loadedBracketId: number | null = null;
   get isComplete(): boolean { return this.data?.bracket.status === 'complete'; }
   get awaitingFinale(): boolean {return this.data?.awaitingFinale??false;}
@@ -159,16 +161,35 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     } catch (error) { this.error = error instanceof Error ? error.message : 'Could not change hold status.'; }
     finally { this.pauseSaving = false; this.changeDetector.markForCheck(); }
   }
+  private isCurrentLoad(version: number, bracketId: number): boolean {
+    return this.loadVersion === version && this.loadedBracketId === bracketId;
+  }
+
   private async refresh(): Promise<void> {
-    if (!this.loadedBracketId || this.refreshInFlight) return;
+    if (!this.loadedBracketId || this.loading || this.refreshInFlightVersion === this.loadVersion) return;
     const bracketId = this.loadedBracketId;
-    this.refreshInFlight = true;
+    const version = this.loadVersion;
+    this.refreshInFlightVersion = version;
     try {
       const data = await this.api.getVotingPage(bracketId);
-      if (this.loadedBracketId === bracketId) { if ((data.awaitingFinale && !this.data?.awaitingFinale) || (data.bracket.status === 'complete' && !this.isComplete)) this.firstVisibleRound = 1; this.data = data; this.refreshMatchupDetails();  if (!this.hasOnlineVoting && this.viewMode === 'vote') this.viewMode = 'bracket'; }
-    } finally { this.refreshInFlight = false; this.changeDetector.markForCheck(); }
+      if (!this.isCurrentLoad(version, bracketId)) return;
+      if ((data.awaitingFinale && !this.data?.awaitingFinale) || (data.bracket.status === 'complete' && !this.isComplete)) this.firstVisibleRound = 1;
+      this.data = data;
+      this.refreshMatchupDetails();
+      if (!this.hasOnlineVoting && this.viewMode === 'vote') this.viewMode = 'bracket';
+    } catch (error) {
+      if (this.isCurrentLoad(version, bracketId)) throw error;
+    } finally {
+      if (this.refreshInFlightVersion === version) this.refreshInFlightVersion = null;
+      if (this.isCurrentLoad(version, bracketId)) this.changeDetector.markForCheck();
+    }
   }
-  ngOnDestroy(): void { clearInterval(this.refreshTimer); this.loadedBracketId = null; }
+  ngOnDestroy(): void {
+    clearInterval(this.refreshTimer);
+    this.routeSubscription?.unsubscribe();
+    this.loadedBracketId = null;
+    ++this.loadVersion;
+  }
 
   get currentWeek(): VotingWeek | null {
     return this.data?.weeks.find(week => week.isCurrent) ?? null;
@@ -218,7 +239,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.refreshTimer = setInterval(() => { if (!this.loading) void this.refresh().catch(() => {}); },5000);
-    this.route.paramMap.subscribe(params => {
+    this.routeSubscription = this.route.paramMap.subscribe(params => {
       const bracketId = Number(params.get('bracketId'));
       if (bracketId > 0) void this.load(bracketId);
     });
@@ -287,11 +308,22 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
   }
 
   private async load(bracketId: number): Promise<void> {
+    const version = ++this.loadVersion;
     this.loadedBracketId = bracketId;
     this.loading = true;
     this.error = '';
+    this.notice = '';
+    this.data = null;
+    this.currentMemberId = null;
+    this.isAdmin = false;
+    this.detailsMatch = null;
+    this.detailsWeek = null;
+    this.closeMatchupDetails();
+    for (const key of Object.keys(this.picks)) delete this.picks[Number(key)];
+    for (const key of Object.keys(this.comments)) delete this.comments[Number(key)];
     try {
       const [data, user] = await Promise.all([this.api.getVotingPage(bracketId), this.authApi.getCurrentUser()]);
+      if (!this.isCurrentLoad(version, bracketId)) return;
       this.firstVisibleRound = 1;
       this.data = data;
       this.viewMode = this.hasOnlineVoting ? 'vote' : 'bracket';
@@ -304,10 +336,12 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         }
       }
     } catch (error) {
-      this.error = error instanceof Error ? error.message : 'Could not load this bracket.';
+      if (this.isCurrentLoad(version, bracketId)) this.error = error instanceof Error ? error.message : 'Could not load this bracket.';
     } finally {
-      this.loading = false;
-      this.changeDetector.markForCheck();
+      if (this.isCurrentLoad(version, bracketId)) {
+        this.loading = false;
+        this.changeDetector.markForCheck();
+      }
     }
   }
 }
