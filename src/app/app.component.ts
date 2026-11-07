@@ -6,7 +6,7 @@ import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { ActiveBracketPageComponent } from './brackets/feature/active-bracket-page.component';
 import { HomePageComponent } from './home/feature/home-page.component';
 import { HistoryPageComponent } from './history/feature/history-page.component';
-import { BracketsPageComponent } from './brackets/feature/brackets-page.component';
+import type { BracketsPageComponent } from './brackets/feature/brackets-page.component';
 import { FamilyMember } from './family-members/data-access/family-member.model';
 import { AuthApiService, AuthUser } from './auth/data-access/auth-api.service';
 import { UserBracketLink, UserBracketsApiService } from './brackets/data-access/user-brackets-api.service';
@@ -49,7 +49,7 @@ export class AppComponent implements OnDestroy {
   private bracketLoadVersion = 0;
   private bracketRefreshTimer?: ReturnType<typeof setInterval>;
   private removeSessionListener?: () => void;
-  private bracketsPage: BracketsPageComponent | null = null;
+  private bracketsPage: Pick<BracketsPageComponent, 'showList'> | null = null;
 
   selectPage(page: 'home' | 'history' | 'familyMembers' | 'songs' | 'playlists' | 'brackets'): void {
     if (!this.isAdmin && ['familyMembers', 'songs', 'playlists', 'brackets'].includes(page)) return;
@@ -58,7 +58,9 @@ export class AppComponent implements OnDestroy {
   }
 
   onRouteActivate(component: unknown): void {
-    this.bracketsPage = component instanceof BracketsPageComponent ? component : null;
+    this.bracketsPage = component !== null && typeof component === 'object'
+      && 'showList' in component && typeof component.showList === 'function'
+      ? component as Pick<BracketsPageComponent, 'showList'> : null;
     if (component instanceof HomePageComponent) {
       component.currentMember = this.currentMember;
       component.toastMessage.subscribe(message => this.showToast(message));
