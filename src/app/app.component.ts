@@ -1,5 +1,6 @@
+import { apiSession } from './shared/data-access/api-client';
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { ActiveBracketPageComponent } from './brackets/feature/active-bracket-page.component';
@@ -16,8 +17,17 @@ import { UserBracketLink, UserBracketsApiService } from './brackets/data-access/
   imports: [CommonModule, FormsModule, RouterLink, RouterOutlet],
   templateUrl: './app.component.html'
 })
-export class AppComponent {
-  constructor(private readonly authApi: AuthApiService, private readonly changeDetector: ChangeDetectorRef, private readonly router: Router, private readonly userBracketsApi: UserBracketsApiService) { void this.restoreSession(); }
+export class AppComponent implements OnDestroy {
+  constructor(private readonly authApi: AuthApiService, private readonly changeDetector: ChangeDetectorRef, private readonly router: Router, private readonly userBracketsApi: UserBracketsApiService) {
+    this.removeSessionListener = apiSession.onExpired(() => {
+      this.clearSignedInState();
+      this.setAuthMode('login');
+      this.authError = 'Your session has expired. Please log in again.';
+      this.authBusy = false;
+      this.changeDetector.markForCheck();
+    });
+    void this.restoreSession();
+  }
 
   currentMember: FamilyMember = { id: 'you', name: 'Family member', initials: 'FM', color: '#c47d51' };
   authUser: AuthUser | null = null;
@@ -38,6 +48,7 @@ export class AppComponent {
   private toastTimer?: ReturnType<typeof setTimeout>;
   private bracketLoadVersion = 0;
   private bracketRefreshTimer?: ReturnType<typeof setInterval>;
+  private removeSessionListener?: () => void;
   private bracketsPage: BracketsPageComponent | null = null;
 
   selectPage(page: 'home' | 'history' | 'familyMembers' | 'songs' | 'playlists' | 'brackets'): void {
@@ -128,18 +139,30 @@ export class AppComponent {
     try { await this.authApi.signOut(); }
     catch (error) { this.showToast(error instanceof Error ? error.message : 'Could not contact the login service.'); }
     finally {
-      this.authUser = null;
-      this.authState = 'signedOut';
-      this.bracketLoadVersion++;
-      if (this.bracketRefreshTimer) clearInterval(this.bracketRefreshTimer);
-      this.bracketRefreshTimer = undefined;
-      this.userBrackets = [];
-      this.password = '';
-      this.confirmPassword = '';
+      apiSession.end();
+      this.clearSignedInState();
       void this.router.navigateByUrl('/brackets');
       this.authBusy = false;
       this.changeDetector.detectChanges();
     }
+  }
+
+  private clearSignedInState(): void {
+    this.authUser = null;
+    this.authState = 'signedOut';
+    this.bracketLoadVersion++;
+    if (this.bracketRefreshTimer) clearInterval(this.bracketRefreshTimer);
+    this.bracketRefreshTimer = undefined;
+    this.userBrackets = [];
+    this.password = '';
+    this.confirmPassword = '';
+  }
+
+  ngOnDestroy(): void {
+    this.removeSessionListener?.();
+    if (this.bracketRefreshTimer) clearInterval(this.bracketRefreshTimer);
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    apiSession.end();
   }
 
   setAuthMode(mode: 'login' | 'forgot' | 'reset'): void {
@@ -167,6 +190,7 @@ export class AppComponent {
   }
 
   private acceptLogin(user: AuthUser): void {
+    apiSession.start();
     this.authUser = user;
     const parts = user.displayName.trim().split(/\s+/).filter(Boolean);
     this.currentMember = {

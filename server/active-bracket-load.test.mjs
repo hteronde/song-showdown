@@ -11,7 +11,7 @@ const votingState = await loadFrontendModule(new URL('../src/app/brackets/state/
 const source=readFileSync(new URL('../src/app/brackets/feature/active-bracket-page.component.ts',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true}}).outputText;
 const core={Component:()=>()=>{},ViewChild:()=>()=>{},Output:()=>()=>{},EventEmitter:class{emit(){}}};
-const context=createContext({exports:{},Error,require:name=>name==='@angular/core'?core:name==='../state/voting-state'?votingState:{},setInterval,clearInterval});
+const context=createContext({exports:{},Error,AbortController,require:name=>name==='@angular/core'?core:name==='../state/voting-state'?votingState:{},setInterval,clearInterval});
 runInContext(compiled,context);
 const Component=context.exports.ActiveBracketPageComponent;
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
@@ -20,7 +20,7 @@ function fixture(){
   const requests=[];
   const saves=[];
   let checks=0;
-  const component=new Component({}, {}, {getVotingPage(id){const request={id,...deferred()};requests.push(request);return request.promise;},saveVote(...args){const save={args,...deferred()};saves.push(save);return save.promise;}}, {async getCurrentUser(){return {userId:7,role:'member'};}}, {markForCheck(){checks++;}});
+  const component=new Component({}, {}, {getVotingPage(id,signal){const request={id,signal,...deferred()};requests.push(request);return request.promise;},saveVote(...args){const save={args,...deferred()};saves.push(save);return save.promise;}}, {async getCurrentUser(){return {userId:7,role:'member'};}}, {markForCheck(){checks++;}});
   return {component,requests,saves,get checks(){return checks;}};
 }
 
@@ -171,4 +171,14 @@ test('an old submission cannot change a newly selected bracket',async()=>{
   f.saves[0].reject(new Error('Old save failed'));await save;
   assert.equal(c.data.bracket.bracketId,2);assert.equal(c.error,'');assert.equal(c.savingMatchupId,null);
   assert.equal(Object.keys(c.picks).length,0);
+});
+
+
+test('navigation and destruction abort the actual request signals',async()=>{
+  const {component:c,requests}=fixture();
+  const old=c.load(1);const next=c.load(2);
+  assert.equal(requests[0].signal.aborted,true);assert.equal(requests[1].signal.aborted,false);
+  c.ngOnDestroy();assert.equal(requests[1].signal.aborted,true);
+  requests[0].resolve(data(1));requests[1].resolve(data(2));await Promise.all([old,next]);
+  assert.equal(c.data,null);
 });

@@ -1,37 +1,24 @@
 import { Injectable } from '@angular/core';
+import { apiRequest } from '../../shared/data-access/api-client';
 import { PlaylistBracket, PlaylistInput, PlaylistRecord } from './playlist.model';
 
 @Injectable({ providedIn: 'root' })
 export class PlaylistsApiService {
-  private readonly baseUrl = '/api';
-
-  async getAll(): Promise<PlaylistRecord[]> {
-    const response = await fetch(`${this.baseUrl}/playlists`, { credentials: 'include' });
-    const payload = await response.json() as { playlists?: PlaylistRecord[]; error?: string };
-    if (!response.ok) throw new Error(payload.error || 'Could not load playlists.');
+  async getAll(signal?: AbortSignal): Promise<PlaylistRecord[]> {
+    const payload = await apiRequest<{playlists?: PlaylistRecord[]}>('/api/playlists', {signal});
     return payload.playlists ?? [];
   }
-
-  async getBrackets(): Promise<PlaylistBracket[]> {
-    const response = await fetch(`${this.baseUrl}/playlist-options`, { credentials: 'include' });
-    const payload = await response.json() as { brackets?: PlaylistBracket[]; error?: string };
-    if (!response.ok) throw new Error(payload.error || 'Could not load brackets.');
+  async getBrackets(signal?: AbortSignal): Promise<PlaylistBracket[]> {
+    const payload = await apiRequest<{brackets?: PlaylistBracket[]}>('/api/playlist-options', {signal});
     return payload.brackets ?? [];
   }
-
-  create(input: PlaylistInput): Promise<void> { return this.send(`${this.baseUrl}/playlists`, 'POST', input); }
-  update(playlistId: number, input: PlaylistInput): Promise<void> {
-    return this.send(`${this.baseUrl}/playlists/${playlistId}`, 'PUT', input);
+  async create(input: PlaylistInput): Promise<void> {
+    await apiRequest('/api/playlists', {method: 'POST', json: input});
   }
-  remove(playlistId: number): Promise<void> { return this.send(`${this.baseUrl}/playlists/${playlistId}`, 'DELETE'); }
-
-  private async send(url: string, method: string, body?: PlaylistInput): Promise<void> {
-    const response = await fetch(url, {
-      method,
-      credentials: 'include',
-      ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})
-    });
-    const payload = await response.json() as { error?: string };
-    if (!response.ok) throw new Error(payload.error || 'Could not save playlist changes.');
+  async update(playlistId: number, input: PlaylistInput): Promise<void> {
+    await apiRequest(`/api/playlists/${playlistId}`, {method: 'PUT', json: input});
+  }
+  async remove(playlistId: number): Promise<void> {
+    await apiRequest(`/api/playlists/${playlistId}`, {method: 'DELETE'});
   }
 }

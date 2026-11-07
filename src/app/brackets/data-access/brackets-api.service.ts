@@ -1,3 +1,4 @@
+import { apiRequest, ApiRequestOptions } from '../../shared/data-access/api-client';
 import { Injectable } from '@angular/core';
 import { SessionPlaylist, BracketSessionsData, BracketAlbum, BracketSong, BracketDetail, BracketInput, BracketParticipant, BracketRecord } from './bracket.model';
 
@@ -5,8 +6,8 @@ import { SessionPlaylist, BracketSessionsData, BracketAlbum, BracketSong, Bracke
 export class BracketsApiService {
   private readonly baseUrl = '/api/admin/brackets';
 
-  async getAll(): Promise<BracketRecord[]> {
-    const data = await this.request<{ brackets?: BracketRecord[] }>(this.baseUrl);
+  async getAll(signal?: AbortSignal): Promise<BracketRecord[]> {
+    const data = await this.request<{ brackets?: BracketRecord[] }>(this.baseUrl, {signal});
     return data.brackets ?? [];
   }
 
@@ -18,7 +19,7 @@ export class BracketsApiService {
     return this.request(`${this.baseUrl}/${bracketId}/session-playlists`,{method:'PUT',body:JSON.stringify({sessionPlaylists})});
   }
 
-  async getSessions(bracketId:number):Promise<BracketSessionsData> {return this.request(`${this.baseUrl}/${bracketId}/sessions`);}
+  async getSessions(bracketId:number, signal?: AbortSignal):Promise<BracketSessionsData> {return this.request(`${this.baseUrl}/${bracketId}/sessions`, {signal});}
   async saveSessions(bracketId:number,revision:string,sessions:Array<{weekId:number;opensAt:string|null;closesAt:string|null}>):Promise<BracketSessionsData> {
     return this.request(`${this.baseUrl}/${bracketId}/sessions`,{method:'PUT',body:JSON.stringify({revision,sessions})});
   }
@@ -27,8 +28,8 @@ export class BracketsApiService {
     await this.request(`${this.baseUrl}/${bracketId}/session-settings`,{method:'PUT',body:JSON.stringify(input)});
   }
 
-  async getParticipants(): Promise<BracketParticipant[]> {
-    const data = await this.request<{ members?: BracketParticipant[] }>(`${this.baseUrl}/participants`);
+  async getParticipants(signal?: AbortSignal): Promise<BracketParticipant[]> {
+    const data = await this.request<{ members?: BracketParticipant[] }>(`${this.baseUrl}/participants`, {signal});
     return data.members ?? [];
   }
 
@@ -37,8 +38,8 @@ export class BracketsApiService {
     return data.members;
   }
 
-  async get(bracketId: number): Promise<BracketDetail> {
-    const data = await this.request<{ bracket: BracketDetail }>(`${this.baseUrl}/${bracketId}`);
+  async get(bracketId: number, signal?: AbortSignal): Promise<BracketDetail> {
+    const data = await this.request<{ bracket: BracketDetail }>(`${this.baseUrl}/${bracketId}`, {signal});
     return data.bracket;
   }
 
@@ -78,14 +79,7 @@ export class BracketsApiService {
     await this.request(`${this.baseUrl}/${bracketId}`, { method: 'DELETE' });
   }
 
-  private async request<T = unknown>(url: string, options: RequestInit = {}): Promise<T> {
-    const response = await fetch(url, {
-      ...options,
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...options.headers }
-    });
-    const data = await response.json() as T & { error?: string; requiresReset?: boolean };
-    if (!response.ok) throw Object.assign(new Error(data.error || 'Could not complete the bracket request.'), { requiresReset: !!data.requiresReset });
-    return data;
+  private request<T = unknown>(url: string, options: ApiRequestOptions = {}): Promise<T> {
+    return apiRequest<T>(url, {errorMessage: 'Could not complete the bracket request.', ...options});
   }
 }

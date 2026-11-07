@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../../shared/data-access/api-client';
 import {ActivatedRoute,Router} from '@angular/router';
 import {Subscription} from 'rxjs';
 import { CommonModule } from '@angular/common';
@@ -25,14 +26,18 @@ export class FamilyMembersPageComponent implements OnInit, OnDestroy {
 
   get pageMode():'list'|'add'|'edit' {return this.route.snapshot.data['pageMode']??'list';}
   private routeSubscription?:Subscription;
+  private readController = new AbortController();
+  private routeVersion = 0;
   ngOnInit():void {
     this.success=window.history.state?.message??'';
     this.routeSubscription=this.route.paramMap.subscribe(()=>{void this.loadRoute();});
   }
-  ngOnDestroy():void {this.routeSubscription?.unsubscribe();}
+  ngOnDestroy():void {this.routeSubscription?.unsubscribe();this.readController.abort();++this.routeVersion;}
   private async loadRoute():Promise<void> {
+    const version = ++this.routeVersion;
     this.editingId=null;this.draft=this.emptyDraft();
     await this.loadMembers();
+    if (version !== this.routeVersion || this.readController.signal.aborted) return;
     if(this.pageMode==='edit'&&!this.error) {
       const id=Number(this.route.snapshot.paramMap.get('id'));
       const item=this.members.find(item=>item.userId===id);
@@ -45,13 +50,17 @@ export class FamilyMembersPageComponent implements OnInit, OnDestroy {
 
 
   async loadMembers(): Promise<void> {
+    this.readController.abort();
+    const controller = this.readController = new AbortController();
     this.loading = true;
     try {
-      this.members = await this.familyMembersApi.getAll();
-      this.error = '';
+      const items = await this.familyMembersApi.getAll(controller.signal);
+      if (controller.signal.aborted) return;
+      this.members = items;
+      if (!controller.signal.aborted) this.error = '';
     } catch (error) {
-      this.error = error instanceof TypeError ? 'The database API is unavailable. Start it with npm run start:api.' : error instanceof Error ? error.message : 'Could not load family members.';
-    } finally { this.loading = false;this.changeDetector.markForCheck(); }
+      if (!controller.signal.aborted) this.error = apiErrorMessage(error, 'Could not load family members.');
+    } finally { if (!controller.signal.aborted) {this.loading = false;this.changeDetector.markForCheck();} }
   }
 
   private populateDraft(member: FamilyMemberRecord): void {
@@ -72,7 +81,7 @@ export class FamilyMembersPageComponent implements OnInit, OnDestroy {
       else await this.familyMembersApi.update(this.editingId, this.draft);
       this.success = this.editingId === null ? 'Family member added.' : 'Family member updated.';
       await this.router.navigate(['/manage/family-members'],{state:{message:this.success}});
-    } catch (error) { this.error = error instanceof TypeError ? 'The database API is unavailable. Start it with npm run start:api.' : error instanceof Error ? error.message : 'Could not save this family member.'; }
+    } catch (error) { this.error = apiErrorMessage(error, 'Could not save this family member.'); }
     finally { this.saving = false;this.changeDetector.markForCheck(); }
   }
 
@@ -84,7 +93,7 @@ export class FamilyMembersPageComponent implements OnInit, OnDestroy {
       if (this.editingId === member.userId) this.cancelEdit();
       this.success = 'Family member removed from the family.';
       await this.loadMembers();
-    } catch (error) { this.error = error instanceof TypeError ? 'The database API is unavailable. Start it with npm run start:api.' : error instanceof Error ? error.message : 'Could not remove this family member.'; }
+    } catch (error) { this.error = apiErrorMessage(error, 'Could not remove this family member.'); }
   }
 
   private emptyDraft(): { displayName: string; email: string; role: 'owner' | 'member' } {

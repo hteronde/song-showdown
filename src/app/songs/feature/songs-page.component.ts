@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../../shared/data-access/api-client';
 import {ActivatedRoute,Router} from '@angular/router';
 import {Subscription} from 'rxjs';
 import { CommonModule } from '@angular/common';
@@ -27,14 +28,18 @@ export class SongsPageComponent implements OnInit, OnDestroy {
 
   get pageMode():'list'|'add'|'edit' {return this.route.snapshot.data['pageMode']??'list';}
   private routeSubscription?:Subscription;
+  private readController = new AbortController();
+  private routeVersion = 0;
   ngOnInit():void {
     this.success=window.history.state?.message??'';
     this.routeSubscription=this.route.paramMap.subscribe(()=>{void this.loadRoute();});
   }
-  ngOnDestroy():void {this.routeSubscription?.unsubscribe();}
+  ngOnDestroy():void {this.routeSubscription?.unsubscribe();this.readController.abort();++this.routeVersion;}
   private async loadRoute():Promise<void> {
+    const version = ++this.routeVersion;
     this.editingId=null;this.draft=this.emptyDraft();
     await this.loadSongs();
+    if (version !== this.routeVersion || this.readController.signal.aborted) return;
     if(this.pageMode==='edit'&&!this.error) {
       const id=Number(this.route.snapshot.paramMap.get('id'));
       const item=this.songs.find(item=>item.songId===id);
@@ -47,14 +52,18 @@ export class SongsPageComponent implements OnInit, OnDestroy {
 
 
   async loadSongs(): Promise<void> {
+    this.readController.abort();
+    const controller = this.readController = new AbortController();
     this.loading = true;
     try {
-      this.songs = await this.songsApi.getAll();
+      const items = await this.songsApi.getAll(controller.signal);
+      if (controller.signal.aborted) return;
+      this.songs = items;
       this.filterSongs();
-      this.error = '';
+      if (!controller.signal.aborted) this.error = '';
     } catch (error) {
-      this.error = error instanceof TypeError ? 'The database API is unavailable. Start it with npm run start:api.' : error instanceof Error ? error.message : 'Could not load songs.';
-    } finally { this.loading = false;this.changeDetector.markForCheck(); }
+      if (!controller.signal.aborted) this.error = apiErrorMessage(error, 'Could not load songs.');
+    } finally { if (!controller.signal.aborted) {this.loading = false;this.changeDetector.markForCheck();} }
   }
 
   filterSongs(): void {
@@ -89,7 +98,7 @@ export class SongsPageComponent implements OnInit, OnDestroy {
       else await this.songsApi.update(this.editingId, body);
       this.success = this.editingId === null ? 'Song added to the catalog.' : 'Song updated.';
       await this.router.navigate(['/manage/songs'],{state:{message:this.success}});
-    } catch (error) { this.error = error instanceof TypeError ? 'The database API is unavailable. Start it with npm run start:api.' : error instanceof Error ? error.message : 'Could not save this song.'; }
+    } catch (error) { this.error = apiErrorMessage(error, 'Could not save this song.'); }
     finally { this.saving = false;this.changeDetector.markForCheck(); }
   }
 
@@ -101,7 +110,7 @@ export class SongsPageComponent implements OnInit, OnDestroy {
       if (this.editingId === song.songId) this.cancelEdit();
       this.success = 'Song deleted from the catalog.';
       await this.loadSongs();
-    } catch (error) { this.error = error instanceof TypeError ? 'The database API is unavailable. Start it with npm run start:api.' : error instanceof Error ? error.message : 'Could not delete this song.'; }
+    } catch (error) { this.error = apiErrorMessage(error, 'Could not delete this song.'); }
   }
 
   private emptyDraft(): { artist: string; title: string; album: string; year: string; category: string; youtubeUrl: string; spotifyUrl: string } {

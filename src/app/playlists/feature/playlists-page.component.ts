@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../../shared/data-access/api-client';
 import {ActivatedRoute,Router} from '@angular/router';
 import {Subscription} from 'rxjs';
 import { CommonModule } from '@angular/common';
@@ -30,14 +31,18 @@ export class PlaylistsPageComponent implements OnInit, OnDestroy {
 
   get pageMode():'list'|'add'|'edit' {return this.route.snapshot.data['pageMode']??'list';}
   private routeSubscription?:Subscription;
+  private readController = new AbortController();
+  private routeVersion = 0;
   ngOnInit():void {
     this.success=window.history.state?.message??'';
     this.routeSubscription=this.route.paramMap.subscribe(()=>{void this.loadRoute();});
   }
-  ngOnDestroy():void {this.routeSubscription?.unsubscribe();}
+  ngOnDestroy():void {this.routeSubscription?.unsubscribe();this.readController.abort();++this.routeVersion;}
   private async loadRoute():Promise<void> {
+    const version = ++this.routeVersion;
     this.editingId=null;this.draft=this.emptyDraft();
     await this.loadData();
+    if (version !== this.routeVersion || this.readController.signal.aborted) return;
     if(this.pageMode==='edit'&&!this.error) {
       const id=Number(this.route.snapshot.paramMap.get('id'));
       const item=this.playlists.find(item=>item.playlistId===id);
@@ -50,20 +55,24 @@ export class PlaylistsPageComponent implements OnInit, OnDestroy {
 
 
   async loadData(): Promise<void> {
+    this.readController.abort();
+    const controller = this.readController = new AbortController();
     this.loading = true;
     try {
-      [this.playlists, this.brackets] = await Promise.all([
-        this.playlistsApi.getAll(),
-        this.playlistsApi.getBrackets()
+      const [playlists, brackets] = await Promise.all([
+        this.playlistsApi.getAll(controller.signal),
+        this.playlistsApi.getBrackets(controller.signal)
       ]);
+      if (controller.signal.aborted) return;
+      this.playlists = playlists; this.brackets = brackets;
       if (this.draft.bracketId === null && this.brackets.length) {
         this.draft.bracketId = this.brackets[0].bracketId;
       }
-      this.error = '';
+      if (!controller.signal.aborted) this.error = '';
     } catch (error) {
-      this.error = this.errorMessage(error, 'Could not load playlists.');
+      if (!controller.signal.aborted) this.error = this.errorMessage(error, 'Could not load playlists.');
     } finally {
-      this.loading = false;this.changeDetector.markForCheck();
+      if (!controller.signal.aborted) {this.loading = false;this.changeDetector.markForCheck();}
     }
   }
 
@@ -121,9 +130,7 @@ export class PlaylistsPageComponent implements OnInit, OnDestroy {
   }
 
   private errorMessage(error: unknown, fallback: string): string {
-    return error instanceof TypeError
-      ? 'The database API is unavailable. Start it with npm run start:api.'
-      : error instanceof Error ? error.message : fallback;
+    return apiErrorMessage(error, fallback);
   }
 
   private emptyDraft(): { bracketId: number | null; weekId: number | null; playlistName: string; playlistUrl: string } {

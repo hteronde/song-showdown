@@ -158,6 +158,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         }
     }
     pauseSaving = false;
+    private requestController = new AbortController();
     private refreshTimer?: ReturnType<typeof setInterval>;
     private routeSubscription?: {
         unsubscribe(): void;
@@ -197,7 +198,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         const version = this.requests.version;
         this.requests.pollingVersion = version;
         try {
-            const data = await this.api.getVotingPage(bracketId);
+            const data = await this.api.getVotingPage(bracketId, this.requestController.signal);
             if (!this.requests.isCurrent(version, bracketId))
                 return;
             if ((data.awaitingFinale && !this.data?.awaitingFinale) || (data.bracket.status === 'complete' && !this.isComplete))
@@ -227,6 +228,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         clearInterval(this.refreshTimer);
         this.routeSubscription?.unsubscribe();
         this.requests.invalidate();
+        this.requestController.abort();
     }
     get currentWeek(): VotingWeek | null {
         return this.data?.weeks.find(week => week.isCurrent) ?? null;
@@ -362,6 +364,8 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     }
     private async load(bracketId: number): Promise<void> {
         const version = this.requests.begin(bracketId);
+        this.requestController.abort();
+        this.requestController = new AbortController();
         this.loading = true;
         this.error = '';
         this.notice = '';
@@ -374,7 +378,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         this.closeMatchupDetails();
         this.voteDrafts.clear();
         try {
-            const [data, user] = await Promise.all([this.api.getVotingPage(bracketId), this.authApi.getCurrentUser()]);
+            const [data, user] = await Promise.all([this.api.getVotingPage(bracketId, this.requestController.signal), this.authApi.getCurrentUser(this.requestController.signal)]);
             if (!this.requests.isCurrent(version, bracketId))
                 return;
             this.firstVisibleRound = 1;

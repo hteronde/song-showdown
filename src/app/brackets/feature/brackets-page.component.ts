@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../../shared/data-access/api-client';
 import { BracketFieldErrors, enteredSongCount, validateBracketSettings } from '../state/bracket-settings';
 import { canReorderSong, reorderSong, seedGroupSongs, seedAssignmentError } from '../state/song-editing';
 import { ParticipantEditor } from '../state/participant-editor';
@@ -31,6 +32,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     }
     get pageMode(): 'list' | 'add' | 'edit' { return this.route.snapshot.data['pageMode'] ?? 'list'; }
     private routeSubscription?: Subscription;
+    private readController = new AbortController();
     formOpen = false;
     showValidationErrors = false;
     validationBannerDismissed = false;
@@ -512,7 +514,10 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         this.routeSubscription = this.route.paramMap.subscribe(() => { void this.loadRoute(); });
     }
     private async loadRoute(): Promise<void> {
-        await this.load();
+        this.readController.abort();
+        const controller = this.readController = new AbortController();
+        await this.load(controller.signal);
+        if (controller.signal.aborted) return;
         if (this.error)
             return;
         if (this.pageMode === 'add') {
@@ -523,7 +528,8 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             const id = Number(this.route.snapshot.paramMap.get('id'));
             if (Number.isSafeInteger(id) && id > 0) {
                 this.loading = true;
-                await this.loadBracket(id);
+                await this.loadBracket(id, controller.signal);
+                if (controller.signal.aborted) return;
                 this.loading = false;
             }
             else
@@ -533,20 +539,23 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.formOpen = false;
         this.changeDetector.markForCheck();
     }
-    async load(): Promise<void> {
+    async load(signal = this.readController.signal): Promise<void> {
         this.loading = true;
         this.error = '';
         try {
-            const [brackets, members] = await Promise.all([this.bracketsApi.getAll(), this.bracketsApi.getParticipants()]);
+            const [brackets, members] = await Promise.all([this.bracketsApi.getAll(signal), this.bracketsApi.getParticipants(signal)]);
+            if (signal.aborted) return;
             this.brackets = brackets;
             this.members = members;
         }
         catch (error) {
-            this.error = this.message(error);
+            if (!signal.aborted) this.error = this.message(error);
         }
         finally {
-            this.loading = false;
-            this.changeDetector.markForCheck();
+            if (!signal.aborted) {
+                this.loading = false;
+                this.changeDetector.markForCheck();
+            }
         }
     }
     newBracket(): void { void this.router.navigate(['/manage/brackets/new']); }
@@ -557,11 +566,12 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             void this.router.navigate(['/manage/brackets']);
     }
     edit(bracket: BracketRecord): Promise<boolean> { return this.router.navigate(['/manage/brackets', bracket.bracketId, 'edit']); }
-    private async loadBracket(bracketId: number): Promise<void> {
+    private async loadBracket(bracketId: number, signal = this.readController.signal): Promise<void> {
         this.error = '';
         this.success = '';
         try {
-            const [item, sessionData] = await Promise.all([this.bracketsApi.get(bracketId), this.bracketsApi.getSessions(bracketId)]);
+            const [item, sessionData] = await Promise.all([this.bracketsApi.get(bracketId, signal), this.bracketsApi.getSessions(bracketId, signal)]);
+            if (signal.aborted) return;
             this.setSessionData(sessionData);
             this.sessionsError = '';
             this.sessionsNotice = '';
@@ -616,7 +626,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.fieldErrors = {};
         }
         catch (error) {
-            this.error = this.message(error);
+            if (!signal.aborted) this.error = this.message(error);
         }
         finally {
             this.changeDetector.markForCheck();
@@ -894,6 +904,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.sessionToastTimer = setTimeout(() => { this.sessionToastMessage = ''; this.changeDetector.markForCheck(); }, 5000);
     }
     ngOnDestroy(): void {
+        this.readController.abort();
         this.routeSubscription?.unsubscribe();
         if (this.sessionToastTimer)
             clearTimeout(this.sessionToastTimer);
@@ -1154,5 +1165,5 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         }
     }
     private toLocalInput(value: string): string { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
-    private message(error: unknown): string { return error instanceof Error ? error.message : 'Something went wrong.'; }
+    private message(error: unknown): string { return apiErrorMessage(error); }
 }

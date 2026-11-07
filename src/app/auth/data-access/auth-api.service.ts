@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { apiRequest } from '../../shared/data-access/api-client';
 
 export interface AuthUser {
   userId: number;
@@ -6,72 +7,26 @@ export interface AuthUser {
   email: string;
   role: 'owner' | 'member' | null;
 }
-
-interface AuthResponse {
-  authenticated?: boolean;
-  user?: AuthUser | null;
-  error?: string;
-}
+interface AuthResponse { authenticated?: boolean; user?: AuthUser | null; }
 
 @Injectable({ providedIn: 'root' })
 export class AuthApiService {
-  private readonly baseUrl = '/api/auth';
-
-  async getCurrentUser(): Promise<AuthUser | null> {
-    let response: Response;
-    try {
-      response = await fetch(`${this.baseUrl}/session`, { credentials: 'include', signal: AbortSignal.timeout(5000) });
-    } catch {
-      throw new Error('Could not reach the login service. Check that npm run start:api is running.');
-    }
-    const payload = await response.json() as AuthResponse;
-    if (!response.ok) throw new Error(payload.error || 'Could not check the login session.');
+  async getCurrentUser(signal?: AbortSignal): Promise<AuthUser | null> {
+    const payload = await apiRequest<AuthResponse>('/api/auth/session', {signal, session: 'check'});
     return payload.authenticated ? payload.user ?? null : null;
   }
-
-  signIn(username: string, password: string): Promise<AuthUser> {
-    return this.send('/login', { username, password });
-  }
-
-  requestPasswordReset(username: string): Promise<void> {
-    return this.resetRequest('/forgot-password', { username });
-  }
-
-  resetPassword(token: string, password: string): Promise<void> {
-    return this.resetRequest('/reset-password', { token, password });
-  }
-
-  private async resetRequest(path: string, body: unknown): Promise<void> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body), signal: AbortSignal.timeout(15000)
-    });
-    const payload = await response.json() as AuthResponse;
-    if (!response.ok) throw new Error(payload.error || 'Could not reset your password.');
-  }
-
-  async signOut(): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/logout`, {
-      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}'
-    });
-    const payload = await response.json() as AuthResponse;
-    if (!response.ok) throw new Error(payload.error || 'Could not log out.');
-  }
-
-  private async send(path: string, body: unknown): Promise<AuthUser> {
-    let response: Response;
-    try {
-      response = await fetch(`${this.baseUrl}${path}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-    } catch {
-      throw new Error('The login service is unavailable. Start it with npm run start:api.');
-    }
-    const payload = await response.json() as AuthResponse;
-    if (!response.ok || !payload.user) throw new Error(payload.error || 'Could not sign in.');
+  async signIn(username: string, password: string, signal?: AbortSignal): Promise<AuthUser> {
+    const payload = await apiRequest<AuthResponse>('/api/auth/login', {method: 'POST', json: {username, password}, session: 'public', signal});
+    if (!payload.user) throw new Error('Could not sign in.');
     return payload.user;
+  }
+  async requestPasswordReset(username: string, signal?: AbortSignal): Promise<void> {
+    await apiRequest('/api/auth/forgot-password', {method: 'POST', json: {username}, session: 'public', signal});
+  }
+  async resetPassword(token: string, password: string, signal?: AbortSignal): Promise<void> {
+    await apiRequest('/api/auth/reset-password', {method: 'POST', json: {token, password}, session: 'public', signal});
+  }
+  async signOut(): Promise<void> {
+    await apiRequest('/api/auth/logout', {method: 'POST', json: {}, session: 'public'});
   }
 }

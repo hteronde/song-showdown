@@ -1,3 +1,4 @@
+import { apiRequest } from '../../shared/data-access/api-client';
 import { Injectable } from '@angular/core';
 
 export interface VotingSong {
@@ -63,34 +64,19 @@ export interface AdvanceWeekPlan {weekId:number;weekNumber:number;nextWeekId:num
 
 @Injectable({ providedIn: 'root' })
 export class ActiveBracketApiService {
-  async getVotingPage(bracketId: number): Promise<ActiveBracketVotingData> {
-    const response = await fetch(`/api/brackets/${bracketId}/voting`, { credentials: 'include' });
-    const payload = await response.json() as ActiveBracketVotingData & { error?: string };
-    if (!response.ok) throw new Error(payload.error || 'Could not load this week’s bracket.');
-    return payload;
+  getVotingPage(bracketId: number, signal?: AbortSignal): Promise<ActiveBracketVotingData> {
+    return apiRequest(`/api/brackets/${bracketId}/voting`, {signal});
   }
-
-  async getAdvanceWeekPlan(bracketId:number):Promise<AdvanceWeekPlan> {
-    const response=await fetch(`/api/admin/brackets/${bracketId}/advance-week`,{credentials:'include'});
-    const payload=await response.json();if(!response.ok)throw new Error(payload.error||'Could not load the next session.');return payload;
+  getAdvanceWeekPlan(bracketId: number, signal?: AbortSignal): Promise<AdvanceWeekPlan> {
+    return apiRequest(`/api/admin/brackets/${bracketId}/advance-week`, {signal});
   }
-  async advanceWeek(bracketId:number,weekId:number,nextClosesAt:string|null):Promise<void> {
-    const response=await fetch(`/api/admin/brackets/${bracketId}/advance-week`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({weekId,nextClosesAt})});
-    const payload=await response.json();if(!response.ok)throw new Error(payload.error||'Could not advance the week.');
+  async advanceWeek(bracketId: number, weekId: number, nextClosesAt: string | null): Promise<void> {
+    await apiRequest(`/api/admin/brackets/${bracketId}/advance-week`, {method: 'POST', json: {weekId, nextClosesAt}});
   }
-
   async setPaused(bracketId: number, paused: boolean): Promise<void> {
-    const response = await fetch(`/api/admin/brackets/${bracketId}/${paused ? 'pause' : 'resume'}`, { method: 'POST', credentials: 'include' });
-    const payload = await response.json() as { error?: string };
-    if (!response.ok) throw new Error(payload.error || 'Could not change bracket hold status.');
+    await apiRequest(`/api/admin/brackets/${bracketId}/${paused ? 'pause' : 'resume'}`, {method: 'POST'});
   }
-
   async saveVote(matchupId: number, userId: number, selectedEntryId: number, comment: string): Promise<void> {
-    const response = await fetch(`/api/matchups/${matchupId}/votes`, {
-      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, selectedEntryId, comment })
-    });
-    const payload = await response.json() as { error?: string };
-    if (!response.ok) throw new Error(payload.error || 'Could not save this vote.');
+    await apiRequest(`/api/matchups/${matchupId}/votes`, {method: 'POST', json: {userId, selectedEntryId, comment}});
   }
 }

@@ -36,6 +36,7 @@ Manual Radiohead testing has covered the main participant, voting, advancement, 
 - `src/app/brackets/feature/session-schedule.ts` owns schedule calculations, date-input conversion, duration conversion, and session payload construction.
 - Page components coordinate API calls, navigation, and dialogs. Each page has a separate `.component.css`; the active and History pages share bracket connector styles in `brackets/ui/bracket-connectors.css`.
 - `server/bracket-editor-state.test.mjs` tests the extracted frontend rules in Node; `server/active-bracket-load.test.mjs` exercises component request ordering and saved-vote/draft behavior with deferred requests.
+- `src/app/shared/data-access/api-client.ts` owns frontend fetch requests, error normalization, timeouts, cancellation, and session-expiry notifications.
 - `src/main.ts` only bootstraps the Angular application.
 
 ## Run locally
@@ -149,3 +150,11 @@ Limits apply to attempts, including successful ones:
 Throttled requests return HTTP 429 with `Retry-After`. Limiter storage is capped at 10,000 entries and fails closed with HTTP 503 if full. All password hashing and verification share two concurrent work slots, with HTTP 503 and `Retry-After` rather than an unbounded job queue when busy. Reset completion locks and validates a live, unused token before hashing; any hashing failure rolls back without consuming the token.
 
 These controls are process-local and reset when the API restarts. Multiple API instances need a shared limiter or equivalent enforcement at the gateway. Client identity uses the socket address; untrusted `X-Forwarded-For` headers are ignored. With a reverse proxy, clients share that proxy's address unless a trusted-proxy configuration and gateway limits are supplied.
+
+## Frontend API requests
+
+All frontend API calls use the shared `apiRequest` client. Requests include session cookies, use JSON headers, and have a 15-second default timeout covering response-body reading as well as fetching. The client accepts a caller's `AbortSignal`; route/detail/dialog reads cancel on replacement or teardown. Session changes cancel protected work across features.
+
+`ApiError` distinguishes HTTP errors, unavailable connections, timeouts, cancellations, and invalid server responses. HTTP status, `Retry-After`, and error details such as `requiresReset` remain available to workflows. Cancelled reads are not displayed as failures. The client does not automatically retry writes; aborting a browser request does not undo a change already committed by the server.
+
+A protected HTTP 401 expires the current frontend session once, clears the signed-in shell and sidebar, stops its polling, and prompts for login while preserving the requested route. A normal signed-out session check does not trigger an expiry alert. Bad credentials on the public login endpoint and HTTP 403 permission failures do not expire a session. Old requests cannot expire a newer login.

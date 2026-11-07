@@ -1,3 +1,4 @@
+import { apiRequest } from '../../shared/data-access/api-client';
 import { Injectable } from '@angular/core';
 
 export interface UserBracketLink {
@@ -10,10 +11,8 @@ export interface UserBracketLink {
 
 @Injectable({ providedIn: 'root' })
 export class UserBracketsApiService {
-  async getParticipating(): Promise<UserBracketLink[]> {
-    const response = await fetch('/api/my/brackets', { credentials: 'include' });
-    const payload = await response.json() as { brackets?: UserBracketLink[]; error?: string };
-    if (!response.ok) throw new Error(payload.error || 'Could not load your brackets.');
+  async getParticipating(signal?: AbortSignal): Promise<UserBracketLink[]> {
+    const payload = await apiRequest<{brackets?: UserBracketLink[]}>('/api/my/brackets', {signal});
     return payload.brackets ?? [];
   }
 }

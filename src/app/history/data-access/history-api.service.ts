@@ -1,3 +1,4 @@
+import { apiRequest } from '../../shared/data-access/api-client';
 import { Injectable } from '@angular/core';
 import { BracketHistoryListResponse, BracketHistoryResponse, FinaleOptions } from './history.models';
 
@@ -5,41 +6,14 @@ import { BracketHistoryListResponse, BracketHistoryResponse, FinaleOptions } fro
 export class HistoryApiService {
   private readonly baseUrl = '/api';
 
-  async getBrackets(): Promise<BracketHistoryListResponse> {
-    const response = await fetch(`${this.baseUrl}/brackets?familyId=1`, {
-      signal: AbortSignal.timeout(10_000), credentials: 'include'
-    });
-    const payload = await response.json() as BracketHistoryListResponse | { error?: string };
-    if (!response.ok || !('brackets' in payload)) {
-      throw new Error('error' in payload && payload.error ? payload.error : 'Could not load bracket history.');
-    }
-    return payload;
+  getBrackets(signal?: AbortSignal): Promise<BracketHistoryListResponse> {
+    return apiRequest(`${this.baseUrl}/brackets`, {signal});
   }
-
-  async getBracket(bracketId: number): Promise<BracketHistoryResponse> {
-    let response: Response;
-    try {
-      response = await fetch(`${this.baseUrl}/brackets/${bracketId}`, {
-        signal: AbortSignal.timeout(10_000), credentials: 'include'
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'TimeoutError') {
-        throw new Error('The bracket request timed out. Check that MySQL is running and the API .env settings match your database.');
-      }
-      throw error;
-    }
-    const payload = await response.json() as BracketHistoryResponse | { error?: string };
-    if (!response.ok || !('bracket' in payload)) {
-      throw new Error('error' in payload && payload.error ? payload.error : 'Could not load bracket history.');
-    }
-    return payload;
+  getBracket(bracketId: number, signal?: AbortSignal): Promise<BracketHistoryResponse> {
+    return apiRequest(`${this.baseUrl}/brackets/${bracketId}`, {signal});
   }
-
-  async getFinaleOptions(bracketId: number): Promise<FinaleOptions> {
-    const response = await fetch(`${this.baseUrl}/brackets/${bracketId}/finale-options`, { credentials: 'include' });
-    const payload = await response.json() as FinaleOptions | { error?: string };
-    if (!response.ok || !('rounds' in payload)) throw new Error('error' in payload && payload.error ? payload.error : 'Could not load finale setup.');
-    return payload;
+  getFinaleOptions(bracketId: number, signal?: AbortSignal): Promise<FinaleOptions> {
+    return apiRequest(`${this.baseUrl}/brackets/${bracketId}/finale-options`, {signal});
   }
 
   async startFinale(bracketId: number, adminUserId: number, startRoundNumber: number, participantIds: number[]): Promise<void> {
@@ -58,10 +32,7 @@ export class HistoryApiService {
     return this.post(`/brackets/${bracketId}/finale/votes`, { adminUserId, matchupId, ballots, tieBreakEntryId });
   }
 
-  private async post<T = unknown>(path: string, body: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const payload = await response.json() as T & { error?: string };
-    if (!response.ok) throw new Error(payload.error || 'Could not save finale changes.');
-    return payload;
+  private post<T = unknown>(path: string, body: unknown): Promise<T> {
+    return apiRequest(`${this.baseUrl}${path}`, {method: 'POST', json: body});
   }
 }

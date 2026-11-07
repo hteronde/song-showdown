@@ -1,3 +1,4 @@
+import { apiErrorMessage } from '../../shared/data-access/api-client';
 import { BracketChampionComponent } from '../../brackets/ui/bracket-champion.component';
 import { BracketConnectorsDirective } from '../../brackets/ui/bracket-connectors.directive';
 import { SongAlbumArtComponent } from '../../brackets/ui/song-album-art.component';
@@ -16,7 +17,7 @@ import { HistoryApiService } from '../data-access/history-api.service';
     templateUrl: './history-page.component.html',
     styleUrls: ['./history-page.component.css', '../../brackets/ui/bracket-connectors.css']
 })
-export class HistoryPageComponent implements OnInit {
+export class HistoryPageComponent implements OnInit, OnDestroy {
     constructor(private readonly historyApi: HistoryApiService, private readonly authApi: AuthApiService, private readonly changeDetector: ChangeDetectorRef, private readonly route: ActivatedRoute, private readonly router: Router) { }
     get hasRandomTies(): boolean { return this.historyRounds.some(round => round.matches.some(match => match.randomTiebreakerVoteEntryId != null)); }
     matchVotes(match: PastMatch, entryId: number): number {
@@ -94,56 +95,63 @@ export class HistoryPageComponent implements OnInit {
     get matchupCount(): number {
         return this.historyRounds.reduce((count, round) => count + round.matches.length, 0);
     }
+    private readonly pageController = new AbortController();
+    private detailController?: AbortController;
+    private routeSubscriptions: Array<{unsubscribe(): void}> = [];
+    ngOnDestroy(): void {
+        this.pageController.abort();
+        this.detailController?.abort();
+        for (const subscription of this.routeSubscriptions) subscription.unsubscribe();
+    }
     ngOnInit(): void {
         this.permissionsReady = this.loadPermissions();
         void this.loadBrackets();
-        this.route.queryParamMap.subscribe(params => {
+        this.routeSubscriptions.push(this.route.queryParamMap.subscribe(params => {
             if (params.get('finale') === 'setup') {
                 void this.permissionsReady.then(() => {
-                    if (this.isAdmin) {
+                    if (this.isAdmin && !this.pageController.signal.aborted) {
                         this.finaleSetupOpen = true;
                         this.changeDetector.markForCheck();
                     }
                 });
             }
-        });
-        this.route.paramMap.subscribe(params => {
+        }));
+        this.routeSubscriptions.push(this.route.paramMap.subscribe(params => {
             const bracketId = Number(params.get('bracketId'));
-            if (bracketId > 0)
-                void this.loadBracketDetails(bracketId);
+            if (bracketId > 0) void this.loadBracketDetails(bracketId);
             else {
+                this.detailController?.abort();
                 this.isBracketDetailOpen = false;
                 this.selectedBracket = null;
             }
-        });
+        }));
     }
     private async loadPermissions(): Promise<void> {
         try {
-            const user = await this.authApi.getCurrentUser();
+            const user = await this.authApi.getCurrentUser(this.pageController.signal);
             this.isAdmin = user?.role === 'owner';
         }
         catch {
             this.isAdmin = false;
         }
         finally {
-            this.changeDetector.markForCheck();
+            if (!this.pageController.signal.aborted) this.changeDetector.markForCheck();
         }
     }
     private async loadBrackets(): Promise<void> {
         this.historyLoading = true;
         this.historyError = '';
         try {
-            const payload = await this.historyApi.getBrackets();
+            const payload = await this.historyApi.getBrackets(this.pageController.signal);
+            if (this.pageController.signal.aborted) return;
             this.historyBrackets = payload.brackets;
         }
         catch (error) {
-            this.historyError = error instanceof TypeError
-                ? 'The bracket database API is not running. Start it with npm run start:api after configuring .env.'
-                : error instanceof Error ? error.message : 'Could not load bracket history.';
+            if (!this.pageController.signal.aborted) this.historyError = apiErrorMessage(error, 'Could not load bracket history.');
         }
         finally {
             this.historyLoading = false;
-            this.changeDetector.markForCheck();
+            if (!this.pageController.signal.aborted) this.changeDetector.markForCheck();
         }
     }
     async openBracket(bracket: BracketHistoryInfo): Promise<void> {
@@ -153,11 +161,16 @@ export class HistoryPageComponent implements OnInit {
         await this.router.navigate(['/history']);
     }
     private async loadBracketDetails(bracketId: number): Promise<void> {
+        this.detailController?.abort();
+        const controller = this.detailController = new AbortController();
         this.historyLoading = true;
         this.historyError = '';
         try {
             await this.permissionsReady;
-            const payload = await this.historyApi.getBracket(bracketId);
+            const payload = await this.historyApi.getBracket(bracketId, controller.signal);
+            if (controller.signal.aborted) return;
+            const finaleOptions = await this.historyApi.getFinaleOptions(bracketId, controller.signal);
+            if (controller.signal.aborted) return;
             if (!this.isAdmin && payload.bracket.status !== 'complete') {
                 await this.router.navigate(['/brackets', bracketId]);
                 return;
@@ -173,7 +186,7 @@ export class HistoryPageComponent implements OnInit {
             this.bracketPlaylists = payload.playlists;
             this.bracketChampion = payload.champion;
             this.canViewBallots = payload.canViewBallots !== false;
-            this.finaleOptions = await this.historyApi.getFinaleOptions(bracketId);
+            this.finaleOptions = finaleOptions;
             this.bracketMembers = payload.participants;
             this.finaleParticipants = payload.participants.filter(person => person.finaleParticipant);
             this.nonFinaleParticipantIds = payload.participants.filter(person => person.nonFinaleParticipant).map(person => person.userId);
@@ -211,13 +224,13 @@ export class HistoryPageComponent implements OnInit {
             this.isBracketDetailOpen = true;
         }
         catch (error) {
-            this.historyError = error instanceof TypeError
-                ? 'The bracket database API is not running. Start it with npm run start:api after configuring .env.'
-                : error instanceof Error ? error.message : 'Could not load bracket history.';
+            if (!controller.signal.aborted) this.historyError = apiErrorMessage(error, 'Could not load bracket history.');
         }
         finally {
-            this.historyLoading = false;
-            this.changeDetector.markForCheck();
+            if (!controller.signal.aborted) {
+                this.historyLoading = false;
+                this.changeDetector.markForCheck();
+            }
         }
     }
     toggleParticipant(userId: number): void {

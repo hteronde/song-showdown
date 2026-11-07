@@ -1,3 +1,4 @@
+import { apiRequest, ApiError, isApiCancelled } from '../../shared/data-access/api-client';
 import { SongAlbumArtComponent } from './song-album-art.component';
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, EventEmitter, OnDestroy, Output, ViewChild } from '@angular/core';
@@ -11,12 +12,12 @@ interface EditorData {
   songAYear: number|null; songBYear: number|null;
   songAAlbum: string|null; songBAlbum: string|null; songAAlbumCoverUrl: string|null; songBAlbumCoverUrl: string|null;
   tieBreakEntryId: number|null;
-  participants: BallotPerson[]; revision: string; canEdit: boolean; editRestriction: string; inFinale: boolean; seedingSize: number|null; tiebreakerOption: string;
+  participants: BallotPerson[]; revision: string; canEdit: boolean; editRestriction: string; inFinale: boolean; seedingSize: number|null; tiebreakerOption: 'random'|'seed'|'seed_low'|'admin_pick';
 }
 @Component({
   selector:'app-admin-ballot-editor', standalone:true, imports:[CommonModule,FormsModule,SongAlbumArtComponent],
   template:`
-    <dialog #dialog class="admin-ballot-dialog" aria-labelledby="admin-ballot-title" (cancel)="saving && $event.preventDefault()">
+    <dialog #dialog class="admin-ballot-dialog" aria-labelledby="admin-ballot-title" (cancel)="cancel($event)">
       <span class="eyebrow">ADMIN · MATCHUP BALLOTS</span><h2 id="admin-ballot-title">Edit participant votes</h2>
       <p *ngIf="loading" role="status">Loading ballots…</p>
       <ng-container *ngIf="data as match">
@@ -89,27 +90,29 @@ export class AdminBallotEditorComponent implements OnDestroy {
   revealFinalTally='';
   private bracketId=0;
   private requestVersion=0;
+  private requestController?: AbortController;
   get hasChanges():boolean { return this.data?.participants.some(p=>this.picks[p.userId]!==p.selectedEntryId)??false; }
   async open(bracketId:number,matchupId:number):Promise<void> {
     const requestVersion=++this.requestVersion;
+    this.requestController?.abort();
+    this.requestController=new AbortController();
     this.revealing=false;this.revealedWinner='';this.unresolvedTie=false;
     this.bracketId=bracketId;this.data=null;this.picks={};this.error='';this.confirmReset=false;this.tiePick=null;this.loading=true;
     if (!this.dialog?.nativeElement.open) this.dialog?.nativeElement.showModal();
     try {
-      const response=await fetch(`/api/admin/brackets/${bracketId}/matchups/${matchupId}/ballots`,{credentials:'include'});
-      const payload=await response.json();
+      const payload=await apiRequest<EditorData>(`/api/admin/brackets/${bracketId}/matchups/${matchupId}/ballots`,{signal:this.requestController.signal});
       if(requestVersion !== this.requestVersion) return;
-      if(!response.ok) throw new Error(payload.error||'Could not load ballots.');
       this.data=payload;
       this.tiePick=payload.inFinale
         ? payload.tiebreakerOption === 'admin_pick' ? 'admin_vote' : payload.tiebreakerOption
         : payload.tieBreakEntryId??null;
       for(const person of payload.participants) this.picks[person.userId]=person.selectedEntryId;
-    } catch(error) {if(requestVersion === this.requestVersion) this.error=error instanceof Error?error.message:'Could not load ballots.';}
+    } catch(error) {if(requestVersion === this.requestVersion && !isApiCancelled(error)) this.error=error instanceof Error?error.message:'Could not load ballots.';}
     finally {if(requestVersion === this.requestVersion) {this.loading=false;this.changeDetector.markForCheck();}}
   }
-  ngOnDestroy():void {++this.requestVersion;}
-  close():void {if(!this.saving) this.dialog?.nativeElement.close();}
+  ngOnDestroy():void {++this.requestVersion;this.requestController?.abort();}
+  cancel(event: Event):void {if(this.saving) event.preventDefault(); else this.close();}
+  close():void {if(!this.saving) {++this.requestVersion;this.requestController?.abort();this.dialog?.nativeElement.close();}}
   async openCurrentBallots():Promise<void> {
     if(this.data && !this.saving) await this.open(this.bracketId,this.data.matchupId);
   }
@@ -117,13 +120,10 @@ export class AdminBallotEditorComponent implements OnDestroy {
     if(!this.data||!this.data.canEdit||this.saving) return;
     this.saving=true;this.error='';
     try {
-      const response=await fetch(`/api/admin/brackets/${this.bracketId}/matchups/${this.data.matchupId}/ballots`,{
-        method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({revision:this.data.revision,ballots:this.data.participants.filter(p=>this.picks[p.userId]!==p.selectedEntryId).map(p=>({userId:p.userId,selectedEntryId:this.picks[p.userId]})),tieBreakEntryId:this.tiePick,resetLaterRounds:this.confirmReset})
+      const payload=await apiRequest<{winnerEntryId:number|null;randomTiebreakerVoteEntryId:number|null;participantVotesA:number;participantVotesB:number;voteCountA:number;voteCountB:number}>(`/api/admin/brackets/${this.bracketId}/matchups/${this.data.matchupId}/ballots`,{
+        method:'PUT',signal:this.requestController?.signal,
+        json:{revision:this.data.revision,ballots:this.data.participants.filter(p=>this.picks[p.userId]!==p.selectedEntryId).map(p=>({userId:p.userId,selectedEntryId:this.picks[p.userId]})),tieBreakEntryId:this.tiePick,resetLaterRounds:this.confirmReset}
       });
-      const payload=await response.json();
-      if(payload.requiresReset) {this.confirmReset=true;this.resetMessage=payload.error;return;}
-      if(!response.ok) throw new Error(payload.error||'Could not save ballots.');
       const matchupId = this.data.matchupId;
       if (this.data.inFinale) {
         const version = this.requestVersion;
@@ -155,7 +155,10 @@ export class AdminBallotEditorComponent implements OnDestroy {
         return;
       }
       this.dialog?.nativeElement.close();this.revealing=false;this.saved.emit(matchupId);
-    } catch(error) {this.error=error instanceof Error?error.message:'Could not save ballots.';}
+    } catch(error) {
+      if(error instanceof ApiError && error.requiresReset) {this.confirmReset=true;this.resetMessage=error.message;}
+      else if(!isApiCancelled(error)) this.error=error instanceof Error?error.message:'Could not save ballots.';
+    }
     finally {this.saving=false;this.changeDetector.markForCheck();}
   }
 }
