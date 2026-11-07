@@ -32,6 +32,10 @@ Manual Radiohead testing has covered the main participant, voting, advancement, 
 - `src/app/history/feature/` holds the bracket history page; `history/data-access/` holds its API service and bracket models.
 - `src/app/family-members/feature/` holds family member management; `family-members/data-access/` holds its API service and models.
 - `src/app/songs/feature/` holds song catalog management; `songs/data-access/` holds its API service and models.
+- `src/app/brackets/state/` holds settings validation, song/seed editing rules, participant drafts, and voting drafts/request versions. These modules do not depend on Angular rendering or dialogs.
+- `src/app/brackets/feature/session-schedule.ts` owns schedule calculations, date-input conversion, duration conversion, and session payload construction.
+- Page components coordinate API calls, navigation, and dialogs. Each page has a separate `.component.css`; the active and History pages share bracket connector styles in `brackets/ui/bracket-connectors.css`.
+- `server/bracket-editor-state.test.mjs` tests the extracted frontend rules in Node; `server/active-bracket-load.test.mjs` exercises component request ordering and saved-vote/draft behavior with deferred requests.
 - `src/main.ts` only bootstraps the Angular application.
 
 ## Run locally

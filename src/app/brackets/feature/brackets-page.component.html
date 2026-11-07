@@ -209,20 +209,20 @@
       <p class="hint">Save Changes saves this option immediately. Changing it after votes exist requires confirming a tournament rebuild.</p>
       <p class="field-error" *ngIf="modalErrors['randomization']" role="alert">{{ modalErrors['randomization'] }}</p><div class="song-modal-actions"><button class="add-song" type="button" (click)="saveRandomizationOptions()" [disabled]="!!modalSaving">{{ modalSaving === 'randomization' ? 'SAVING…' : 'Save Changes' }}</button><button class="cancel" type="button" (click)="cancelRandomizationOptions()" [disabled]="!!modalSaving">Cancel</button></div>
     </dialog>
-    <dialog #participantsDialog class="song-dialog participants-dialog" aria-labelledby="participants-modal-title" (cancel)="participantSaving && $event.preventDefault()">
+    <dialog #participantsDialog class="song-dialog participants-dialog" aria-labelledby="participants-modal-title" (cancel)="participantEditor.saving && $event.preventDefault()">
       <span class="stat-label">BRACKET PARTICIPANTS</span>
       <h3 id="participants-modal-title">Participants</h3>
-      <div class="participant-summary"><span aria-live="polite">{{ participantDraftIds.length }} selected</span><button class="cancel" type="button" (click)="selectAllParticipants()" [disabled]="!members.length || participantSaving">{{ allParticipantsSelected ? 'Deselect all' : 'Select all' }}</button></div>
+      <div class="participant-summary"><span aria-live="polite">{{ participantEditor.ids.length }} selected</span><button class="cancel" type="button" (click)="selectAllParticipants()" [disabled]="!members.length || participantEditor.saving">{{ allParticipantsSelected ? 'Deselect all' : 'Select all' }}</button></div>
       <div class="participants" role="group" aria-label="Participants">
         <div class="participant-email-row" *ngFor="let member of members">
-          <label><input type="checkbox" [disabled]="participantSaving" [checked]="participantDraftIds.includes(member.userId)" (change)="toggleParticipant(member.userId,$any($event.target).checked)"> {{ member.displayName }}</label>
-          <input type="email" [id]="'participant-email-' + member.userId" [name]="'participant-email-' + member.userId" [(ngModel)]="participantEmails[member.userId]" [disabled]="participantSaving" maxlength="254" [attr.aria-label]="member.displayName + ' email'" autocomplete="off">
+          <label><input type="checkbox" [disabled]="participantEditor.saving" [checked]="participantEditor.ids.includes(member.userId)" (change)="toggleParticipant(member.userId,$any($event.target).checked)"> {{ member.displayName }}</label>
+          <input type="email" [id]="'participant-email-' + member.userId" [name]="'participant-email-' + member.userId" [(ngModel)]="participantEditor.emails[member.userId]" [disabled]="participantEditor.saving" maxlength="254" [attr.aria-label]="member.displayName + ' email'" autocomplete="off">
         </div>
       </div>
       <p class="hint" *ngIf="!members.length">No family members are available.</p>
-      <p class="field-error" *ngIf="participantModalError" role="alert">{{ participantModalError }}</p>
+      <p class="field-error" *ngIf="participantEditor.error" role="alert">{{ participantEditor.error }}</p>
       <p class="hint">Save Changes saves participant selections and email updates together immediately.</p>
-      <div class="song-modal-actions"><button class="add-song" type="button" [disabled]="participantSaving" (click)="saveParticipants()">{{ participantSaving ? 'SAVING…' : 'SAVE CHANGES' }}</button><button class="cancel" type="button" [disabled]="participantSaving" (click)="closeParticipantsModal()">Cancel</button></div>
+      <div class="song-modal-actions"><button class="add-song" type="button" [disabled]="participantEditor.saving" (click)="saveParticipants()">{{ participantEditor.saving ? 'SAVING…' : 'SAVE CHANGES' }}</button><button class="cancel" type="button" [disabled]="participantEditor.saving" (click)="closeParticipantsModal()">Cancel</button></div>
     </dialog>
     <dialog #songDialog class="song-dialog" aria-labelledby="song-dialog-title" (close)="onSongModalClosed()" (cancel)="songSaving && $event.preventDefault()">
       <span class="stat-label">{{ editingSongIndex === null ? 'NEW SONG' : 'EDIT SONG' }}</span>

@@ -3,13 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
+import { loadFrontendModule } from './test-support/frontend-module.mjs';
+const votingState = await loadFrontendModule(new URL('../src/app/brackets/state/voting-state.ts', import.meta.url));
 
 // Exercise the actual component with deferred API requests; Angular's rendering
 // and decorators are stubbed so no browser or additional test runner is needed.
 const source=readFileSync(new URL('../src/app/brackets/feature/active-bracket-page.component.ts',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true}}).outputText;
 const core={Component:()=>()=>{},ViewChild:()=>()=>{},Output:()=>()=>{},EventEmitter:class{emit(){}}};
-const context=createContext({exports:{},Error,require:name=>name==='@angular/core'?core:{},setInterval,clearInterval});
+const context=createContext({exports:{},Error,require:name=>name==='@angular/core'?core:name==='../state/voting-state'?votingState:{},setInterval,clearInterval});
 runInContext(compiled,context);
 const Component=context.exports.ActiveBracketPageComponent;
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};

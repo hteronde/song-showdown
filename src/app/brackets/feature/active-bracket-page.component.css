@@ -1,0 +1,583 @@
+.upcoming-bracket-message {
+  max-width: 700px;
+  margin: 64px auto;
+  padding: 32px;
+  text-align: center;
+}
+
+.upcoming-bracket-message h1 {
+  font-size: clamp(25px,4vw,38px);
+  line-height: 1.25;
+}
+
+.upcoming-bracket-message p {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #77776e;
+}
+
+.upcoming-bracket-message time {
+  color: #354e45;
+  font-weight: 600;
+}
+
+.next-session-end {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  margin: 18px 0;
+}
+
+.next-session-end input {
+  padding: 10px;
+  border: 1px solid #d9d6cb;
+  border-radius: 4px;
+  background: white;
+  color: #30312b;
+  font: inherit;
+}
+
+.listen-links a:focus-visible {
+  outline: 2px solid #b96c4b;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.album-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.album-tile:has(img):before {
+  display: none;
+}
+
+:host {
+  display: block;
+}
+
+.vote-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.vote-actions button {
+  border: 0;
+  border-radius: 5px;
+  background: #30312b;
+  color: #fff;
+  padding: 10px 16px;
+  font: 600 11px 'DM Mono',monospace;
+  letter-spacing: .04em;
+  cursor: pointer;
+}
+
+.vote-actions button:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.admin-finale-entry {
+  display: flex;
+  justify-content: flex-end;
+  margin: -14px 0 24px;
+}
+
+.admin-finale-entry button {
+  border: 1px solid #d8c3b4;
+  background: #fffaf6;
+  color: #9a5538;
+  border-radius: 5px;
+  padding: 8px 12px;
+  font: 600 10px 'DM Mono',monospace;
+  letter-spacing: .04em;
+  cursor: pointer;
+}
+
+.week-section {
+  margin: 30px 0;
+}
+
+.week-section h2 {
+  font: 600 22px 'Space Grotesk',sans-serif;
+  margin: 5px 0 16px;
+  color: #30312b;
+}
+
+.song-choice {
+  cursor: pointer;
+}
+
+.song-choice:focus-visible {
+  outline: 2px solid #b96c4b;
+  outline-offset: 2px;
+}
+
+.song-choice.picked {
+  border-color: #b96c4b;
+  background: #fbf5f1;
+}
+
+.page-error {
+  background: #fff0ed;
+  border: 1px solid #efc7be;
+  color: #9f3324;
+  padding: 12px 15px;
+  border-radius: 5px;
+  margin: 16px 0;
+}
+
+.page-success {
+  background: #edf6ee;
+  border: 1px solid #c8dfc9;
+  color: #315b3a;
+  padding: 12px 15px;
+  border-radius: 5px;
+  margin: 16px 0;
+}
+
+.no-matchups {
+  padding: 24px;
+  background: #f2f1eb;
+  border: 1px solid #e5e3db;
+  color: #77776e;
+  border-radius: 5px;
+}
+
+.week-label {
+  font: 8px 'DM Mono',monospace;
+  letter-spacing: .1em;
+  color: #b96c4b;
+  text-transform: uppercase;
+}
+
+.active-view-toggle {
+  justify-content: flex-end;
+  margin: 12px 0 26px;
+}
+
+.bracket-visibility-note {
+  font-size: 12px;
+  color: #8b897f;
+  margin: -8px 0 18px;
+}
+
+.revealed-bracket {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  overflow-x: auto;
+  padding: 4px 0 18px;
+}
+
+.revealed-round {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.revealed-round h3 {
+  font: 600 13px 'DM Mono',monospace;
+  letter-spacing: .08em;
+  color: #9a674f;
+  text-transform: uppercase;
+  margin: 0 0 2px;
+}
+
+.revealed-game {
+  background: #fff;
+  border: 1px solid #e5e3db;
+  border-radius: 5px;
+  padding: 10px 12px;
+}
+
+.revealed-game-label {
+  font: 8px 'DM Mono',monospace;
+  color: #aaa79c;
+  letter-spacing: .07em;
+  margin-bottom: 6px;
+}
+
+.revealed-team {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0eee8;
+  font-size: 11px;
+  color: #77776e;
+}
+
+.revealed-team:last-of-type {
+  border-bottom: 0;
+}
+
+.revealed-winner {
+  color: #30312b;
+  font-weight: 650;
+}
+
+.revealed-winner b {
+  color: #66816a;
+}
+
+.revealed-result {
+  font: 9px 'DM Mono',monospace;
+  color: #66816a;
+  margin-top: 7px;
+}
+
+.revealed-result.pending {
+  color: #aaa79c;
+}
+
+.revealed-round-games {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.full-tournament-bracket {
+  --connector-half-gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(var(--bracket-round-count),minmax(0,1fr));
+  gap: calc(2 * var(--connector-half-gap));
+  overflow-x: visible;
+  width: 100%;
+}
+
+.full-tournament-bracket .revealed-round {
+  min-width: 0;
+  gap: 0;
+}
+
+.full-tournament-bracket .revealed-round h3 {
+  font-size: clamp(9px,1vw,13px);
+  overflow-wrap: anywhere;
+  height: 34px;
+  box-sizing: border-box;
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+.full-tournament-bracket .revealed-round-games {
+  display: grid;
+  grid-template-rows: repeat(var(--bracket-row-count),minmax(180px,auto));
+  gap: 0;
+}
+
+.full-tournament-bracket .revealed-game {
+  min-width: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+  height: auto;
+  min-height: 140px;
+  box-sizing: border-box;
+  align-self: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.full-tournament-bracket .revealed-team>span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.full-tournament-bracket .revealed-result {
+  line-height: 1.4;
+}
+
+.full-tournament-bracket .revealed-round:not(:last-child) .revealed-game:after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: var(--connector-half-gap);
+  border-top: 1px solid #cfcbbf;
+}
+
+.full-tournament-bracket .revealed-round:not(:first-child) .revealed-game:before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: calc(50% - var(--feeder-offset));
+  width: var(--connector-half-gap);
+  height: calc(2 * var(--feeder-offset));
+  border-left: 1px solid #cfcbbf;
+  background: linear-gradient(#cfcbbf,#cfcbbf) left center/100% 1px no-repeat;
+  pointer-events: none;
+}
+
+.bracket-hold-banner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: #a62e28;
+  color: #fff;
+  border: 1px solid #8e231f;
+  border-radius: 6px;
+  padding: 24px;
+  margin: 20px 0;
+  box-shadow: 0 3px 12px #a62e281a;
+}
+
+.bracket-hold-banner strong {
+  display: block;
+  font: 600 22px 'Space Grotesk',sans-serif;
+  margin-bottom: 7px;
+}
+
+.bracket-hold-banner p {
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  color: #fff;
+}
+
+.hold-icon {
+  flex: none;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.song-choice.voting-disabled {
+  cursor: default;
+}
+
+.song-choice.voting-disabled:hover {
+  border-color: #eceae3;
+  background: #fbfaf7;
+}
+
+.song-choice.voting-disabled.chosen:hover {
+  background: #f7f1e9;
+  border-color: #c9946f;
+}
+
+.comment-field textarea:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width:460px) {
+  .bracket-hold-banner {
+    padding: 18px;
+    gap: 12px;
+  }
+  .bracket-hold-banner strong {
+    font-size: 19px;
+  }
+}
+
+.revealed-game.admin-editable {
+  cursor: pointer;
+}
+
+.revealed-game.admin-editable:hover {
+  border-color: #b2c2ae;
+  box-shadow: 0 0 0 1px #b2c2ae;
+}
+
+.revealed-game.admin-editable:focus-visible {
+  outline: 2px solid #66816a;
+  outline-offset: 2px;
+}
+
+.admin-ballot-entry {
+  display: flex;
+  justify-content: flex-end;
+  margin: 5px 0 10px;
+}
+
+.admin-ballot-entry button {
+  border: 1px solid #d8c3b4;
+  border-radius: 4px;
+  background: #fffaf6;
+  color: #9a5538;
+  padding: 7px 10px;
+  font: 10px 'DM Mono',monospace;
+  cursor: pointer;
+}
+
+.finale-view-banner {
+  padding: 20px 24px;
+  margin: 20px 0;
+  border: 1px solid #d3decd;
+  border-radius: 6px;
+  background: #edf3e9;
+  color: #3d5744;
+}
+
+.finale-view-banner strong {
+  font: 600 18px 'Space Grotesk',sans-serif;
+}
+
+.finale-view-banner p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+
+.full-tournament-bracket.redrawn-rounds .revealed-game:before,.full-tournament-bracket.redrawn-rounds .revealed-game:after {
+  display: none;
+}
+
+.revealed-game {
+  cursor: pointer;
+}
+
+.revealed-game:hover {
+  border-color: #b2c2ae;
+}
+
+.revealed-game:focus-visible {
+  outline: 2px solid #66816a;
+  outline-offset: 2px;
+}
+
+.admin-ballot-entry {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.matchup-details-dialog {
+  box-sizing: border-box;
+  width: min(680px,calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid #e5e3db;
+  border-radius: 6px;
+  background: #fcfbf8;
+  color: #30312b;
+  box-shadow: 0 20px 70px #24251e33;
+}
+
+.matchup-details-dialog::backdrop {
+  background: #24251e80;
+}
+
+.matchup-details-dialog h2 {
+  font: 600 22px 'Space Grotesk',sans-serif;
+  margin: 8px 0 16px;
+}
+
+.details-songs {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.details-song {
+  padding: 16px;
+  border: 1px solid #e5e3db;
+  border-radius: 5px;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+
+.details-song.winner {
+  border-color: #b2c2ae;
+}
+
+.details-song app-song-album-art {
+  margin: 0 auto 14px;
+}
+
+.details-song h3 {
+  font: 600 16px 'Space Grotesk',sans-serif;
+  margin: 0 0 8px;
+}
+
+.details-song p,.details-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #77776e;
+}
+
+.details-song ul {
+  padding-left: 18px;
+  margin: 10px 0 0;
+}
+
+.details-song li {
+  font-size: 13px;
+  padding: 5px 0;
+}
+
+.details-tally {
+  font: 10px 'DM Mono',monospace;
+  color: #66816a;
+}
+
+.details-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.details-actions button {
+  padding: 10px 14px;
+  border: 1px solid #d8d4c8;
+  border-radius: 4px;
+  background: #fff;
+  color: #30312b;
+  font: 11px 'DM Mono',monospace;
+  cursor: pointer;
+}
+
+.details-actions button.primary {
+  background: #30312b;
+  color: #fff;
+}
+
+@media (max-width:460px) {
+  .details-songs {
+    grid-template-columns: 1fr;
+  }
+}
+
+.details-song .listen-links {
+  font-size: 9px;
+  height: auto;
+  min-height: 26px;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 4px 0 10px;
+}
+
+.full-tournament-bracket {
+  position: relative;
+}
+
+.full-tournament-bracket .revealed-game:before,.full-tournament-bracket .revealed-game:after {
+  display: none;
+}
+
+.full-tournament-bracket .revealed-game {
+  z-index: 1;
+}
+
+.bracket-connectors {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.bracket-connectors path.pending-draw {
+  stroke-dasharray: 4 3;
+  stroke: #c7b8a8;
+}

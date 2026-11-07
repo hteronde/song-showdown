@@ -1,0 +1,340 @@
+.history-tournament {
+  display: grid;
+  gap: 24px;
+  overflow-x: auto;
+  padding: 4px 0 18px;
+  align-items: start;
+}
+
+.history-round {
+  min-width: 0;
+}
+
+.history-round h3 {
+  height: 34px;
+  box-sizing: border-box;
+  margin: 0;
+  font: 600 13px 'DM Mono',monospace;
+  letter-spacing: .08em;
+  color: #9a674f;
+  text-transform: uppercase;
+}
+
+.history-round-games {
+  display: grid;
+  grid-template-rows: repeat(var(--history-row-count),minmax(180px,auto));
+}
+
+.history-match {
+  position: relative;
+  align-self: center;
+  height: auto;
+  min-height: 140px;
+  box-sizing: border-box;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #e5e3db;
+  border-radius: 5px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow-wrap: anywhere;
+}
+
+.history-game-label {
+  font: 8px 'DM Mono',monospace;
+  color: #aaa79c;
+  letter-spacing: .07em;
+  margin-bottom: 6px;
+}
+
+.history-team {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0eee8;
+  font-size: 11px;
+  color: #77776e;
+}
+
+.history-team>span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.history-team.game-winner {
+  color: #30312b;
+  font-weight: 650;
+}
+
+.history-team b {
+  color: #66816a;
+}
+
+.history-result {
+  font: 9px/1.4 'DM Mono',monospace;
+  color: #66816a;
+  margin-top: 7px;
+}
+
+.history-result.pending {
+  color: #aaa79c;
+}
+
+.history-round:not(:last-child) .history-match:after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: 12px;
+  border-top: 1px solid #cfcbbf;
+}
+
+.history-round:not(:first-child) .history-match:before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: calc(50% - var(--feeder-offset));
+  width: 12px;
+  height: calc(2 * var(--feeder-offset));
+  border-left: 1px solid #cfcbbf;
+  background: linear-gradient(#cfcbbf,#cfcbbf) left center/100% 1px no-repeat;
+  pointer-events: none;
+}
+
+.history-match.finale-ready {
+  cursor: pointer;
+  outline: 1px solid #b2c2ae;
+  outline-offset: 1px;
+}
+
+.history-match.finale-ready:hover,.history-match.finale-selected {
+  box-shadow: 0 0 0 2px #88a188;
+}
+
+.history-match.admin-editable {
+  cursor: pointer;
+}
+
+.history-match.admin-editable:hover {
+  border-color: #b2c2ae;
+}
+
+.history-match:focus-visible {
+  outline: 2px solid #66816a;
+  outline-offset: 2px;
+}
+
+.history-match {
+  cursor: pointer;
+}
+
+.history-match:hover {
+  border-color: #b2c2ae;
+  box-shadow: 0 0 0 1px #b2c2ae;
+}
+
+.view-votes-hint {
+  margin-top: 8px;
+  font: 8px 'DM Mono',monospace;
+  color: #9a674f;
+}
+
+.history-votes-dialog {
+  box-sizing: border-box;
+  width: min(680px,calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid #e5e3db;
+  border-radius: 6px;
+  background: #fcfbf8;
+  color: #30312b;
+  box-shadow: 0 20px 70px #24251e33;
+}
+
+.history-votes-dialog::backdrop {
+  background: #24251e80;
+}
+
+.history-votes-dialog h2 {
+  font: 600 22px 'Space Grotesk',sans-serif;
+  margin: 8px 0 16px;
+}
+
+.history-votes-label {
+  font: 9px 'DM Mono',monospace;
+  color: #9a674f;
+}
+
+.history-vote-columns {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.history-vote-song {
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e5e3db;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+
+.history-vote-song h3 {
+  font: 600 16px 'Space Grotesk',sans-serif;
+  margin: 0 0 8px;
+}
+
+.history-vote-song ul {
+  padding-left: 18px;
+  margin: 10px 0 0;
+}
+
+.history-vote-song li {
+  font-size: 13px;
+  padding: 5px 0;
+}
+
+.history-vote-song p {
+  font-size: 12px;
+  color: #77776e;
+  margin: 8px 0;
+}
+
+.history-vote-song.history-vote-winner {
+  border-color: #b2c2ae;
+}
+
+.history-vote-tally {
+  font: 10px 'DM Mono',monospace;
+  color: #66816a;
+}
+
+.history-votes-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.history-votes-actions button {
+  padding: 10px 14px;
+  border: 1px solid #d8d4c8;
+  border-radius: 4px;
+  background: #fff;
+  color: #30312b;
+  font: 11px 'DM Mono',monospace;
+  cursor: pointer;
+}
+
+.history-votes-actions button.primary {
+  background: #30312b;
+  color: #fff;
+}
+
+.system-vote {
+  color: #9a5538;
+}
+
+.no-vote-history {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #77776e;
+}
+
+@media (max-width:460px) {
+  .history-vote-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.history-champion .champion-album-cover {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-left: auto;
+  flex: none;
+  box-shadow: 0 3px 10px #24251e22;
+}
+
+.history-vote-album-cover {
+  display: block;
+  width: 160px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 4px;
+  margin: 0 auto 16px;
+  box-shadow: 0 3px 10px #24251e18;
+}
+
+.unknown-voters {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #e4d6c2;
+  border-radius: 5px;
+  background: #f8f2e9;
+}
+
+.unknown-voters h3 {
+  font: 600 15px 'Space Grotesk',sans-serif;
+  margin: 0 0 8px;
+  color: #785b3e;
+}
+
+.unknown-voters p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #8b705e;
+  margin: 8px 0 0;
+}
+
+.unknown-voters ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.unknown-voters li {
+  padding: 5px 9px;
+  border: 1px solid #e4d6c2;
+  background: #fffdf9;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #785b3e;
+}
+
+.history-tournament.redrawn-rounds .history-match:before,.history-tournament.redrawn-rounds .history-match:after {
+  display: none;
+}
+
+.history-tournament {
+  position: relative;
+}
+
+.history-tournament .history-match:before,.history-tournament .history-match:after {
+  display: none;
+}
+
+.history-match {
+  z-index: 1;
+}
+
+.bracket-connectors {
+  top: 0;
+  left: 0;
+}
+
+.history-vote-song app-song-album-art {
+  margin: 0 auto 16px;
+}
