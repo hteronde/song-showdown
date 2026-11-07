@@ -6,6 +6,7 @@
     "start": "ng serve --proxy-config proxy.conf.json",
     "start:api": "node --watch --env-file-if-exists=.env server/index.mjs",
     "test:api": "node --test server/*.test.mjs",
+    "profile:bracket": "node scripts/profile-bracket-rendering.mjs",
     "build": "ng build"
   },
   "dependencies": {

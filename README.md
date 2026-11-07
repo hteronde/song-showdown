@@ -158,3 +158,7 @@ All frontend API calls use the shared `apiRequest` client. Requests include sess
 `ApiError` distinguishes HTTP errors, unavailable connections, timeouts, cancellations, and invalid server responses. HTTP status, `Retry-After`, and error details such as `requiresReset` remain available to workflows. Cancelled reads are not displayed as failures. The client does not automatically retry writes; aborting a browser request does not undo a change already committed by the server.
 
 A protected HTTP 401 expires the current frontend session once, clears the signed-in shell and sidebar, stops its polling, and prompts for login while preserving the requested route. A normal signed-out session check does not trigger an expiry alert. Bad credentials on the public login endpoint and HTTP 403 permission failures do not expire a session. Old requests cannot expire a newer login.
+
+## Bracket rendering profile
+
+Run `npm run profile:bracket` for the reproducible source-execution baseline. See [the baseline report](docs/bracket-rendering-profile.md) for measured getter/geometry-read counts, illustrative Node timings, and the browser trace still needed before optimizing. This harness uses synthetic DOM geometry and does not measure actual browser layout, paint, or frame rate.
