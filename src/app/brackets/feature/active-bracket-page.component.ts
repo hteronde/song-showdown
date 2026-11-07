@@ -175,6 +175,9 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
       if (!this.isCurrentLoad(version, bracketId)) return;
       if ((data.awaitingFinale && !this.data?.awaitingFinale) || (data.bracket.status === 'complete' && !this.isComplete)) this.firstVisibleRound = 1;
       this.data = data;
+      for (const week of data.weeks) for (const match of week.matchups) {
+        if (this.savingMatchupId !== match.matchupId) this.clearSavedOverrides(match);
+      }
       this.refreshMatchupDetails();
       if (!this.hasOnlineVoting && this.viewMode === 'vote') this.viewMode = 'bracket';
     } catch (error) {
@@ -248,13 +251,19 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
   readonly failedCoverUrls = new Set<string>();
   coverFailed(url: string): void { this.failedCoverUrls.add(url); }
 
+  private clearSavedOverrides(match: VotingMatchup): void {
+    if (this.picks[match.matchupId] === match.selectedEntryId) delete this.picks[match.matchupId];
+    if (this.comments[match.matchupId] === (match.comment ?? '')) delete this.comments[match.matchupId];
+  }
+
   songPick(match: VotingMatchup): number | null {
-    return this.picks[match.matchupId] ?? match.selectedEntryId;
+    return Object.hasOwn(this.picks, match.matchupId) ? this.picks[match.matchupId]! : match.selectedEntryId;
   }
 
   pick(match: VotingMatchup, entryId: number | null): void {
     if (this.isComplete || this.finaleModeActive || this.awaitingFinale || this.paused || entryId === null) return;
-    this.picks[match.matchupId] = entryId;
+    if (entryId === match.selectedEntryId && this.savingMatchupId !== match.matchupId) delete this.picks[match.matchupId];
+    else this.picks[match.matchupId] = entryId;
     this.notice = '';
   }
 
@@ -264,12 +273,18 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
 
   updateComment(match: VotingMatchup, event: Event): void {
     if (this.isComplete || this.finaleModeActive || this.awaitingFinale || this.paused) return;
-    this.comments[match.matchupId] = (event.target as HTMLTextAreaElement).value;
+    const comment = (event.target as HTMLTextAreaElement).value;
+    if (comment === (match.comment ?? '') && this.savingMatchupId !== match.matchupId) delete this.comments[match.matchupId];
+    else this.comments[match.matchupId] = comment;
   }
 
   async saveVote(match: VotingMatchup): Promise<void> {
     if (this.isComplete || this.finaleModeActive || this.awaitingFinale || this.paused) return;
-    const selectedEntryId = this.songPick(match);
+    const currentMatch = this.data?.weeks.flatMap(week => week.matchups).find(item => item.matchupId === match.matchupId) ?? match;
+    const selectedEntryId = this.songPick(currentMatch);
+    const comment = this.commentValue(currentMatch);
+    const version = this.loadVersion;
+    const bracketId = this.loadedBracketId;
     if (!selectedEntryId || !this.currentMemberId) {
       this.error = 'Choose a song before saving your vote.';
       return;
@@ -278,17 +293,26 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     this.error = '';
     this.notice = '';
     try {
-      await this.api.saveVote(match.matchupId, this.currentMemberId, selectedEntryId, this.commentValue(match));
-      match.selectedEntryId = selectedEntryId;
-      match.comment = this.commentValue(match);
-      delete this.picks[match.matchupId];
-      delete this.comments[match.matchupId];
+      await this.api.saveVote(match.matchupId, this.currentMemberId, selectedEntryId, comment);
+      if (bracketId === null || !this.isCurrentLoad(version, bracketId)) return;
+      // Polling may have replaced the displayed matchup while the save was pending.
+      const latestMatch = this.data?.weeks.flatMap(week => week.matchups).find(item => item.matchupId === match.matchupId);
+      if (latestMatch) { latestMatch.selectedEntryId = selectedEntryId; latestMatch.comment = comment; }
+      // Preserve any additional edits made while this submission was in flight.
+      if (this.picks[match.matchupId] === selectedEntryId) delete this.picks[match.matchupId];
+      if (this.comments[match.matchupId] === comment) delete this.comments[match.matchupId];
       this.toastMessage.emit('Your vote has been saved.');
     } catch (error) {
-      this.error = error instanceof Error ? error.message : 'Could not save your vote.';
+      if (bracketId !== null && this.isCurrentLoad(version, bracketId)) {
+        const latestMatch = this.data?.weeks.flatMap(week => week.matchups).find(item => item.matchupId === match.matchupId);
+        if (latestMatch) this.clearSavedOverrides(latestMatch);
+        this.error = error instanceof Error ? error.message : 'Could not save your vote.';
+      }
     } finally {
-      this.savingMatchupId = null;
-      this.changeDetector.markForCheck();
+      if (bracketId !== null && this.isCurrentLoad(version, bracketId)) {
+        this.savingMatchupId = null;
+        this.changeDetector.markForCheck();
+      }
     }
   }
 
@@ -313,6 +337,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.error = '';
     this.notice = '';
+    this.savingMatchupId = null;
     this.data = null;
     this.currentMemberId = null;
     this.isAdmin = false;
@@ -329,12 +354,6 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
       this.viewMode = this.hasOnlineVoting ? 'vote' : 'bracket';
       this.currentMemberId = user?.userId ?? null;
       this.isAdmin = user?.role === 'owner';
-      for (const week of data.weeks) {
-        for (const match of week.matchups) {
-          if (match.selectedEntryId) this.picks[match.matchupId] = match.selectedEntryId;
-          if (match.comment) this.comments[match.matchupId] = match.comment;
-        }
-      }
     } catch (error) {
       if (this.isCurrentLoad(version, bracketId)) this.error = error instanceof Error ? error.message : 'Could not load this bracket.';
     } finally {
