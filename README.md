@@ -115,3 +115,23 @@ SECURITY_DB_TESTS=1 node --env-file-if-exists=.env --test server/security.integr
 ```
 
 This check creates two test families inside a transaction, uses connection-local token storage, and rolls back all test records. It checks family isolation, initial password setup, token expiry, and token replay.
+
+## Authentication abuse controls
+
+Authentication JSON bodies are limited to 8 KB; usernames to 254 characters; passwords to 1,024 UTF-8 bytes (at least 12 characters for setup/recovery); and reset tokens to exactly 43 URL-safe characters. Login accepts existing passwords of at least one character within the byte limit.
+
+Limits apply to attempts, including successful ones:
+
+| Scope | Limit |
+| --- | --- |
+| All authentication routes per socket client address | 120 per minute |
+| Login per client address | 30 per 15 minutes |
+| Login per normalized account email, across clients | 10 per 15 minutes |
+| Reset-link requests per client address | 10 per 15 minutes |
+| Reset-link requests per normalized email | 5 per 15 minutes, plus the database's one-minute cooldown |
+| Password setup/reset completion per client address, shared across both routes | 20 per 15 minutes |
+| Password setup/reset completion per token, shared across both routes | 5 per 15 minutes |
+
+Throttled requests return HTTP 429 with `Retry-After`. Limiter storage is capped at 10,000 entries and fails closed with HTTP 503 if full. All password hashing and verification share two concurrent work slots, with HTTP 503 and `Retry-After` rather than an unbounded job queue when busy. Reset completion locks and validates a live, unused token before hashing; any hashing failure rolls back without consuming the token.
+
+These controls are process-local and reset when the API restarts. Multiple API instances need a shared limiter or equivalent enforcement at the gateway. Client identity uses the socket address; untrusted `X-Forwarded-For` headers are ignored. With a reverse proxy, clients share that proxy's address unless a trusted-proxy configuration and gateway limits are supplied.

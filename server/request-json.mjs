@@ -2,14 +2,14 @@
 // and session dates. Keep a bounded limit large enough for that metadata.
 export const maxJsonBodyBytes = 4 * 1024 * 1024;
 
-export async function readJson(request) {
+export async function readJson(request, limitBytes = maxJsonBodyBytes) {
   const chunks = [];
   let bytes = 0;
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     bytes += buffer.length;
-    if (bytes > maxJsonBodyBytes) {
-      const error = new Error('Request body is too large. The maximum size is 4 MB.');
+    if (bytes > limitBytes) {
+      const error = new Error(`Request body is too large. The maximum size is ${limitBytes} bytes.`);
       error.status = 413;
       throw error;
     }

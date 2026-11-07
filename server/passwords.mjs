@@ -1,3 +1,4 @@
+import { runPasswordWork, validatePassword } from './auth-abuse.mjs';
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 
@@ -8,14 +9,16 @@ const PARALLELIZATION = 1;
 const KEY_LENGTH = 64;
 
 export async function hashPassword(password) {
+  validatePassword(password);
   const salt = randomBytes(16);
-  const key = await scryptAsync(password, salt, KEY_LENGTH, {
+  const key = await runPasswordWork(() => scryptAsync(password, salt, KEY_LENGTH, {
     N: COST, r: BLOCK_SIZE, p: PARALLELIZATION, maxmem: 64 * 1024 * 1024
-  });
+  }));
   return `scrypt$${COST}$${BLOCK_SIZE}$${PARALLELIZATION}$${salt.toString('hex')}$${key.toString('hex')}`;
 }
 
 export async function verifyPassword(password, encoded) {
+  validatePassword(password);
   if (typeof encoded !== 'string') return false;
   const [algorithm, costText, blockText, parallelText, saltHex, keyHex, extra] = encoded.split('$');
   const cost = Number(costText), blockSize = Number(blockText), parallelization = Number(parallelText);
@@ -25,8 +28,8 @@ export async function verifyPassword(password, encoded) {
     || !/^[a-f\d]{32}$/.test(saltHex || '') || !/^[a-f\d]{128}$/.test(keyHex || '')) return false;
   const salt = Buffer.from(saltHex, 'hex');
   const expected = Buffer.from(keyHex, 'hex');
-  const actual = await scryptAsync(password, salt, expected.length, {
+  const actual = await runPasswordWork(() => scryptAsync(password, salt, expected.length, {
     N: cost, r: blockSize, p: parallelization, maxmem: 128 * 1024 * 1024
-  });
+  }));
   return timingSafeEqual(expected, actual);
 }

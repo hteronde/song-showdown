@@ -75,3 +75,26 @@ test('a verified token initializes a password once; replay cannot claim or chang
   await assert.rejects(completePasswordReset(pool,'a'.repeat(43),'replayed attacker password'),{status:400});
   assert.equal(storedHash,firstHash);
 });
+
+test('well-formed but expired or unknown reset tokens never trigger password hashing',async()=>{
+  let hashes=0;
+  await assert.rejects(completePasswordReset(database(false),'a'.repeat(43),'valid length password',{hash:async()=>{hashes++;return 'hash';}}),{status:400});
+  assert.equal(hashes,0);
+});
+test('reset hashing begins only after locking and validating the live token',async()=>{
+  const pool=database(true);
+  await completePasswordReset(pool,'a'.repeat(43),'valid length password',{hash:async()=>{
+    const queries=pool.calls.filter(call=>call.sql).map(call=>call.sql);
+    assert.equal(queries.length,2);
+    assert.ok(queries.every(sql=>sql.includes('FOR UPDATE')));
+    assert.match(queries[1],/expires_at > NOW\(\) AND used_at IS NULL/);
+    return 'bounded password hash';
+  }});
+  assert.equal(pool.calls.find(call=>call.sql?.startsWith('UPDATE users')).params[0],'bounded password hash');
+});
+test('busy password hashing rolls back without consuming the reset token',async()=>{
+  const pool=database(true);
+  await assert.rejects(completePasswordReset(pool,'a'.repeat(43),'valid length password',{hash:async()=>{throw Object.assign(new Error('Busy'),{status:503});}}),{status:503});
+  assert.ok(pool.calls.includes('rollback'));
+  assert.ok(!pool.calls.some(call=>call.sql?.startsWith('UPDATE')));
+});

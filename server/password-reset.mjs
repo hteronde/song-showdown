@@ -1,3 +1,4 @@
+import { validatePassword } from './auth-abuse.mjs';
 import { createHash, randomBytes } from 'node:crypto';
 import { hashPassword } from './passwords.mjs';
 
@@ -30,10 +31,9 @@ export async function requestPasswordReset(pool, username, deliver) {
   if (delivery) await deliver(delivery);
 }
 
-export async function completePasswordReset(pool, token, password) {
-  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw Object.assign(new Error('This reset link is invalid or expired. Request a new link.'), { status: 400 });
-  if (password.length < 12 || password.length > 1024) throw Object.assign(new Error('Use a password between 12 and 1024 characters.'), { status: 400 });
-  const passwordHash = await hashPassword(password);
+export async function completePasswordReset(pool, token, password, { hash = hashPassword } = {}) {
+  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw Object.assign(new Error('This reset link is invalid or expired. Request a new link.'), { status: 400 });
+  validatePassword(password, 12);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -41,6 +41,8 @@ export async function completePasswordReset(pool, token, password) {
     const [users] = await connection.execute('SELECT u.user_id FROM users u JOIN password_reset_tokens t ON t.user_id = u.user_id WHERE t.token_hash = ? AND u.family_id IS NOT NULL FOR UPDATE', [tokenHash(token)]);
     const [tokens] = await connection.execute('SELECT user_id FROM password_reset_tokens WHERE token_hash = ? AND expires_at > NOW() AND used_at IS NULL FOR UPDATE', [tokenHash(token)]);
     if (!users.length || !tokens.length) throw Object.assign(new Error('This reset link is invalid or expired. Request a new link.'), { status: 400 });
+    // Only a live, locked token is allowed to consume a bounded hashing slot.
+    const passwordHash = await hash(password);
     const userId = tokens[0].user_id;
     await connection.execute('UPDATE users SET password_hash = ? WHERE user_id = ?', [passwordHash, userId]);
     await connection.execute('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = ?', [userId]);

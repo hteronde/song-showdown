@@ -1,3 +1,4 @@
+import { createAuthRateLimiter, readAuthInput } from './auth-abuse.mjs';
 import { authorizeBracketRequest, authorizeBracket } from './bracket-access.mjs';
 import { getSongOrderLocks } from './song-order-locks.mjs';
 import { requestPasswordReset, completePasswordReset, deliverPasswordReset } from './password-reset.mjs';
@@ -29,6 +30,7 @@ import { parseVoteInput } from './vote-input.mjs';
 import { verifyPassword } from './passwords.mjs';
 
 const port = Number(process.env.API_PORT || 3000);
+const authRateLimiter = createAuthRateLimiter();
 const sessionCookie = 'song_showdown_session';
 const sessionLifetimeSeconds = 14 * 24 * 60 * 60;
 const effectiveBracketStatus = `CASE
@@ -162,6 +164,7 @@ const server = createServer(async (request, response) => {
 
   if (url.pathname.startsWith('/api/auth/')) {
     try {
+      authRateLimiter.checkRequest(request, url.pathname);
       if (request.method === 'GET' && url.pathname === '/api/auth/session') {
         const user = await findAuthenticatedUser(request);
         send(200, { authenticated: Boolean(user), user: user ? publicUser(user) : null });
@@ -169,7 +172,7 @@ const server = createServer(async (request, response) => {
       }
 
       if (request.method === 'POST' && url.pathname === '/api/auth/forgot-password') {
-        const input = await readJson(request);
+        const input = await readAuthInput(request, url.pathname, authRateLimiter);
         const username = typeof input.username === 'string' ? input.username.trim() : '';
         if (!username || username.length > 254) { send(400, { error: 'Enter your account email address.' }); return; }
         if (process.env.NODE_ENV === 'production' && (!process.env.PASSWORD_RESET_EMAIL_WEBHOOK || !process.env.APP_URL)) {
@@ -184,14 +187,14 @@ const server = createServer(async (request, response) => {
       }
 
       if (request.method === 'POST' && url.pathname === '/api/auth/reset-password') {
-        const input = await readJson(request);
+        const input = await readAuthInput(request, url.pathname, authRateLimiter);
         await completePasswordReset(pool, typeof input.token === 'string' ? input.token : '', typeof input.password === 'string' ? input.password : '');
         send(200, { reset: true }, { 'Set-Cookie': clearSessionCookie() });
         return;
       }
 
       if (request.method === 'POST' && url.pathname === '/api/auth/login') {
-        const input = await readJson(request);
+        const input = await readAuthInput(request, url.pathname, authRateLimiter);
         const username = typeof input.username === 'string' ? input.username.trim() : '';
         const password = typeof input.password === 'string' ? input.password : '';
         const [rows] = await pool.execute(
@@ -209,7 +212,7 @@ const server = createServer(async (request, response) => {
       }
 
       if (request.method === 'POST' && url.pathname === '/api/auth/setup-password') {
-        const input = await readJson(request);
+        const input = await readAuthInput(request, url.pathname, authRateLimiter);
         // Initial setup uses the same emailed, expiring, single-use proof as recovery.
         // Email + password alone can never claim an account or establish a session.
         await completePasswordReset(pool, typeof input.token === 'string' ? input.token : '', typeof input.password === 'string' ? input.password : '');
@@ -226,7 +229,7 @@ const server = createServer(async (request, response) => {
 
       send(404, { error: 'Authentication route not found.' });
     } catch (error) {
-      if (error.status) send(error.status, { error: error.message });
+      if (error.status) send(error.status, { error: error.message }, error.retryAfter ? { 'Retry-After': String(error.retryAfter) } : {});
       else {
         console.error('Authentication request failed:', error.message);
         send(500, { error: 'Could not process the authentication request.' });
