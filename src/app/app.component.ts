@@ -22,7 +22,7 @@ export class AppComponent {
   currentMember: FamilyMember = { id: 'you', name: 'Family member', initials: 'FM', color: '#c47d51' };
   authUser: AuthUser | null = null;
   authState: 'checking' | 'signedOut' | 'signedIn' = 'checking';
-  authMode: 'login' | 'setup' | 'forgot' | 'reset' = 'login';
+  authMode: 'login' | 'forgot' | 'reset' = 'login';
   authNotice = '';
   resetToken = new URLSearchParams(window.location.hash.slice(1)).get('resetToken') || '';
   username = '';
@@ -114,19 +114,9 @@ export class AppComponent {
       this.authError = 'Enter your email and password.';
       return;
     }
-    if (this.authMode === 'setup' && this.password !== this.confirmPassword) {
-      this.authError = 'The passwords do not match.';
-      return;
-    }
-    if (this.authMode === 'setup' && this.password.length < 12) {
-      this.authError = 'Use at least 12 characters for your password.';
-      return;
-    }
     this.authBusy = true;
     try {
-      const user = this.authMode === 'login'
-        ? await this.authApi.signIn(this.username, this.password)
-        : await this.authApi.setPassword(this.username, this.password);
+      const user = await this.authApi.signIn(this.username, this.password);
       this.acceptLogin(user);
     } catch (error) {
       this.authError = error instanceof Error ? error.message : 'Could not sign in.';
@@ -152,7 +142,7 @@ export class AppComponent {
     }
   }
 
-  setAuthMode(mode: 'login' | 'setup' | 'forgot' | 'reset'): void {
+  setAuthMode(mode: 'login' | 'forgot' | 'reset'): void {
     this.authMode = mode;
     this.authNotice = '';
     this.authError = '';

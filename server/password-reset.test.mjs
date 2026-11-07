@@ -51,3 +51,27 @@ test('reset hashes password, consumes tokens, and revokes sessions atomically', 
   assert.ok(pool.calls.includes('commit'));
   assert.ok(!pool.calls.includes('rollback'));
 });
+
+test('initial password setup rejects email-only claims before database access',async()=>{
+  const pool=database(true);
+  await assert.rejects(completePasswordReset(pool,'','attacker chosen password'),{status:400});
+  assert.equal(pool.calls.length,0);
+});
+
+test('a verified token initializes a password once; replay cannot claim or change it',async()=>{
+  let used=false,storedHash=null;
+  const c={async beginTransaction(){},async commit(){},async rollback(){},release(){},async execute(sql,params){
+    if(sql.startsWith('SELECT u.'))return [[{user_id:7}]];
+    if(sql.startsWith('SELECT user_id'))return [used?[]:[{user_id:7}]];
+    if(sql.startsWith('UPDATE users'))storedHash=params[0];
+    if(sql.startsWith('UPDATE password_reset_tokens'))used=true;
+    return [{affectedRows:1}];
+  }};
+  const pool={async getConnection(){return c;}};
+  await completePasswordReset(pool,'a'.repeat(43),'verified initial password');
+  const firstHash=storedHash;
+  assert.ok(firstHash);
+  assert.notEqual(firstHash,'verified initial password');
+  await assert.rejects(completePasswordReset(pool,'a'.repeat(43),'replayed attacker password'),{status:400});
+  assert.equal(storedHash,firstHash);
+});

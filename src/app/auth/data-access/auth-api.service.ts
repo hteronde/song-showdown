@@ -33,10 +33,6 @@ export class AuthApiService {
     return this.send('/login', { username, password });
   }
 
-  setPassword(username: string, password: string): Promise<AuthUser> {
-    return this.send('/setup-password', { username, password });
-  }
-
   requestPasswordReset(username: string): Promise<void> {
     return this.resetRequest('/forgot-password', { username });
   }

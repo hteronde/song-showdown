@@ -13,7 +13,7 @@
     <ng-container *ngIf="authMode !== 'forgot'">
     <label for="login-password">{{ authMode === 'login' ? 'Password' : 'Create password' }}</label>
     <input id="login-password" name="password" type="password" [(ngModel)]="password" [autocomplete]="authMode === 'login' ? 'current-password' : 'new-password'" [minlength]="authMode !== 'login' ? 12 : 1" required>
-    <ng-container *ngIf="authMode === 'setup' || authMode === 'reset'">
+    <ng-container *ngIf="authMode === 'reset'">
       <label for="confirm-password">Confirm password</label>
       <input id="confirm-password" name="confirmPassword" type="password" [(ngModel)]="confirmPassword" autocomplete="new-password" minlength="12" required>
       <small class="password-hint">Use at least 12 characters.</small>
@@ -23,7 +23,7 @@
     <div class="login-error" role="alert" *ngIf="authError">{{ authError }}</div>
     <button class="login-submit" type="submit" [disabled]="authBusy">{{ authBusy ? 'Please wait…' : authMode === 'forgot' ? 'Send reset link' : authMode === 'reset' ? 'Save new password' : authMode === 'login' ? 'Log in' : 'Set password and log in' }}</button>
     <button class="login-mode-toggle" type="button" *ngIf="authMode === 'login'" [disabled]="authBusy" (click)="setAuthMode('forgot')">Forgot password?</button>
-    <button class="login-mode-toggle" type="button" [disabled]="authBusy" (click)="setAuthMode(authMode === 'login' ? 'setup' : 'login')">{{ authMode === 'login' ? 'First time? Set up a password' : 'Already have a password? Log in' }}</button>
+    <button class="login-mode-toggle" type="button" [disabled]="authBusy" (click)="setAuthMode(authMode === 'login' ? 'forgot' : 'login')">{{ authMode === 'login' ? 'First time? Request a password link' : 'Already have a password? Log in' }}</button>
   </form>
 </section>
 

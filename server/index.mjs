@@ -1,3 +1,4 @@
+import { authorizeBracketRequest, authorizeBracket } from './bracket-access.mjs';
 import { getSongOrderLocks } from './song-order-locks.mjs';
 import { requestPasswordReset, completePasswordReset, deliverPasswordReset } from './password-reset.mjs';
 import {adminPageRequest} from './admin-pages.mjs';
@@ -25,7 +26,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import mysql from 'mysql2/promise';
 import { assignSongSeeds } from './song-seeds.mjs';
 import { parseVoteInput } from './vote-input.mjs';
-import { hashPassword, verifyPassword } from './passwords.mjs';
+import { verifyPassword } from './passwords.mjs';
 
 const port = Number(process.env.API_PORT || 3000);
 const sessionCookie = 'song_showdown_session';
@@ -200,7 +201,7 @@ const server = createServer(async (request, response) => {
         );
         const user = rows[0];
         if (!user) { send(401, { error: 'Username or password is incorrect.' }); return; }
-        if (!user.passwordHash) { send(409, { error: 'This account needs a password. Choose “Set up password” to create one.' }); return; }
+        if (!user.passwordHash) { send(409, { error: 'This account needs a password. Request an email link with “Forgot password?” to create one.' }); return; }
         if (!await verifyPassword(password, user.passwordHash)) { send(401, { error: 'Username or password is incorrect.' }); return; }
         const token = await startSession(user.userId);
         send(200, { authenticated: true, user: publicUser(user) }, { 'Set-Cookie': passwordSessionCookie(token) });
@@ -209,30 +210,10 @@ const server = createServer(async (request, response) => {
 
       if (request.method === 'POST' && url.pathname === '/api/auth/setup-password') {
         const input = await readJson(request);
-        const username = typeof input.username === 'string' ? input.username.trim() : '';
-        const password = typeof input.password === 'string' ? input.password : '';
-        if (password.length < 12) { send(400, { error: 'Use a password with at least 12 characters.' }); return; }
-        const connection = await pool.getConnection();
-        let user;
-        try {
-          await connection.beginTransaction();
-          const [rows] = await connection.execute(
-            `SELECT user_id AS userId, display_name AS displayName, email, \`role\` AS role, password_hash AS passwordHash
-             FROM users WHERE family_id IS NOT NULL AND LOWER(email) = LOWER(?) LIMIT 1 FOR UPDATE`,
-            [username]
-          );
-          user = rows[0];
-          if (!user) { await connection.rollback(); send(401, { error: 'Account not found.' }); return; }
-          if (user.passwordHash) { await connection.rollback(); send(409, { error: 'A password is already set. Sign in instead.' }); return; }
-          const passwordHash = await hashPassword(password);
-          await connection.execute('UPDATE users SET password_hash = ? WHERE user_id = ? AND password_hash IS NULL', [passwordHash, user.userId]);
-          await connection.commit();
-        } catch (error) {
-          await connection.rollback();
-          throw error;
-        } finally { connection.release(); }
-        const token = await startSession(user.userId);
-        send(200, { authenticated: true, user: publicUser(user) }, { 'Set-Cookie': passwordSessionCookie(token) });
+        // Initial setup uses the same emailed, expiring, single-use proof as recovery.
+        // Email + password alone can never claim an account or establish a session.
+        await completePasswordReset(pool, typeof input.token === 'string' ? input.token : '', typeof input.password === 'string' ? input.password : '');
+        send(200, { reset: true }, { 'Set-Cookie': clearSessionCookie() });
         return;
       }
 
@@ -267,6 +248,15 @@ const server = createServer(async (request, response) => {
     if (adminOnlyPaths.some(path => url.pathname === path || url.pathname.startsWith(`${path}/`))
       && authenticatedUser.role !== 'owner') {
       send(403, { error: 'Only an admin can access the Manage section.' });
+      return;
+    }
+  }
+
+  if (authenticatedUser) {
+    try { await authorizeBracketRequest(pool, authenticatedUser.userId, request.method, url.pathname); }
+    catch (error) {
+      if (!error.status) console.error('Bracket authorization failed:', error.message);
+      send(error.status || 500, { error: error.status ? error.message : 'Could not check bracket access.' });
       return;
     }
   }
@@ -929,6 +919,7 @@ const server = createServer(async (request, response) => {
 
       connection = await pool.getConnection();
       await connection.beginTransaction();
+      await authorizeBracket(connection,authenticatedUser.userId,bracketId,{ownerOnly:true});
       const [sessions] = await connection.execute(
         'SELECT f.start_round_number AS startRoundNumber,f.status,b.paused_at AS pausedAt FROM bracket_finale_sessions f JOIN brackets b ON b.bracket_id=f.bracket_id WHERE f.bracket_id=? FOR UPDATE',
         [bracketId]);

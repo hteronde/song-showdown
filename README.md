@@ -22,7 +22,7 @@ npm start
 
 Open the local URL printed by Angular CLI. Run `npm run build` to create a production build in `dist/song-showdown`.
 
-Log in with the email stored on your family account as the username. If the account has no password yet, choose “First time? Set up a password”; passwords must be at least 12 characters. Passwords are stored as scrypt hashes. A successful login creates a 14-day HttpOnly session cookie; use **Log out** to revoke it. For existing databases, run `database/migrate_auth_sessions.sql` once before starting the API.
+Log in with the email stored on your family account as the username. If the account has no password yet, choose “First time? Request a password link” and follow the emailed link; passwords must be at least 12 characters. Email and a new password alone cannot claim an account. Passwords are stored as scrypt hashes. A successful login creates a 14-day HttpOnly session cookie; use **Log out** to revoke it. For existing databases, run `database/migrate_auth_sessions.sql` once before starting the API.
 
 ## Connect the Beatles history to MAMP MySQL
 
@@ -42,10 +42,10 @@ The browser calls the local Node API; the API reads MySQL. Database credentials 
 ## API endpoints
 
 - `GET /api/health` checks that MySQL is reachable.
-- `GET /api/auth/session`, `POST /api/auth/login`, `POST /api/auth/setup-password`, and `POST /api/auth/logout` manage login sessions. Password setup is available only when the account has no password hash yet.
+- `GET /api/auth/session`, `POST /api/auth/login`, `POST /api/auth/setup-password`, and `POST /api/auth/logout` manage login sessions. Password setup requires an expiring, single-use email token in `{token,password}` and does not automatically sign in. `/setup-password` and `/reset-password` both consume the same verified token flow.
 - `GET /api/brackets?familyId=1` returns the Morgan family's history entries.
 - `GET /api/brackets/:bracketId` returns bracket metadata, songs, playlists, rounds, matchups, and the recorded champion.
-- `GET /api/brackets/:bracketId/finale-options`, `POST /api/brackets/:bracketId/finale`, `POST /api/brackets/:bracketId/finale/participants`, and `POST /api/brackets/:bracketId/finale/votes` support Finale Mode. The API checks that the supplied admin user ID has the `owner` role; ballot submissions advance a winner after every selected participant has voted. Since the prototype has no login, callers can spoof that ID, so this role check is not security for a public deployment.
+- `GET /api/brackets/:bracketId/finale-options`, `POST /api/brackets/:bracketId/finale`, `POST /api/brackets/:bracketId/finale/participants`, and `POST /api/brackets/:bracketId/finale/votes` support Finale Mode. The API derives the user from the login session, enforces family and participant access before bracket reads, and requires an owner in the same family for finale modifications. Client-supplied admin IDs do not grant access. Ballot submissions advance a winner after every selected participant has voted.
 - `bracket_members` links general participants to individual brackets, so participation can differ from one bracket to another. The `non_finale_participant` and `finale_participant` flags control eligibility in earlier rounds and the finale independently. The database ensures each user belongs to that bracket's family.
 - `GET /api/family-members?familyId=1`, `POST /api/family-members`, `PUT /api/family-members/:userId`, and `DELETE /api/family-members/:userId?familyId=1` manage users assigned to the Morgan family. A user's family and family role are stored directly on `users`; removing a member unlinks them and their bracket participation while retaining their account and votes.
 - `GET /api/songs`, `POST /api/songs`, `PUT /api/songs/:songId`, and `DELETE /api/songs/:songId` manage the shared song catalog. MySQL prevents deleting a song already linked to a bracket.
@@ -93,3 +93,25 @@ The Beatles and Cake history brackets read from MySQL. Voting and the active bra
 Run `database/migrate_password_reset.sql` once for an existing database, then restart the API. Choose **Forgot password?** on the login screen and enter the account email. In local development, copy the reset link from the API terminal. Links expire after 30 minutes, can only be used once, and are stored as hashes. Requests are limited to one per account per minute. Resetting a password revokes all existing sessions; sign in again afterward.
 
 For email delivery, configure `APP_URL` and `PASSWORD_RESET_EMAIL_WEBHOOK` in `.env`. The webhook must send an email from the JSON fields `to`, `subject`, and `text`; `PASSWORD_RESET_EMAIL_SECRET` supplies an optional Bearer credential. Production requires the webhook and application URL and never logs reset links. Unknown emails receive the same confirmation as existing accounts.
+
+## Account setup and bracket access
+
+Initial passwords and password recovery both require a 30-minute, single-use email token, stored only as a hash. Run `database/migrate_password_reset.sql` on existing databases if not already applied. Configure email delivery as described above; without it, local development prints links only to the operator’s terminal. Existing initialized accounts continue to use normal login.
+
+Create the first owner through the operator-only CLI with database access, after creating the family:
+
+```sh
+node --env-file-if-exists=.env scripts/bootstrap-owner.mjs FAMILY_ID owner@example.com "Owner name"
+```
+
+The command refuses to replace an owner or reuse an existing email. It creates an uninitialized owner and prints a private setup link for the operator to deliver to the intended owner. There is no public owner registration endpoint. Do not run it for a family that already has an owner; use verified email recovery instead.
+
+All bracket ID routes (including history, voting, finale options, finale writes, and admin subroutes) pass through shared authorization. Owners are limited to their own family; members must belong to the same family and participate in the bracket. Matchup voting resolves its bracket before applying the same check. Missing or inaccessible brackets return 404 without returning bracket details.
+
+Run security unit regressions with `npm run test:api`. To run the MySQL security integration check:
+
+```sh
+SECURITY_DB_TESTS=1 node --env-file-if-exists=.env --test server/security.integration.test.mjs
+```
+
+This check creates two test families inside a transaction, uses connection-local token storage, and rolls back all test records. It checks family isolation, initial password setup, token expiry, and token replay.
