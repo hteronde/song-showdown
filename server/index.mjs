@@ -1,7 +1,11 @@
+import { hostingConfig, clientAddress } from './hosting-config.mjs';
+import { checkStaticSite } from './static-site.mjs';
+import { createAuthRateLimiter } from './auth-abuse.mjs';
 import mysql from 'mysql2/promise';
 import { createApiServer } from './api-server.mjs';
 
-const port = Number(process.env.API_PORT || 3000);
+const hosting = hostingConfig();
+await checkStaticSite(hosting.staticDirectory);
 const pool = mysql.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
   port: Number(process.env.DB_PORT || 8889),
@@ -12,9 +16,10 @@ const pool = mysql.createPool({
   connectionLimit: 5,
   decimalNumbers: true
 });
-const app = createApiServer({ pool });
-app.server.listen(port, '127.0.0.1', () => {
-  console.log(`Music Bracket API listening at http://127.0.0.1:${port}`);
+const authRateLimiter = createAuthRateLimiter({clientAddress: request => clientAddress(request, hosting.trustRailwayProxy)});
+const app = createApiServer({ pool, hosting, authRateLimiter });
+app.server.listen(hosting.port, hosting.host, () => {
+  console.log(`Music Bracket API listening at http://${hosting.host}:${hosting.port}`);
   app.startProgression();
 });
 

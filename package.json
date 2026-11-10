@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "ng serve --proxy-config proxy.conf.json",
+    "start:server": "node server/index.mjs",
     "start:api": "node --watch --env-file-if-exists=.env server/index.mjs",
     "test:api": "node --test server/*.test.mjs",
     "test:integration": "node --env-file-if-exists=.env scripts/run-http-integration.mjs",

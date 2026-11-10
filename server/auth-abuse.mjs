@@ -12,8 +12,8 @@ export function validatePassword(password, minimum = 1) {
 }
 const digest = value => createHash('sha256').update(value).digest('hex');
 
-// Single-process limiter. Never trust client-controlled forwarded headers.
-export function createAuthRateLimiter({ now = Date.now, maxEntries = 10000 } = {}) {
+// Single-process limiter; forwarded headers are ignored unless the caller explicitly supplies a trusted resolver.
+export function createAuthRateLimiter({ now = Date.now, maxEntries = 10000, clientAddress = request => request.socket?.remoteAddress || 'unknown' } = {}) {
   const buckets = new Map();
   let nextSweep = 0;
   function consume(key, limit, windowMs) {
@@ -34,7 +34,7 @@ export function createAuthRateLimiter({ now = Date.now, maxEntries = 10000 } = {
   }
   return {
     checkRequest(request, path) {
-      const ip = digest(request.socket?.remoteAddress || 'unknown');
+      const ip = digest(clientAddress(request));
       consume(`all:${ip}`, 120, 60000);
       if (request.method !== 'POST') return;
       if (path === '/api/auth/login') consume(`login:${ip}`, 30, 15 * 60000);

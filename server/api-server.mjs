@@ -1,3 +1,5 @@
+import { originAllowed } from './hosting-config.mjs';
+import { serveStaticSite } from './static-site.mjs';
 import { createAuthRateLimiter, readAuthInput } from './auth-abuse.mjs';
 import { authorizeBracketRequest, authorizeBracket } from './bracket-access.mjs';
 import { getSongOrderLocks } from './song-order-locks.mjs';
@@ -29,7 +31,7 @@ import { parseVoteInput } from './vote-input.mjs';
 import { verifyPassword } from './passwords.mjs';
 
 // The caller owns the pool and listener. Importing this module opens no connections or timers.
-export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter() }) {
+export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter(), hosting = {} }) {
 const sessionCookie = 'song_showdown_session';
 const sessionLifetimeSeconds = 14 * 24 * 60 * 60;
 const effectiveBracketStatus = `CASE
@@ -128,8 +130,8 @@ async function finalizeClosedWeeks() {
 
 const server = createServer(async (request, response) => {
   const origin = request.headers.origin || '';
-  if (origin && !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
-    sendJson(response, 403, { error: 'This local API only accepts requests from this computer.' }, 'null');
+  if (!originAllowed(origin, hosting)) {
+    sendJson(response, 403, { error: 'This website origin is not allowed.' }, 'null');
     return;
   }
   const send = (status, data, extraHeaders = {}) => sendJson(response, status, data, origin || 'http://localhost:4200', extraHeaders);
@@ -140,6 +142,15 @@ const server = createServer(async (request, response) => {
   }
 
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
+  if (hosting.staticDirectory && url.pathname !== '/api' && !url.pathname.startsWith('/api/')) {
+    try { await serveStaticSite(request, response, url.pathname, hosting.staticDirectory); }
+    catch (error) {
+      console.error('Website asset request failed:', error.message);
+      if (!response.headersSent) {response.writeHead(500, {'Content-Type':'text/plain'});response.end('Could not load the website.');}
+      else response.destroy();
+    }
+    return;
+  }
   if (request.method === 'GET' && url.pathname === '/api/health') {
     try {
       await pool.query('SELECT 1');
