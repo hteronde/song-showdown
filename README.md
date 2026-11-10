@@ -8,11 +8,11 @@ The following table describes code paths present in the project. It does not est
 
 | Area | Implemented behavior | Main source |
 | --- | --- | --- |
-| Authentication | Database sessions, login/logout, scrypt password hashes, single-use setup/recovery tokens, session revocation, and abuse controls | `server/index.mjs`, `server/passwords.mjs`, `server/password-reset.mjs`, `server/auth-abuse.mjs` |
-| Voting | Angular submits and updates participant votes through a transactional MySQL endpoint | `src/app/brackets/feature/active-bracket-page.component.ts`, `src/app/brackets/data-access/active-bracket-api.service.ts`, `server/index.mjs` |
+| Authentication | Database sessions, login/logout, scrypt password hashes, single-use setup/recovery tokens, session revocation, and abuse controls | `server/api-server.mjs`, `server/passwords.mjs`, `server/password-reset.mjs`, `server/auth-abuse.mjs` |
+| Voting | Angular submits and updates participant votes through a transactional MySQL endpoint | `src/app/brackets/feature/active-bracket-page.component.ts`, `src/app/brackets/data-access/active-bracket-api.service.ts`, `server/api-server.mjs` |
 | Bracket administration | Creation, drafts, duplication, participant assignment, songs, albums, schedules, and playlists | `src/app/brackets/feature/`, `server/bracket-drafts.mjs`, `server/duplicate-bracket.mjs`, `server/session-management.mjs` |
 | Tournament rules | Seeding, randomization, tie resolution, winner advancement, and finale workflows | `server/bracket-seeding.mjs`, `server/round-randomization.mjs`, `server/tiebreaker.mjs`, `server/admin-ballots.mjs`, `server/session-progression.mjs` |
-| Operational behavior | Pause/resume, timed and untimed sessions, manual week advancement, and periodic server progression | `server/bracket-pause.mjs`, `server/session-progression.mjs`, `server/index.mjs` |
+| Operational behavior | Pause/resume, timed and untimed sessions, manual week advancement, and periodic server progression | `server/bracket-pause.mjs`, `server/session-progression.mjs`, `server/api-server.mjs` |
 | Privacy and authorization | Anonymous-ballot filtering, users' own saved votes, unrevealed-song projection, and family/participant access checks | `server/ballot-privacy.mjs`, `server/member-bracket-view.mjs`, `server/bracket-access.mjs` |
 
 ## Database-backed pages and remaining demo behavior
@@ -162,3 +162,26 @@ A protected HTTP 401 expires the current frontend session once, clears the signe
 ## Bracket rendering profile
 
 Run `npm run profile:bracket` for the reproducible source-execution baseline. See [the baseline report](docs/bracket-rendering-profile.md) for measured getter/geometry-read counts, illustrative Node timings, and the browser trace still needed before optimizing. This harness uses synthetic DOM geometry and does not measure actual browser layout, paint, or frame rate.
+
+## HTTP and disposable MySQL integration tests
+
+```sh
+npm run test:integration
+```
+
+This opt-in suite starts the same API handler used locally, on an automatically assigned loopback port, against a randomly named `song_showdown_test_*` database. It creates the schema directly from `database/schema.sql`, including its triggers. The background progression timer is not started; the normal HTTP request paths still run progression where applicable.
+
+Connection settings use `.env`'s `DB_HOST`, `DB_PORT`, `DB_USER`, and `DB_PASSWORD`, with optional `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, and `TEST_DB_PASSWORD` overrides. The test account must be permitted to create and drop test databases and create triggers. The suite intentionally ignores `DB_NAME`: it never applies test fixtures to the application database or drops a caller-specified database. It drops only the schema it successfully created, on ordinary completion or test failure. If the process is forcibly terminated, the generated test database may remain.
+
+The suite exercises:
+
+- Real HTTP login/session cookies, logout, email-only setup rejection, reset-token expiry and single use.
+- Two-family isolation for bracket history, voting, finale options, finale writes, and management access.
+- Vote submission, refreshed saved selections, replacement of an existing vote, identity checks, and anonymous-ballot filtering.
+- Actual MySQL foreign keys, winner constraints and vote-validation triggers.
+- Transaction rollback when a test-only trigger rejects the second ballot after the first write has succeeded.
+- Simultaneous participant votes, parallel progression requests, and competing manual week advancements. A test-only database audit checks that each first-round winner is written exactly once.
+
+These are API/database tests, not browser end-to-end tests. They do not establish that every UI workflow or arbitrary concurrent workload is correct. The separate optional `SECURITY_DB_TESTS` suite remains available. `npm run test:api` runs the unit/regression suite and skips both opt-in MySQL suites unless explicitly enabled.
+
+`server/index.mjs` now owns production pool configuration, listening and process shutdown. `server/api-server.mjs` exports `createApiServer` without opening a pool, listener or timer on import, allowing the integration suite to inject its disposable pool. The route handler still contains substantial SQL/domain orchestration; this test seam is not a complete backend module split. The schema loader is test-only and does not replace a versioned migration runner for existing databases.
