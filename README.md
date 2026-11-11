@@ -45,7 +45,7 @@ Install a supported Node.js version (22.22.3 or later in the 22.x line, or 24.15
 
 ```sh
 npm install
-npm start
+npm run dev
 ```
 
 Open the local URL printed by Angular CLI. Run `npm run build` to create a production build in `dist/song-showdown`.
@@ -57,7 +57,7 @@ Log in with the email stored on your family account as the username. If the acco
 1. Copy `.env.example` to `.env` and enter the MySQL password used by your Workbench `mydb` connection. The defaults use MAMP's MySQL port `8889` and database `music_bracket`. A new database uses `database/schema.sql`; an existing database needs the migrations appropriate to its current schema. Seed scripts contain optional sample/history data and are separate from schema setup.
 2. Start MySQL in MAMP.
 3. In one Terminal tab, run `npm run start:api`.
-4. In another Terminal tab, run `npm start` and open the Angular URL.
+4. In another Terminal tab, run `npm run dev` and open the Angular URL.
 
 To add the completed Cake bracket to the database, run `database/seed_cake_bracket_history.sql` in MySQL Workbench. It adds the 16-song bracket and its 15 recorded matchups to the Morgan family history.
 
@@ -205,3 +205,9 @@ Test with a small published bracket and member account: verify email content, pe
 Existing installations must run `database/migrate_user_and_bracket_roles.sql` once, after the invitation migration. Back up MySQL, stop the old API, run this migration against `music_bracket`, then start/deploy the updated API. This renames `users.role` to `users.user_role`, converts `owner` to `super` and `member` to `viewer`, and adds `bracket_members.bracket_role`. Fresh installs use the updated schema directly and must not run the migration.
 
 `super` retains family administration; `viewer` has no global management rights. Super users assign Member or Commissioner from Edit bracket → Participants. A commissioner must accept their invitation before gaining editing rights for that bracket. Members can vote and see permitted bracket content, but cannot edit bracket settings. Only super users can assign roles, change accounts, or create/duplicate/delete brackets. Bracket roles belong to `bracket_members`, since each participant can have a different role in each bracket. Existing super-user memberships migrate to commissioner; all other memberships default to member.
+
+### Railway production startup
+
+Set the app service Build Command to `npm run build` and Start Command to `npm run start:server` (or `npm start`, which now also starts the Node API). Use healthcheck path `/api/health`, `NODE_ENV=production`, `SERVE_FRONTEND=true`, and `APP_URL=https://thesongshowdown.com`. Keep the existing database and email variables. The Node server serves the prebuilt Angular files and listens on Railway's `PORT`; do not run `ng serve` in production.
+
+For local development, run `npm run start:api` and `npm run dev` in separate terminals. `npm start` is the production server entry point, not the Angular development server.
