@@ -89,7 +89,12 @@
   margin: -14px 0 24px;
 }
 
-.admin-finale-entry button {
+.admin-finale-entry button,
+.admin-finale-entry a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
   border: 1px solid #d8c3b4;
   background: #fffaf6;
   color: #9a5538;
