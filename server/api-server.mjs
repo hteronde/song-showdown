@@ -3,7 +3,7 @@ import { serveStaticSite } from './static-site.mjs';
 import { createAuthRateLimiter, readAuthInput } from './auth-abuse.mjs';
 import { authorizeBracketRequest, authorizeBracket } from './bracket-access.mjs';
 import { getSongOrderLocks } from './song-order-locks.mjs';
-import { requestPasswordReset, completePasswordReset, deliverPasswordReset } from './password-reset.mjs';
+import { requestPasswordReset, completePasswordReset, deliverPasswordReset, passwordEmailConfigured } from './password-reset.mjs';
 import {adminPageRequest} from './admin-pages.mjs';
 import {saveBracketParticipants} from './bracket-participants.mjs';
 import {getSessionPlaylists,saveSessionPlaylists,getSessionPlaylistMatchups,updateBracketSessionPlaylists} from './session-playlists.mjs';
@@ -175,7 +175,7 @@ const server = createServer(async (request, response) => {
         const input = await readAuthInput(request, url.pathname, authRateLimiter);
         const username = typeof input.username === 'string' ? input.username.trim() : '';
         if (!username || username.length > 254) { send(400, { error: 'Enter your account email address.' }); return; }
-        if (process.env.NODE_ENV === 'production' && (!process.env.PASSWORD_RESET_EMAIL_WEBHOOK || !process.env.APP_URL)) {
+        if (process.env.NODE_ENV === 'production' && !passwordEmailConfigured()) {
           send(503, { error: 'Password recovery is temporarily unavailable. Contact your administrator.' }); return;
         }
         await requestPasswordReset(pool, username, async delivery => {
