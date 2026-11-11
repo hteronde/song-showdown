@@ -22,7 +22,6 @@ export async function sendBracketEmail(pool, bracketId, input, {deliver=deliverE
     FROM bracket_members bm JOIN brackets b ON b.bracket_id=bm.bracket_id AND b.family_id=bm.family_id
     JOIN users u ON u.user_id=bm.user_id AND u.family_id=b.family_id
     WHERE bm.bracket_id=? AND bm.invitation_status='accepted'
-      AND (bm.non_finale_participant=TRUE OR bm.finale_participant=TRUE)
     ORDER BY u.user_id`, [bracketId]);
   if (!recipients.length) throw fail(400, 'This bracket has no accepted participants to email.');
   const result = {sent:0, failed:0};

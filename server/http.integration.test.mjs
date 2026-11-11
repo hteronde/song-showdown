@@ -77,6 +77,11 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.notEqual((await http(path,{method:'POST',cookie:family.member.cookie,body})).status,200);
       assert.notEqual((await http(path,{method:'POST',cookie:other.owner.cookie,body})).status,200);
       assert.equal(customEmails.length,0);
+      await db.pool.execute('UPDATE bracket_members SET non_finale_participant=FALSE,finale_participant=FALSE WHERE bracket_id=? AND user_id=?',[br.id,family.owner.id]);
+      const allRoles=await http(path,{method:'POST',cookie:family.owner.cookie,body});
+      assert.equal(allRoles.status,200);assert.deepEqual(allRoles.body,{sent:2,failed:0});
+      assert.deepEqual(customEmails.map(message=>message.to).sort(),[family.owner.email,family.member.email].sort());
+      customEmails.length=0;
       await db.pool.execute("UPDATE bracket_members SET invitation_status='declined' WHERE bracket_id=? AND user_id=?",[br.id,family.member.id]);
       const sent=await http(path,{method:'POST',cookie:family.owner.cookie,body});
       assert.equal(sent.status,200);assert.deepEqual(sent.body,{sent:1,failed:0});
@@ -84,6 +89,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       await db.pool.execute("UPDATE bracket_members SET invitation_status='accepted',bracket_role='commissioner' WHERE bracket_id=? AND user_id=?",[br.id,family.member.id]);
       const commissioner=await http(path,{method:'POST',cookie:family.member.cookie,body});
       assert.equal(commissioner.status,200);assert.equal(commissioner.body.sent,2);
+      assert.deepEqual(customEmails.slice(-2).map(message=>message.to).sort(),[family.owner.email,family.member.email].sort());
       assert.equal((await http(path,{method:'POST',cookie:family.owner.cookie,body:{...body,subject:''}})).status,400);
       await db.pool.execute("UPDATE bracket_members SET bracket_role='member' WHERE bracket_id=?",[br.id]);
     });

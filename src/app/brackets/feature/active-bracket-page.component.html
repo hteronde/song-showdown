@@ -155,7 +155,7 @@
 
 <dialog #writeEmailDialog class="matchup-details-dialog email-dialog" aria-labelledby="write-email-title" (cancel)="emailSending && $event.preventDefault()">
   <h2 id="write-email-title">Write email</h2>
-  <p>This email will go to all accepted participants in this bracket, including finale participants. Each person receives a separate email.</p>
+  <p>This email will go to all accepted participants in this bracket, regardless of their role or online/finale participation settings. Each person receives a separate email.</p>
   <form (ngSubmit)="sendBracketEmail()">
     <label for="bracket-email-subject">Subject</label>
     <input id="bracket-email-subject" name="emailSubject" [(ngModel)]="emailSubject" maxlength="200" required [disabled]="emailAttempted" autofocus>

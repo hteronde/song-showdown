@@ -81,6 +81,11 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
             this.emailFeedback = result.failed
                 ? `${result.sent} emails accepted for delivery; ${result.failed} failed. You can retry this message.`
                 : `${result.sent} emails accepted for delivery.`;
+            if (this.emailSent) {
+                this.writeEmailDialog?.nativeElement.close();
+                this.notice = this.emailFeedback;
+                this.toastMessage.emit(this.emailFeedback);
+            }
         } catch (error) {
             this.emailFeedback = error instanceof Error ? error.message : 'Could not send the email.';
         } finally {
