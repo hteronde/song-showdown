@@ -1,3 +1,4 @@
+import { processSessionEmails } from './session-emails.mjs';
 import { sendInvitationStatusEmails } from './invitation-status-email.mjs';
 import { isolateBracketSong } from './bracket-song-ownership.mjs';
 import { saveBracketRoles } from './bracket-roles.mjs';
@@ -35,7 +36,7 @@ import { parseVoteInput } from './vote-input.mjs';
 import { verifyPassword } from './passwords.mjs';
 
 // The caller owns the pool and listener. Importing this module opens no connections or timers.
-export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter(), hosting = {}, sendInvitations = sendBracketInvitations, sendStatusNotifications = sendInvitationStatusEmails }) {
+export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter(), hosting = {}, sendInvitations = sendBracketInvitations, sendStatusNotifications = sendInvitationStatusEmails, sendSessionNotifications = processSessionEmails }) {
 const sessionCookie = 'song_showdown_session';
 const sessionLifetimeSeconds = 14 * 24 * 60 * 60;
 const effectiveBracketStatus = `CASE
@@ -106,6 +107,17 @@ function publicUser(user) {
 
 let closedWeekFinalization = null;
 let closedWeekTimer;
+let notificationRun=null;
+async function runProgressionTick() {
+  // Keep the schedule moving even while a provider is slow or retrying emails.
+  await finalizeClosedWeeks();
+  if(notificationRun)return notificationRun;
+  notificationRun=(async()=>{
+    try {await sendSessionNotifications(pool);}
+    catch(error) {console.error('Session notifications unavailable. Check the session-email migration and email configuration.',error.code || '');}
+  })().finally(()=>{notificationRun=null;});
+  return notificationRun;
+}
 async function finalizeClosedWeeks() {
   if (closedWeekFinalization) return closedWeekFinalization;
   closedWeekFinalization = (async () => {
@@ -1318,8 +1330,8 @@ const server = createServer(async (request, response) => {
     server,
     startProgression() {
       if (closedWeekTimer) return;
-      void finalizeClosedWeeks();
-      closedWeekTimer = setInterval(() => { void finalizeClosedWeeks(); }, 15_000);
+      void runProgressionTick();
+      closedWeekTimer = setInterval(() => { void runProgressionTick(); }, 15_000);
     },
     async close() {
       if (closedWeekTimer) clearInterval(closedWeekTimer);
@@ -1329,6 +1341,7 @@ const server = createServer(async (request, response) => {
         else resolve();
       }));
       if (closedWeekFinalization) await closedWeekFinalization;
+      if (notificationRun) await notificationRun;
     }
   };
 }

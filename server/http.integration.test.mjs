@@ -1,3 +1,4 @@
+import { processSessionEmails } from './session-emails.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, createHash } from 'node:crypto';
@@ -402,6 +403,43 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
         const [[saved]]=await db.pool.execute('SELECT invitation_status FROM bracket_members WHERE bracket_id=? AND user_id=?',[br.id,a.member.id]);assert.equal(saved.invitation_status,'declined');
       }finally{failStatusNotification=false;}
       assert.equal(statusNotifications.length,start+2);
+    });
+
+    await t.test('session notifications respect timing, consent, retries, and concurrent workers',async()=>{
+      const br=await bracket(a);
+      const env={NODE_ENV:'production',APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'};
+      const messages=[];
+      const deliver=async(message,options)=>{messages.push({message,key:options.idempotencyKey});};
+      await db.pool.execute('UPDATE session_email_settings SET enabled_at=NOW(6) WHERE settings_id=1');
+      await db.pool.execute("UPDATE brackets SET start_at=DATE_ADD(NOW(6),INTERVAL 1 HOUR) WHERE bracket_id=?",[br.id]);
+      await db.pool.execute('UPDATE bracket_weeks SET opens_at=NOW(6),closes_at=DATE_ADD(NOW(6),INTERVAL 2 HOUR) WHERE week_id=?',[br.weeks[0]]);
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0);
+      await db.pool.execute('UPDATE brackets SET start_at=NOW(6),paused_at=NOW(6) WHERE bracket_id=?',[br.id]);
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='declined' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      await db.pool.execute('UPDATE brackets SET paused_at=NULL WHERE bracket_id=?',[br.id]);
+      await Promise.all([processSessionEmails(db.pool,{env,deliver}),processSessionEmails(db.pool,{env,deliver})]);
+      assert.equal(messages.length,1);assert.equal(messages[0].message.to,a.owner.email);assert.match(messages[0].message.text,/You have until/);
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='accepted' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      const keys=[];
+      const failed=await processSessionEmails(db.pool,{env,deliver:async(message,options)=>{keys.push(options.idempotencyKey);throw Error('Test mail outage');}});
+      assert.equal(failed.failed,1);
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0,'retry cooldown');
+      await db.pool.execute("UPDATE session_email_deliveries SET attempt_at=DATE_SUB(NOW(6),INTERVAL 2 MINUTE) WHERE bracket_id=? AND delivery_status='pending'",[br.id]);
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,1);assert.equal(messages.at(-1).key,keys[0]);
+      await db.pool.execute('UPDATE bracket_weeks SET closes_at=NOW(6) WHERE week_id=?',[br.weeks[0]]);
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,2);assert.ok(messages.slice(-2).every(m=>m.message.subject.includes('has ended')));
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0);
+      // A new untimed session opens only after every feeder winner is known.
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE bracket_id=? AND week_id=?',[br.id,br.weeks[0]]);
+      await db.pool.execute('UPDATE bracket_weeks SET opens_at=NOW(6),closes_at=NULL WHERE week_id=?',[br.weeks[1]]);
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,2);assert.ok(messages.slice(-2).every(m=>m.message.text.includes('no fixed deadline')));
+      // Deleting the bracket removes its delivery records along with the sessions.
+      assert.equal((await http(`/api/admin/brackets/${br.id}`,{cookie:a.owner.cookie,method:'DELETE'})).status,200);
+      const [[count]]=await db.pool.execute('SELECT COUNT(*) AS total FROM session_email_deliveries WHERE bracket_id=?',[br.id]);assert.equal(Number(count.total),0);
     });
 
     await t.test('legacy role migration preserves accounts and assigns bracket role defaults',async()=>{

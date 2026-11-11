@@ -211,3 +211,13 @@ Existing installations must run `database/migrate_user_and_bracket_roles.sql` on
 Set the app service Build Command to `npm run build` and Start Command to `npm run start:server` (or `npm start`, which now also starts the Node API). Use healthcheck path `/api/health`, `NODE_ENV=production`, `SERVE_FRONTEND=true`, and `APP_URL=https://thesongshowdown.com`. Keep the existing database and email variables. The Node server serves the prebuilt Angular files and listens on Railway's `PORT`; do not run `ng serve` in production.
 
 For local development, run `npm run start:api` and `npm run dev` in separate terminals. `npm start` is the production server entry point, not the Angular development server.
+
+### Session start/end emails
+
+Apply `database/migrate_session_emails.sql` to the existing `music_bracket` database before deploying session emails. It is safe to rerun and does not change accounts, votes, or schedules. Fresh databases include these tables. An activation timestamp suppresses emails about sessions that started/ended before this migration.
+
+The running API checks every 15 seconds after advancing sessions; a browser does not need to be open. Accepted online participants receive one start and one end notification per session. Start messages include the current closing date in America/Chicago and the bracket link; untimed sessions explain that they close when everyone has voted. Finale sessions use in-person voting and do not send online-session notifications. Paused brackets and pending/declined/removed participants are excluded. Late acceptance during an open session can trigger that participant's start notification.
+
+Use the existing `RESEND_API_KEY`, `EMAIL_FROM`, and HTTPS `APP_URL`. Session emails default on in production and off locally to prevent duplicate emails from a local database copy. Set `SESSION_EMAILS_ENABLED=false` to disable, or `true` to explicitly enable local testing with an email provider. Railway must keep the API running; notifications cannot fire while its container is asleep or stopped.
+
+Delivery records survive restarts. Failed attempts retry after one minute; abandoned worker leases expire after ten minutes. Resend retries use a stable idempotency key and payload (provider keys last 24 hours: https://resend.com/docs/dashboard/emails/idempotency-keys). A successful submission to the provider is recorded as sent; inbox delivery is not guaranteed. If recipient/deadline content changes after a failed attempt, that event is skipped rather than sending obsolete content. No start email is sent after its session has already closed. Historical completed sessions are not replayed on installation, and deleting a bracket also deletes its notification records.

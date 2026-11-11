@@ -77,7 +77,7 @@ export async function deliverPasswordReset({ email, token }, { env = process.env
   catch { throw new Error('Password reset email delivery failed.'); }
 }
 
-export async function deliverEmail(message, { env = process.env, fetchImpl = globalThis.fetch } = {}) {
+export async function deliverEmail(message, { env = process.env, fetchImpl = globalThis.fetch, idempotencyKey } = {}) {
   if (env.NODE_ENV === 'production' && !passwordEmailConfigured(env)) throw new Error('Email delivery is not configured.');
   let endpoint, headers, body;
   if (env.RESEND_API_KEY) {
@@ -93,6 +93,7 @@ export async function deliverEmail(message, { env = process.env, fetchImpl = glo
     console.log(`Email to ${message.to}: ${message.subject}\n${message.text}`);
     return;
   }
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   try {
     const response = await fetchImpl(endpoint, {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...headers },
