@@ -621,10 +621,11 @@ const server = createServer(async (request, response) => {
           await connection.beginTransaction();
           const [rows]=await connection.execute('SELECT bracket_id FROM brackets WHERE bracket_id=? AND family_id=? FOR UPDATE',[id,familyId]);
           if (!rows.length) { await connection.rollback(); send(404,{error:'Bracket not found.'}); return; }
-          const [activity]=await connection.execute('SELECT (SELECT COUNT(*) FROM votes WHERE bracket_id=?) + (SELECT COUNT(*) FROM bracket_finale_sessions WHERE bracket_id=?) + (SELECT COUNT(*) FROM matchups WHERE bracket_id=? AND winner_entry_id IS NOT NULL) AS total',[id,id,id]);
-          if (Number(activity[0].total)>0) { await connection.rollback(); send(409,{error:'This bracket has votes or a finale session and cannot be deleted.'}); return; }
+          // Remove dependent records inside the same transaction as the bracket.
+          await connection.execute('DELETE FROM votes WHERE bracket_id=?',[id]);
+          await connection.execute('DELETE FROM bracket_finale_sessions WHERE bracket_id=?',[id]);
           await connection.execute('UPDATE matchups SET next_matchup_id=NULL,next_slot=NULL WHERE bracket_id=?',[id]);
-          for(const table of ['matchups','bracket_playlists','bracket_weeks','bracket_rounds','bracket_songs','bracket_members']) await connection.execute(`DELETE FROM ${table} WHERE bracket_id=?`,[id]);
+          for(const table of ['matchups','bracket_playlists','bracket_weeks','bracket_rounds','bracket_songs','bracket_albums','bracket_members']) await connection.execute(`DELETE FROM ${table} WHERE bracket_id=?`,[id]);
           await connection.execute('DELETE FROM brackets WHERE bracket_id=?',[id]); await connection.commit(); send(200,{deleted:true}); return;
         } catch(error) { await connection.rollback(); throw error; } finally { connection.release(); }
       }
@@ -647,7 +648,7 @@ const server = createServer(async (request, response) => {
          WHERE bm.user_id=?
            AND (bm.non_finale_participant=TRUE OR bm.finale_participant=TRUE)
            AND b.status<>'draft' AND bm.invitation_status<>'declined'
-           AND (${effectiveBracketStatus}='active' OR bm.invitation_status='pending')
+           AND (${effectiveBracketStatus}='active' OR (b.start_at>NOW() AND b.status<>'complete' AND b.completed_at IS NULL) OR bm.invitation_status='pending')
          ORDER BY b.start_at DESC,b.created_at DESC`,[authenticatedUser.userId]);
       send(200,{brackets});
     } catch(error) {
@@ -969,11 +970,12 @@ const server = createServer(async (request, response) => {
       await connection.beginTransaction();
       await authorizeBracket(connection,authenticatedUser.userId,bracketId,{manageOnly:true});
       const [sessions] = await connection.execute(
-        'SELECT f.start_round_number AS startRoundNumber,f.status,b.paused_at AS pausedAt FROM bracket_finale_sessions f JOIN brackets b ON b.bracket_id=f.bracket_id WHERE f.bracket_id=? FOR UPDATE',
+        "SELECT f.start_round_number AS startRoundNumber,f.status,b.paused_at AS pausedAt,(b.start_at<=NOW(6) AND b.status<>'draft') AS hasStarted FROM bracket_finale_sessions f JOIN brackets b ON b.bracket_id=f.bracket_id WHERE f.bracket_id=? FOR UPDATE",
         [bracketId]);
       if (!sessions.length || sessions[0].status !== 'active') {
         await connection.rollback(); send(409, { error: 'Finale Mode is not active for this bracket.' }); return;
       }
+      if (!sessions[0].hasStarted) { await connection.rollback(); send(409,{error:'Voting opens at the scheduled bracket start time.'}); return; }
       if (sessions[0].pausedAt) { await connection.rollback(); send(409,{error:'This bracket is on hold. Resume it before recording votes.'}); return; }
       const [matchups] = await connection.execute(
         `SELECT m.matchup_id AS matchupId,m.song_a_entry_id AS songAEntryId,m.song_b_entry_id AS songBEntryId,
@@ -1084,6 +1086,8 @@ const server = createServer(async (request, response) => {
       const connection = await pool.getConnection();
       try {
         await connection.beginTransaction();
+        const [[timing]]=await connection.execute("SELECT (start_at<=NOW(6) AND status<>'draft') AS hasStarted FROM brackets WHERE bracket_id=? FOR UPDATE",[bracketId]);
+        if (!timing?.hasStarted) throw Object.assign(new Error('Finale Mode cannot start before the scheduled bracket start time.'),{status:409});
         await connection.execute(
           `UPDATE bracket_members SET finale_participant=CASE WHEN user_id IN (${participantIds.map(() => '?').join(',')}) THEN TRUE ELSE FALSE END
            WHERE bracket_id=? AND family_id=?`,

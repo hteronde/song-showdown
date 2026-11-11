@@ -1153,7 +1153,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     }
     readonly deletingBracketIds = new Set<number>();
     async remove(bracket: BracketRecord): Promise<void> {
-        if (this.deletingBracketIds.has(bracket.bracketId) || !window.confirm(`Delete “${bracket.title}”?`))
+        if (this.deletingBracketIds.has(bracket.bracketId) || !window.confirm(`Permanently delete “${bracket.title}”? This will also delete all votes, matchup results, sessions, and participant invitations for this bracket. This cannot be undone.`))
             return;
         this.error = '';
         this.success = '';

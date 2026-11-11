@@ -25,7 +25,7 @@ export async function finalizeClosedMatchups(connection,bracketId=null,weekId=nu
            AND (? IS NULL OR b.bracket_id=?) AND (? IS NULL OR w.week_id=?)
            AND ${priorSessionsReadySql('b','w')}
            AND m.song_a_entry_id IS NOT NULL AND m.song_b_entry_id IS NOT NULL
-           AND b.completed_at IS NULL AND b.status='active' AND b.paused_at IS NULL
+           AND b.completed_at IS NULL AND b.status='active' AND b.paused_at IS NULL AND b.start_at<=NOW(6)
            AND (b.finale_start_round IS NULL OR r.round_number<b.finale_start_round)
            AND ${readyRoundSql('b','r')}
            AND NOT EXISTS (SELECT 1 FROM matchups feeder WHERE feeder.bracket_id=m.bracket_id AND feeder.next_matchup_id=m.matchup_id AND feeder.winner_entry_id IS NULL)
@@ -75,7 +75,7 @@ export async function finalizeClosedMatchups(connection,bracketId=null,weekId=nu
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export async function closeFullyVotedWeeks(c) {
   const [weeks]=await c.execute(`SELECT w.week_id FROM bracket_weeks w JOIN brackets b ON b.bracket_id=w.bracket_id JOIN bracket_rounds r ON r.bracket_id=w.bracket_id AND r.round_id=w.round_id
-    WHERE b.session_duration_minutes IS NULL AND b.status='active' AND b.completed_at IS NULL AND b.paused_at IS NULL
+    WHERE b.session_duration_minutes IS NULL AND b.status='active' AND b.completed_at IS NULL AND b.paused_at IS NULL AND b.start_at<=NOW(6)
       AND w.opens_at<=NOW(6) AND (w.closes_at IS NULL OR w.closes_at>NOW(6))
       AND (b.finale_start_round IS NULL OR r.round_number<b.finale_start_round)
       AND NOT EXISTS (SELECT 1 FROM bracket_finale_sessions f WHERE f.bracket_id=b.bracket_id)
@@ -99,11 +99,12 @@ export async function openNextUntimedWeeks(c) {
   for(const week of weeks)await c.execute('UPDATE bracket_weeks SET opens_at=NOW(6) WHERE week_id=?',[week.week_id]);
 }
 export async function getAdvanceWeekPlan(c,bracketId,familyId,lock=false) {
-  const [brackets]=await c.execute(`SELECT b.status,b.completed_at,b.paused_at,b.session_duration_minutes,b.finale_start_round,
+  const [brackets]=await c.execute(`SELECT b.status,b.completed_at,b.paused_at,b.session_duration_minutes,b.finale_start_round,(b.start_at<=NOW(6)) AS hasStarted,
     (SELECT COUNT(*) FROM bracket_finale_sessions f WHERE f.bracket_id=b.bracket_id) AS finaleSessions
     FROM brackets b WHERE b.bracket_id=? AND b.family_id=?${lock?' FOR UPDATE':''}`,[bracketId,familyId]);
   if(!brackets.length)throw fail(404,'Bracket not found.');
   const b=brackets[0];
+  if(b.hasStarted===0||b.hasStarted===null)throw fail(409,'Voting opens at the scheduled bracket start time.');
   if(b.status!=='active'||b.completed_at||b.paused_at||Number(b.finaleSessions))throw fail(409,'Only an active, unpaused online bracket can advance a week.');
   const [weeks]=await c.execute(`SELECT w.week_id AS weekId,w.week_number AS weekNumber,w.opens_at AS opensAt,w.closes_at AS closesAt,r.round_number AS roundNumber,
     ${readyRoundSql('b','r')} AS roundReady,

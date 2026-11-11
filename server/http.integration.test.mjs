@@ -91,6 +91,41 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal((await vote(br,a.member)).status,200);
     });
 
+    await t.test('accepting a commissioner invitation never opens voting before the scheduled start',async()=>{
+      const br=await bracket(a);
+      await db.pool.execute("UPDATE brackets SET start_at=DATE_ADD(NOW(),INTERVAL 1 HOUR) WHERE bracket_id=?",[br.id]);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      await db.pool.execute("UPDATE bracket_members SET bracket_role='commissioner' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      const [[before]]=await db.pool.execute('SELECT start_at FROM brackets WHERE bracket_id=?',[br.id]);
+      assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie,method:'POST',body:{response:'accepted'}})).status,200);
+      const [[after]]=await db.pool.execute('SELECT start_at FROM brackets WHERE bracket_id=?',[br.id]);
+      assert.equal(after.start_at.getTime(),before.start_at.getTime());
+      const navigation=await http('/api/my/brackets',{cookie:a.member.cookie});
+      const link=navigation.body.brackets.find(row=>row.bracketId===br.id);
+      assert.ok(link);assert.equal(link.navigationStatus,'upcoming');assert.equal(link.invitationStatus,'accepted');
+      await db.pool.execute("UPDATE bracket_weeks SET opens_at=DATE_SUB(NOW(),INTERVAL 2 MINUTE),closes_at=DATE_SUB(NOW(),INTERVAL 1 MINUTE) WHERE week_id=?",[br.weeks[0]]);
+      const view=await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie});
+      assert.equal(view.status,200);assert.equal(view.body.isUpcoming,true);assert.deepEqual(view.body.weeks,[]);
+      const [[results]]=await db.pool.execute('SELECT COUNT(*) AS total FROM matchups WHERE bracket_id=? AND winner_entry_id IS NOT NULL',[br.id]);assert.equal(Number(results.total),0);
+      await db.pool.execute('UPDATE bracket_weeks SET closes_at=NULL WHERE week_id=?',[br.weeks[0]]);
+      const ballotPath=`/api/admin/brackets/${br.id}/matchups/${br.matches[0]}/ballots`;
+      const editor=await http(ballotPath,{cookie:a.member.cookie});
+      assert.equal(editor.status,200);assert.equal(editor.body.canEdit,false);
+      assert.equal((await http(ballotPath,{cookie:a.member.cookie,method:'PUT',body:{revision:editor.body.revision,ballots:[{userId:a.member.id,selectedEntryId:br.entries[0]}]}})).status,409);
+      assert.equal((await http(`/api/admin/brackets/${br.id}/advance-week`,{cookie:a.member.cookie})).status,409);
+      assert.equal((await http(`/api/brackets/${br.id}/finale`,{cookie:a.member.cookie,method:'POST',body:{startRoundNumber:1,participantIds:[a.member.id]}})).status,409);
+      // Even stale session timestamps in the past must not bypass the bracket start.
+      assert.equal((await vote(br,a.member)).status,409);
+      const [[count]]=await db.pool.execute('SELECT COUNT(*) AS total FROM votes WHERE bracket_id=?',[br.id]);assert.equal(Number(count.total),0);
+      await db.pool.execute("UPDATE brackets SET start_at=DATE_SUB(NOW(),INTERVAL 1 MINUTE) WHERE bracket_id=?",[br.id]);
+      await db.pool.execute("UPDATE bracket_weeks SET opens_at=DATE_ADD(NOW(),INTERVAL 1 HOUR) WHERE week_id=?",[br.weeks[0]]);
+      assert.equal((await vote(br,a.member)).status,409);
+      await db.pool.execute("UPDATE bracket_weeks SET opens_at=DATE_SUB(NOW(),INTERVAL 1 MINUTE) WHERE week_id=?",[br.weeks[0]]);
+      assert.equal((await vote(br,a.member)).status,200);
+      const startedNavigation=await http('/api/my/brackets',{cookie:a.member.cookie});
+      assert.equal(startedNavigation.body.brackets.find(row=>row.bracketId===br.id).navigationStatus,'active');
+    });
+
     await t.test('invitations gate all bracket details until acceptance and removal revokes access',async()=>{
       const br=await bracket(a);
       await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
@@ -265,6 +300,42 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const sent=await sendBracketInvitations(db.pool,id,{deliver:async message=>delivered.push(message),env:{APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'}});
       assert.deepEqual(sent,{sent:0,failed:0});assert.equal(delivered.length,0);
       const [[original]]=await db.pool.execute('SELECT COUNT(*) AS total FROM votes WHERE bracket_id=?',[source.id]);assert.equal(Number(original.total),1);
+    });
+
+    await t.test('super can delete a voted active bracket and all its dependent records atomically',async()=>{
+      const br=await bracket(a,{finale:true}),other=await bracket(a);
+      await db.pool.execute('INSERT INTO votes (bracket_id,matchup_id,user_id,selected_entry_id,submitted_at) VALUES (?,?,?,?,NOW())',[br.id,br.matches[0],a.member.id,br.entries[0]]);
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=? WHERE matchup_id=?',[br.entries[0],br.matches[0]]);
+      await db.pool.execute('INSERT INTO matchup_reported_totals (bracket_id,matchup_id,votes_a,votes_b) VALUES (?,?,1,0)',[br.id,br.matches[0]]);
+      const [album]=await db.pool.execute("INSERT INTO bracket_albums (bracket_id,title) VALUES (?,'Delete test album')",[br.id]);
+      await db.pool.execute('UPDATE bracket_songs SET bracket_album_id=? WHERE bracket_song_id=?',[album.insertId,br.entries[0]]);
+      await db.pool.execute("INSERT INTO bracket_playlists (bracket_id,week_id,playlist_name,playlist_url) VALUES (?,?,'Delete test','https://example.com/playlist')",[br.id,br.weeks[0]]);
+      await db.pool.execute("UPDATE bracket_members SET bracket_role='commissioner' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      const path=`/api/admin/brackets/${br.id}`;
+      assert.equal((await http(path,{cookie:a.member.cookie,method:'DELETE'})).status,403);
+      assert.equal((await http(path,{cookie:b.owner.cookie,method:'DELETE'})).status,404);
+      const [[songsBefore]]=await db.pool.execute('SELECT COUNT(*) AS total FROM songs');
+      const [[usersBefore]]=await db.pool.execute('SELECT COUNT(*) AS total FROM users');
+      const result=await http(path,{cookie:a.owner.cookie,method:'DELETE'});assert.equal(result.status,200,JSON.stringify(result.body));
+      for(const table of ['brackets','votes','matchup_reported_totals','matchups','bracket_finale_sessions','bracket_playlists','bracket_weeks','bracket_rounds','bracket_songs','bracket_albums','bracket_members']) {
+        const [[row]]=await db.pool.execute(`SELECT COUNT(*) AS total FROM ${table} WHERE bracket_id=?`,[br.id]);assert.equal(Number(row.total),0,table);
+      }
+      const [[songsAfter]]=await db.pool.execute('SELECT COUNT(*) AS total FROM songs');assert.equal(songsAfter.total,songsBefore.total);
+      const [[usersAfter]]=await db.pool.execute('SELECT COUNT(*) AS total FROM users');assert.equal(usersAfter.total,usersBefore.total);
+      assert.equal((await http(`/api/admin/brackets/${other.id}`,{cookie:a.owner.cookie})).status,200);
+      assert.equal((await http(path,{cookie:a.owner.cookie,method:'DELETE'})).status,404);
+    });
+    await t.test('failed bracket deletion rolls back votes and tournament records',async()=>{
+      const br=await bracket(a);
+      assert.equal((await vote(br,a.member)).status,200);
+      await db.pool.query(`CREATE TRIGGER integration_reject_delete BEFORE DELETE ON brackets FOR EACH ROW BEGIN IF OLD.bracket_id=${br.id} THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Integration deletion failure'; END IF; END`);
+      try {
+        assert.equal((await http(`/api/admin/brackets/${br.id}`,{cookie:a.owner.cookie,method:'DELETE'})).status,500);
+        const [[votes]]=await db.pool.execute('SELECT COUNT(*) AS total FROM votes WHERE bracket_id=?',[br.id]);assert.equal(Number(votes.total),1);
+        const [[matches]]=await db.pool.execute('SELECT COUNT(*) AS total FROM matchups WHERE bracket_id=?',[br.id]);assert.equal(Number(matches.total),3);
+        const [[link]]=await db.pool.execute('SELECT next_matchup_id FROM matchups WHERE matchup_id=?',[br.matches[0]]);assert.equal(Number(link.next_matchup_id),br.matches[2]);
+        assert.equal((await http(`/api/admin/brackets/${br.id}`,{cookie:a.owner.cookie})).status,200);
+      } finally { await db.pool.query('DROP TRIGGER integration_reject_delete'); }
     });
 
     await t.test('legacy role migration preserves accounts and assigns bracket role defaults',async()=>{

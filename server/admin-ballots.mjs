@@ -58,6 +58,7 @@ export async function loadAdminBallots(c,bracketId,matchupId,familyId,lock=false
     CASE WHEN br.seeding_size IS NOT NULL THEN a.assigned_seed ELSE a.seed_number END AS songASeed,CASE WHEN br.seeding_size IS NOT NULL THEN b.assigned_seed ELSE b.seed_number END AS songBSeed,
     br.seeding_size AS seedingSize,br.tiebreaker_option AS tiebreakerOption,br.created_by_user_id AS createdBy,br.finale_start_round AS plannedFinaleRound,f.bracket_id AS finaleSessionId,${readyRoundSql('br','r')} AS roundReady,
     (w.closes_at<=COALESCE(br.paused_at,NOW(6))) AS isClosed,
+    (br.start_at IS NOT NULL AND br.start_at<=NOW(6) AND br.status<>'draft') AS hasStarted,
     (w.opens_at<=COALESCE(br.paused_at,NOW(6))) AS hasOpened,
     (f.bracket_id IS NOT NULL AND r.round_number>=f.start_round_number) AS inFinale,
     (SELECT COUNT(*) FROM matchups feeder WHERE feeder.bracket_id=m.bracket_id AND feeder.next_matchup_id=m.matchup_id AND feeder.winner_entry_id IS NULL) AS pendingFeeders
@@ -75,7 +76,7 @@ export async function loadAdminBallots(c,bracketId,matchupId,familyId,lock=false
   const match=rows[0];
   const currentRound=await getBallotEditingRound(c,bracketId);
   const roundAllowed=roundAllowsBallotEditing(Number(match.roundNumber),currentRound);
-  const editRestriction=match.plannedFinaleRound!=null && Number(match.roundNumber)>=Number(match.plannedFinaleRound) && match.finaleSessionId==null ? 'This round is reserved for the finale. Begin Finale Mode to record in-person votes.' : !match.roundReady ? 'Every winner from the previous round must be known before this round can be randomized and edited.' : !roundAllowed ? 'Only the current round and the immediately previous round can be edited. Older rounds are locked.' : !(match.hasOpened||match.inFinale)||Number(match.pendingFeeders) ? 'This matchup must open and both feeder winners must be decided before its ballots can be edited.' : '';
+  const editRestriction=!match.hasStarted ? 'Voting opens at the scheduled bracket start time. Accepting an invitation does not start voting.' : match.plannedFinaleRound!=null && Number(match.roundNumber)>=Number(match.plannedFinaleRound) && match.finaleSessionId==null ? 'This round is reserved for the finale. Begin Finale Mode to record in-person votes.' : !match.roundReady ? 'Every winner from the previous round must be known before this round can be randomized and edited.' : !roundAllowed ? 'Only the current round and the immediately previous round can be edited. Older rounds are locked.' : !(match.hasOpened||match.inFinale)||Number(match.pendingFeeders) ? 'This matchup must open and both feeder winners must be decided before its ballots can be edited.' : '';
   const [participants]=await c.execute(`SELECT u.user_id AS userId,u.display_name AS displayName,u.user_role,bm.bracket_role,
     v.selected_entry_id AS selectedEntryId,v.submitted_at AS submittedAt
     FROM bracket_members bm JOIN users u ON u.user_id=bm.user_id

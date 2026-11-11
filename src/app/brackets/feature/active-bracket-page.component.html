@@ -1,7 +1,7 @@
 <div class="page-wrap active-bracket-page" *ngIf="!loading && data as bracketData">
   <section class="upcoming-bracket-message" *ngIf="bracketData.isUpcoming; else startedBracket" aria-live="polite">
-    <h1>Thanks for joining this bracket!</h1>
-    <p>It is scheduled to begin on <time [attr.datetime]="bracketData.bracket.startAt">{{ bracketData.bracket.startAt | date:'fullDate' }}</time>. We'll see you then!</p>
+    <h1>Thanks for participating in this bracket!</h1>
+    <p>Please come back on <time [attr.datetime]="bracketData.bracket.startAt">{{ bracketData.bracket.startAt | date:'fullDate' }} at {{ bracketData.bracket.startAt | date:'shortTime' }}</time> (your local time) and cast your first vote.</p>
   </section>
   <ng-template #startedBracket>
   <section class="hero-row">
