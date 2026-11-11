@@ -581,3 +581,7 @@
   stroke-dasharray: 4 3;
   stroke: #c7b8a8;
 }
+
+.email-dialog label { display: block; margin: 1rem 0 .4rem; }
+.email-dialog input, .email-dialog textarea { box-sizing: border-box; width: 100%; padding: .75rem; border: 1px solid #d8dfdb; border-radius: 6px; font: inherit; }
+.email-dialog textarea { resize: vertical; }

@@ -1,3 +1,4 @@
+import {sendBracketEmail} from './bracket-email.mjs';
 import { processSessionEmails } from './session-emails.mjs';
 import { sendInvitationStatusEmails } from './invitation-status-email.mjs';
 import { isolateBracketSong } from './bracket-song-ownership.mjs';
@@ -36,7 +37,7 @@ import { parseVoteInput } from './vote-input.mjs';
 import { verifyPassword } from './passwords.mjs';
 
 // The caller owns the pool and listener. Importing this module opens no connections or timers.
-export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter(), hosting = {}, sendInvitations = sendBracketInvitations, sendStatusNotifications = sendInvitationStatusEmails, sendSessionNotifications = processSessionEmails }) {
+export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter(), hosting = {}, sendInvitations = sendBracketInvitations, sendCustomEmail = sendBracketEmail, sendStatusNotifications = sendInvitationStatusEmails, sendSessionNotifications = processSessionEmails }) {
 const sessionCookie = 'song_showdown_session';
 const sessionLifetimeSeconds = 14 * 24 * 60 * 60;
 const effectiveBracketStatus = `CASE
@@ -328,6 +329,12 @@ const server = createServer(async (request, response) => {
     try {
       const familyId = Number((await pool.execute('SELECT family_id FROM users WHERE user_id = ?', [authenticatedUser.userId]))[0][0]?.family_id);
       if (!familyId) { send(400, { error: 'Your account is not connected to a family.' }); return; }
+      const emailRoute=url.pathname.match(/^\/api\/admin\/brackets\/(\d+)\/email$/);
+      if (emailRoute && request.method==='POST') {
+        try { send(200,await sendCustomEmail(pool,Number(emailRoute[1]),await readJson(request))); }
+        catch(error) {send(error.status||500,{error:error.status?error.message:'Could not send the bracket email.'});}
+        return;
+      }
       const inviteAdminRoute=url.pathname.match(/^\/api\/admin\/brackets\/(\d+)\/invitations$/);
       if (inviteAdminRoute && ['GET','POST'].includes(request.method)) {
         const id=Number(inviteAdminRoute[1]);

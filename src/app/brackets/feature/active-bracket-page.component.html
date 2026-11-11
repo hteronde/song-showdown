@@ -28,7 +28,7 @@
   </section>
 
   <div class="view-toggle active-view-toggle" *ngIf="hasOnlineVoting"><button type="button" *ngIf="!finaleModeActive && !awaitingFinale" [class.toggle-active]="viewMode === 'vote'" (click)="viewMode = 'vote'">Vote <span class="vote-count">{{ savedPicks }}/{{ currentWeek?.matchups?.length || 0 }}</span></button><button type="button" [class.toggle-active]="viewMode === 'bracket'" (click)="viewMode = 'bracket'">Bracket</button></div>
-  <div class="admin-finale-entry" *ngIf="isAdmin"><a [routerLink]="['/manage/brackets', bracketData.bracket.bracketId, 'edit']">Edit bracket ↗</a><button type="button" *ngIf="canAdvanceWeek" (click)="openAdvanceWeek()">Advance week</button><button type="button" *ngIf="bracketData.bracket.status === 'active'" (click)="togglePaused()" [disabled]="pauseSaving">{{ pauseSaving ? 'Saving…' : paused ? 'Resume bracket' : 'Pause bracket' }}</button><button type="button" *ngIf="!isComplete" (click)="enterFinaleMode()" [disabled]="paused">{{ finaleModeActive ? 'Manage Finale Mode ↗' : 'Enter Finale Mode ↗' }}</button></div>
+  <div class="admin-finale-entry" *ngIf="isAdmin"><a [routerLink]="['/manage/brackets', bracketData.bracket.bracketId, 'edit']">Edit bracket ↗</a><button type="button" *ngIf="canAdvanceWeek" (click)="openAdvanceWeek()">Advance week</button><button type="button" *ngIf="bracketData.bracket.status === 'active'" (click)="togglePaused()" [disabled]="pauseSaving">{{ pauseSaving ? 'Saving…' : paused ? 'Resume bracket' : 'Pause bracket' }}</button><button type="button" *ngIf="!isComplete" (click)="enterFinaleMode()" [disabled]="paused">{{ finaleModeActive ? 'Manage Finale Mode ↗' : 'Enter Finale Mode ↗' }}</button><button type="button" (click)="openWriteEmail()">Write email</button></div>
 
   <div class="notice-bar" *ngIf="sessionPlaylists.length && !isComplete"><span class="notice-icon">♫</span><span>Listen to this session’s songs: <ng-container *ngFor="let playlist of sessionPlaylists; let last=last"><a [href]="playlist.playlistUrl" target="_blank" rel="noopener noreferrer">{{ playlist.playlistName }} ↗</a><span *ngIf="!last"> · </span></ng-container></span></div>
   <app-bracket-champion [bracketId]="bracketData.bracket.bracketId" [champion]="champion"></app-bracket-champion>
@@ -151,4 +151,20 @@
   </ng-container>
   <p class="page-error" *ngIf="advanceError" role="alert">{{ advanceError }}</p>
   <div class="details-actions"><button type="button" class="primary" (click)="confirmAdvanceWeek()" [disabled]="advancing || advanceLoading || !advancePlan">{{ advancing ? 'Advancing…' : 'Advance week' }}</button><button type="button" (click)="closeAdvanceWeek()" [disabled]="advancing">Cancel</button></div>
+</dialog>
+
+<dialog #writeEmailDialog class="matchup-details-dialog email-dialog" aria-labelledby="write-email-title" (cancel)="emailSending && $event.preventDefault()">
+  <h2 id="write-email-title">Write email</h2>
+  <p>This email will go to all accepted participants in this bracket, including finale participants. Each person receives a separate email.</p>
+  <form (ngSubmit)="sendBracketEmail()">
+    <label for="bracket-email-subject">Subject</label>
+    <input id="bracket-email-subject" name="emailSubject" [(ngModel)]="emailSubject" maxlength="200" required [disabled]="emailAttempted" autofocus>
+    <label for="bracket-email-body">Body</label>
+    <textarea id="bracket-email-body" name="emailBody" [(ngModel)]="emailBody" rows="10" maxlength="20000" required [disabled]="emailAttempted"></textarea>
+    <p *ngIf="emailFeedback" role="status">{{ emailFeedback }}</p>
+    <div class="details-actions">
+      <button type="submit" class="primary" *ngIf="!emailSent" [disabled]="emailSending || !emailSubject.trim() || !emailBody.trim()">{{ emailSending ? 'Sending…' : emailAttempted ? 'Retry send' : 'Send' }}</button>
+      <button type="button" (click)="closeWriteEmail()" [disabled]="emailSending">{{ emailAttempted ? 'Close' : 'Cancel' }}</button>
+    </div>
+  </form>
 </dialog>

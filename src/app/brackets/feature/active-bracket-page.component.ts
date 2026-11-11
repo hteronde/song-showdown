@@ -52,6 +52,42 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         return final.winnerEntryId === final.songA.entryId ? final.songA : final.songB;
     }
     get connectorMatches(): VotingMatchup[] { return (this.data?.weeks ?? []).flatMap(week => week.matchups); }
+    @ViewChild('writeEmailDialog') writeEmailDialog?: ElementRef<HTMLDialogElement>;
+    emailSubject = '';
+    emailBody = '';
+    emailSending = false;
+    emailAttempted = false;
+    emailSent = false;
+    emailFeedback = '';
+    private emailBracketId = 0;
+    private emailRequestId = '';
+    openWriteEmail(): void {
+        if (!this.isAdmin || !this.data || this.emailSending) return;
+        this.emailBracketId = this.data.bracket.bracketId;
+        this.emailSubject = ''; this.emailBody = ''; this.emailFeedback = '';
+        this.emailAttempted = false; this.emailSent = false;
+        this.emailRequestId = crypto.randomUUID();
+        this.writeEmailDialog?.nativeElement.showModal();
+    }
+    closeWriteEmail(): void {
+        if (!this.emailSending) this.writeEmailDialog?.nativeElement.close();
+    }
+    async sendBracketEmail(): Promise<void> {
+        if (!this.isAdmin || this.emailSending || this.emailSent || !this.emailSubject.trim() || !this.emailBody.trim()) return;
+        this.emailSending = true; this.emailAttempted = true; this.emailFeedback = '';
+        try {
+            const result = await this.api.sendEmail(this.emailBracketId, this.emailSubject, this.emailBody, this.emailRequestId);
+            this.emailSent = result.failed === 0;
+            this.emailFeedback = result.failed
+                ? `${result.sent} emails accepted for delivery; ${result.failed} failed. You can retry this message.`
+                : `${result.sent} emails accepted for delivery.`;
+        } catch (error) {
+            this.emailFeedback = error instanceof Error ? error.message : 'Could not send the email.';
+        } finally {
+            this.emailSending = false;
+            this.changeDetector.markForCheck();
+        }
+    }
     @ViewChild('matchupDetailsDialog')
     matchupDetailsDialog?: ElementRef<HTMLDialogElement>;
     detailsMatch: VotingMatchup | null = null;

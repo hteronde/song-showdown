@@ -1,3 +1,4 @@
+import {sendBracketEmail} from './bracket-email.mjs';
 import { processSessionEmails } from './session-emails.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,9 +12,10 @@ import { hashPassword, verifyPassword } from './passwords.mjs';
 const enabled = process.env.HTTP_DB_TESTS === '1';
 test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, async t => {
   const db = await disposableMysql();
+  const customEmails=[];
   const statusNotifications=[];
   let failStatusNotification=false;
-  const app = createApiServer({pool: db.pool, sendInvitations: async () => ({sent:0,failed:0}),sendStatusNotifications:async changes=>{
+  const app = createApiServer({pool: db.pool, sendCustomEmail:(pool,id,input)=>sendBracketEmail(pool,id,input,{env:{APP_URL:'https://example.com',RESEND_API_KEY:'test-only',EMAIL_FROM:'test@example.com'},pause:async()=>{},deliver:async message=>{customEmails.push(message);}}), sendInvitations: async () => ({sent:0,failed:0}),sendStatusNotifications:async changes=>{
     if(failStatusNotification)throw new Error('Test email provider failure');
     for(const change of changes) {
       const [[member]]=await db.pool.execute('SELECT bm.invitation_status FROM bracket_members bm JOIN users u ON u.user_id=bm.user_id WHERE bm.bracket_id=? AND u.email=?',[change.bracketId,change.email]);
@@ -68,6 +70,23 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
     const a=families[0],b=families[1];
     const vote=(br,user,index=0,entry=br.entries[index*2])=>http(`/api/matchups/${br.matches[index]}/votes`,{cookie:user.cookie,method:'POST',body:{userId:user.id,selectedEntryId:entry,comment:'Test vote'}});
 
+    await t.test('custom bracket email is scoped to managers and accepted participants',async()=>{
+      const family=families[0], other=families[1], br=await bracket(family);
+      const path=`/api/admin/brackets/${br.id}/email`;
+      const body={subject:'Bracket news',body:'Hello\nEveryone',requestId:'12345678-1234-1234-1234-123456789abc'};
+      assert.notEqual((await http(path,{method:'POST',cookie:family.member.cookie,body})).status,200);
+      assert.notEqual((await http(path,{method:'POST',cookie:other.owner.cookie,body})).status,200);
+      assert.equal(customEmails.length,0);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='declined' WHERE bracket_id=? AND user_id=?",[br.id,family.member.id]);
+      const sent=await http(path,{method:'POST',cookie:family.owner.cookie,body});
+      assert.equal(sent.status,200);assert.deepEqual(sent.body,{sent:1,failed:0});
+      assert.equal(customEmails[0].to,family.owner.email);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='accepted',bracket_role='commissioner' WHERE bracket_id=? AND user_id=?",[br.id,family.member.id]);
+      const commissioner=await http(path,{method:'POST',cookie:family.member.cookie,body});
+      assert.equal(commissioner.status,200);assert.equal(commissioner.body.sent,2);
+      assert.equal((await http(path,{method:'POST',cookie:family.owner.cookie,body:{...body,subject:''}})).status,400);
+      await db.pool.execute("UPDATE bracket_members SET bracket_role='member' WHERE bracket_id=?",[br.id]);
+    });
     await t.test('commissioner permissions are scoped, accepted, and revocable; roles remain super-managed',async()=>{
       const br=await bracket(a),other=await bracket(a),foreign=await bracket(b);
       const path=`/api/admin/brackets/${br.id}`;
