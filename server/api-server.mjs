@@ -1,3 +1,4 @@
+import { sendInvitationStatusEmails } from './invitation-status-email.mjs';
 import { isolateBracketSong } from './bracket-song-ownership.mjs';
 import { saveBracketRoles } from './bracket-roles.mjs';
 import { getBracketInvitation, respondToInvitation, listBracketInvitations, sendBracketInvitations } from './bracket-invitations.mjs';
@@ -34,7 +35,7 @@ import { parseVoteInput } from './vote-input.mjs';
 import { verifyPassword } from './passwords.mjs';
 
 // The caller owns the pool and listener. Importing this module opens no connections or timers.
-export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter(), hosting = {}, sendInvitations = sendBracketInvitations }) {
+export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter(), hosting = {}, sendInvitations = sendBracketInvitations, sendStatusNotifications = sendInvitationStatusEmails }) {
 const sessionCookie = 'song_showdown_session';
 const sessionLifetimeSeconds = 14 * 24 * 60 * 60;
 const effectiveBracketStatus = `CASE
@@ -324,9 +325,21 @@ const server = createServer(async (request, response) => {
       const participantsRoute=url.pathname.match(/^\/api\/admin\/brackets(?:\/(\d+))?\/participants$/);
       if(participantsRoute && request.method==='PUT') {
         const input=await readJson(request),connection=await pool.getConnection();
-        try{await connection.beginTransaction();const result=await saveBracketParticipants(connection,{bracketId:Number(participantsRoute[1])||null,familyId,userId:authenticatedUser.userId,input,canAssignRoles:authenticatedUser.user_role==='super'});await connection.commit();const invitations=await sendInvitations(pool,result.bracketId);send(200,{...result,invitations});}
-        catch(error){await connection.rollback();send(error.status||400,{error:error.code==='ER_DUP_ENTRY'?'That email is already in use.':error.message});}
-        finally{connection.release();}return;
+        let result;
+        try {
+          await connection.beginTransaction();
+          result=await saveBracketParticipants(connection,{bracketId:Number(participantsRoute[1])||null,familyId,userId:authenticatedUser.userId,input,canAssignRoles:authenticatedUser.user_role==='super'});
+          await connection.commit();
+        } catch(error) {await connection.rollback();send(error.status||400,{error:error.code==='ER_DUP_ENTRY'?'That email is already in use.':error.message});return;}
+        finally {connection.release();}
+        const {statusNotifications=[],...saved}=result;
+        let statusEmails;
+        try {statusEmails=await sendStatusNotifications(statusNotifications);}
+        catch {statusEmails={sent:0,failed:statusNotifications.length};console.error('Invitation status notification failed.');}
+        let invitations;
+        try {invitations=await sendInvitations(pool,result.bracketId);}
+        catch {invitations={sent:0,failed:1};}
+        send(200,{...saved,invitations,statusEmails});return;
       }
       const albumRoute=url.pathname.match(/^\/api\/admin\/brackets(?:\/(\d+))?\/albums(?:\/(\d+))?$/);
       if(albumRoute && request.method==='DELETE' && albumRoute[1] && albumRoute[2]) {

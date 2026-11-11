@@ -17,7 +17,7 @@ export class BracketsApiService {
     return data.brackets ?? [];
   }
 
-  saveParticipants(bracketId:number|null,input:{participantRoles?:Record<number,'member'|'commissioner'>;participantIds:number[];changes:Array<{userId:number;email:string;previousEmail:string}>;title:string;artist:string}):Promise<{bracketId:number;participantIds:number[];members:Array<{userId:number;email:string}>;invitations?:InvitationDelivery}> {
+  saveParticipants(bracketId:number|null,input:{invitationChanges?:{userId:number;previousStatus:'pending'|'accepted'|'declined';status:'accepted'|'declined'}[];participantRoles?:Record<number,'member'|'commissioner'>;participantIds:number[];changes:Array<{userId:number;email:string;previousEmail:string}>;title:string;artist:string}):Promise<{bracketId:number;participantIds:number[];members:Array<{userId:number;email:string}>;invitations?:InvitationDelivery;statusEmails?:InvitationDelivery}> {
     return this.request(`${this.baseUrl}${bracketId?'/'+bracketId:''}/participants`,{method:'PUT',body:JSON.stringify(input),timeoutMs:120000});
   }
 
@@ -53,11 +53,11 @@ export class BracketsApiService {
     return this.request(`${this.baseUrl}${bracketId?'/'+bracketId:''}/draft`,{method:bracketId?'PUT':'POST',body:JSON.stringify(input)});
   }
 
-  async create(input: BracketInput): Promise<{invitations?:InvitationDelivery}> {
+  async create(input: BracketInput): Promise<{invitations?:InvitationDelivery;statusEmails?:InvitationDelivery}> {
     return this.request(this.baseUrl, { method: 'POST', body: JSON.stringify(input),timeoutMs:120000 });
   }
 
-  async update(bracketId: number, input: BracketInput): Promise<{invitations?:InvitationDelivery}> {
+  async update(bracketId: number, input: BracketInput): Promise<{invitations?:InvitationDelivery;statusEmails?:InvitationDelivery}> {
     return this.request(`${this.baseUrl}/${bracketId}`, { method: 'PUT', body: JSON.stringify(input),timeoutMs:120000 });
   }
 

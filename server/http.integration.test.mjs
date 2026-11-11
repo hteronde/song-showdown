@@ -10,7 +10,17 @@ import { hashPassword, verifyPassword } from './passwords.mjs';
 const enabled = process.env.HTTP_DB_TESTS === '1';
 test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, async t => {
   const db = await disposableMysql();
-  const app = createApiServer({pool: db.pool, sendInvitations: async () => ({sent:0,failed:0})});
+  const statusNotifications=[];
+  let failStatusNotification=false;
+  const app = createApiServer({pool: db.pool, sendInvitations: async () => ({sent:0,failed:0}),sendStatusNotifications:async changes=>{
+    if(failStatusNotification)throw new Error('Test email provider failure');
+    for(const change of changes) {
+      const [[member]]=await db.pool.execute('SELECT bm.invitation_status FROM bracket_members bm JOIN users u ON u.user_id=bm.user_id WHERE bm.bracket_id=? AND u.email=?',[change.bracketId,change.email]);
+      assert.equal(member.invitation_status,change.status,'Notification must follow database commit');
+      statusNotifications.push(change);
+    }
+    return {sent:changes.length,failed:0};
+  }});
   try {
     await new Promise((resolve,reject) => {app.server.once('error',reject);app.server.listen(0,'127.0.0.1',resolve);});
     const base = `http://127.0.0.1:${app.server.address().port}`;
@@ -336,6 +346,62 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
         const [[link]]=await db.pool.execute('SELECT next_matchup_id FROM matchups WHERE matchup_id=?',[br.matches[0]]);assert.equal(Number(link.next_matchup_id),br.matches[2]);
         assert.equal((await http(`/api/admin/brackets/${br.id}`,{cookie:a.owner.cookie})).status,200);
       } finally { await db.pool.query('DROP TRIGGER integration_reject_delete'); }
+    });
+
+    await t.test('admin can restore a declined participant without bypassing start time or resending an invite',async()=>{
+      const br=await bracket(a);
+      await db.pool.execute("UPDATE brackets SET start_at=DATE_ADD(NOW(),INTERVAL 1 HOUR) WHERE bracket_id=?",[br.id]);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='declined',invitation_delivery='sent',invitation_sent_at=NOW(),invitation_responded_at=DATE_SUB(NOW(),INTERVAL 1 HOUR) WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      const path=`/api/admin/brackets/${br.id}/participants`;
+      const body={participantIds:[a.owner.id,a.member.id],invitationChanges:[{userId:a.member.id,previousStatus:'declined',status:'accepted'}]};
+      assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,404);
+      assert.equal((await http(path,{cookie:a.member.cookie,method:'PUT',body})).status,404);
+      assert.equal((await http(path,{cookie:b.owner.cookie,method:'PUT',body})).status,404);
+      assert.equal((await http(path,{cookie:a.owner.cookie,method:'PUT',body:{...body,invitationChanges:[{userId:b.member.id,previousStatus:'declined',status:'accepted'}]}})).status,400);
+      const result=await http(path,{cookie:a.owner.cookie,method:'PUT',body});assert.equal(result.status,200,JSON.stringify(result.body));
+      const invitation=(await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie})).body;
+      assert.equal(invitation.invitationStatus,'accepted');assert.equal(invitation.canAccess,true);
+      const view=await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie});assert.equal(view.status,200);assert.equal(view.body.isUpcoming,true);
+      assert.equal((await vote(br,a.member)).status,409);
+      const listed=(await http('/api/my/brackets',{cookie:a.member.cookie})).body.brackets.find(row=>row.bracketId===br.id);assert.equal(listed.navigationStatus,'upcoming');
+      const [[member]]=await db.pool.execute('SELECT invitation_delivery,invitation_sent_at,invitation_responded_at,bracket_role FROM bracket_members WHERE bracket_id=? AND user_id=?',[br.id,a.member.id]);
+      assert.equal(member.bracket_role,'member');assert.equal(member.invitation_delivery,'sent');assert.ok(member.invitation_sent_at);assert.ok(member.invitation_responded_at);
+      let emails=0;assert.deepEqual(await sendBracketInvitations(db.pool,br.id,{deliver:async()=>emails++}),{sent:0,failed:0});assert.equal(emails,0);
+      const email='commissioner-status@integration.example';
+      const [actor]=await db.pool.execute("INSERT INTO users (family_id,email,display_name,user_role,password_hash) VALUES (?,?,'Commissioner','viewer',?)",[a.id,email,passwordHash]);
+      await db.pool.execute("INSERT INTO bracket_members (bracket_id,family_id,user_id,bracket_role,invitation_status) VALUES (?,?,?,'commissioner','accepted')",[br.id,a.id,actor.insertId]);
+      const login=await http('/api/auth/login',{method:'POST',body:{username:email,password}});assert.equal(login.status,200);
+      const commissionerBody={participantIds:[a.owner.id,a.member.id,Number(actor.insertId)],invitationChanges:[{userId:a.member.id,previousStatus:'accepted',status:'declined'}]};
+      assert.equal((await http(path,{cookie:login.cookie,method:'PUT',body:commissionerBody})).status,200);
+      assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,404);
+      assert.ok(!(await http('/api/my/brackets',{cookie:a.member.cookie})).body.brackets.some(row=>row.bracketId===br.id));
+      assert.equal((await http(path,{cookie:login.cookie,method:'PUT',body:{...commissionerBody,invitationChanges:body.invitationChanges}})).status,200);
+      assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie})).body.invitationStatus,'accepted');
+      assert.equal((await http(path,{cookie:login.cookie,method:'PUT',body:{...commissionerBody,invitationChanges:[{userId:a.member.id,previousStatus:'accepted',status:'invalid'}]}})).status,400);
+      // Stale edits must not override a fresh invitation or accept someone just added.
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      assert.equal((await http(path,{cookie:a.owner.cookie,method:'PUT',body})).status,409);
+      await db.pool.execute('DELETE FROM bracket_members WHERE bracket_id=? AND user_id=?',[br.id,a.member.id]);
+      assert.equal((await http(path,{cookie:a.owner.cookie,method:'PUT',body})).status,409);
+      const [[missing]]=await db.pool.execute('SELECT COUNT(*) AS total FROM bracket_members WHERE bracket_id=? AND user_id=?',[br.id,a.member.id]);assert.equal(Number(missing.total),0);
+    });
+
+    await t.test('status emails follow committed changes only and mail failure leaves the status saved',async()=>{
+      const br=await bracket(a);
+      const path=`/api/admin/brackets/${br.id}/participants`;
+      const update=(previousStatus,status)=>http(path,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[a.owner.id,a.member.id],invitationChanges:[{userId:a.member.id,previousStatus,status}]}});
+      const start=statusNotifications.length;
+      let result=await update('accepted','declined');assert.equal(result.status,200);assert.deepEqual(result.body.statusEmails,{sent:1,failed:0});
+      assert.equal(statusNotifications.length,start+1);assert.equal(statusNotifications.at(-1).email,a.member.email);assert.equal(statusNotifications.at(-1).status,'declined');
+      result=await update('declined','accepted');assert.equal(result.status,200);assert.equal(statusNotifications.at(-1).status,'accepted');
+      result=await update('accepted','accepted');assert.equal(result.status,200);assert.deepEqual(result.body.statusEmails,{sent:0,failed:0});assert.equal(statusNotifications.length,start+2);
+      result=await update('declined','accepted');assert.equal(result.status,409);assert.equal(statusNotifications.length,start+2);
+      failStatusNotification=true;
+      try {
+        result=await update('accepted','declined');assert.equal(result.status,200);assert.deepEqual(result.body.statusEmails,{sent:0,failed:1});
+        const [[saved]]=await db.pool.execute('SELECT invitation_status FROM bracket_members WHERE bracket_id=? AND user_id=?',[br.id,a.member.id]);assert.equal(saved.invitation_status,'declined');
+      }finally{failStatusNotification=false;}
+      assert.equal(statusNotifications.length,start+2);
     });
 
     await t.test('legacy role migration preserves accounts and assigns bracket role defaults',async()=>{

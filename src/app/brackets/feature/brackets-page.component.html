@@ -226,11 +226,17 @@
           <label><input type="checkbox" [disabled]="participantEditor.saving" [checked]="participantEditor.ids.includes(member.userId)" (change)="toggleParticipant(member.userId,$any($event.target).checked)"> {{ member.displayName }}</label>
           <input type="email" [id]="'participant-email-' + member.userId" [name]="'participant-email-' + member.userId" [(ngModel)]="participantEditor.emails[member.userId]" [disabled]="participantEditor.saving || !isSuper" maxlength="254" [attr.aria-label]="member.displayName + ' email'" autocomplete="off">
           <label>Bracket role<select [name]="'bracket-role-' + member.userId" [(ngModel)]="participantEditor.roles[member.userId]" [disabled]="!isSuper || participantEditor.saving || !participantEditor.ids.includes(member.userId)" [attr.aria-label]="member.displayName + ' bracket role'"><option value="member">Member</option><option value="commissioner">Commissioner</option></select></label>
+          <label class="invitation-status">Invitation status
+            <select *ngIf="participantEditor.originalStatuses[member.userId]; else invitationStatusText" [name]="'invitation-status-' + member.userId" [(ngModel)]="participantEditor.invitationStatuses[member.userId]" [disabled]="participantEditor.saving || !participantEditor.ids.includes(member.userId)" [attr.aria-label]="member.displayName + ' invitation status'">
+              <option *ngIf="participantEditor.originalStatuses[member.userId] === 'pending'" value="pending" disabled>Pending</option><option value="accepted">Accepted</option><option value="declined">Declined</option>
+            </select>
+            <ng-template #invitationStatusText><span>{{ participantEditor.originalStatuses[member.userId] ? (participantEditor.originalStatuses[member.userId] | titlecase) : 'Not invited yet' }}</span></ng-template>
+          </label>
         </div>
       </div>
       <p class="hint" *ngIf="!members.length">No family members are available.</p>
       <p class="field-error" *ngIf="participantEditor.error" role="alert">{{ participantEditor.error }}</p>
-      <p class="hint">Save Changes saves participant selections immediately. Super users can also update emails and assign bracket roles. Commissioners can edit this bracket after accepting their invitation.</p>
+      <p class="hint">Save Changes saves participant selections immediately. Super users can also update emails and assign bracket roles. Commissioners can edit this bracket after accepting their invitation. Super users and this bracket’s commissioners can change existing invitations to Accepted or Declined. Accepted restores access; Declined removes access while preserving recorded votes. Voting still follows the scheduled start time.</p>
       <div class="song-modal-actions"><button class="add-song" type="button" [disabled]="participantEditor.saving" (click)="saveParticipants()">{{ participantEditor.saving ? 'SAVING…' : 'SAVE CHANGES' }}</button><button class="cancel" type="button" [disabled]="participantEditor.saving" (click)="closeParticipantsModal()">Cancel</button></div>
     </dialog>
     <dialog #songDialog class="song-dialog" aria-labelledby="song-dialog-title" (close)="onSongModalClosed()" (cancel)="songSaving && $event.preventDefault()">

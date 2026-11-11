@@ -443,7 +443,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     participantIds: number[] = [];
     @ViewChild('participantsDialog')
     participantsDialog?: ElementRef<HTMLDialogElement>;
-    openParticipantsModal(): void { this.participantEditor.open(this.participantIds, this.members, this.participantRoles); this.participantsDialog?.nativeElement.showModal(); }
+    openParticipantsModal(): void { this.participantEditor.open(this.participantIds, this.members, this.participantRoles, this.invitations); this.participantsDialog?.nativeElement.showModal(); }
     closeParticipantsModal(): void {
         if (!this.participantEditor.saving)
             this.participantsDialog?.nativeElement.close();
@@ -459,7 +459,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         this.participantEditor.saving = true;
         this.participantEditor.error = '';
         try {
-            const result = await this.bracketsApi.saveParticipants(this.editingId, { participantIds: this.participantEditor.ids, participantRoles: Object.fromEntries(this.participantEditor.ids.map(id => [id,this.participantEditor.roles[id] ?? 'member'])), changes, title: this.title, artist: this.artist });
+            const result = await this.bracketsApi.saveParticipants(this.editingId, { invitationChanges: this.participantEditor.invitationChanges, participantIds: this.participantEditor.ids, participantRoles: Object.fromEntries(this.participantEditor.ids.map(id => [id,this.participantEditor.roles[id] ?? 'member'])), changes, title: this.title, artist: this.artist });
             this.editingId = result.bracketId;
             this.members = this.members.map(member => ({ ...member, email: result.members.find(item => item.userId === member.userId)?.email ?? member.email }));
             this.participantIds = [...result.participantIds];
@@ -468,7 +468,9 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.participantsDialog?.nativeElement.close();
             await this.loadInvitations();
             this.invitationNotice = result.invitations?.failed ? 'Participants saved, but some invitation emails failed. Retry below.' : 'Participants saved. New participants on published brackets have been invited.';
-            this.showSessionToast('Participants Saved', 'success');
+            if(result.statusEmails?.sent) this.invitationNotice += ` ${result.statusEmails.sent} status-update email(s) sent.`;
+            if(result.statusEmails?.failed) this.invitationNotice += ` Status changes were saved, but ${result.statusEmails.failed} status-update email(s) could not be sent. Check email delivery logs; these notifications are not automatically retried.`;
+            this.showSessionToast(result.statusEmails?.failed ? 'Participants saved; status email delivery failed' : 'Participants Saved', result.statusEmails?.failed ? 'error' : 'success');
         }
         catch (error) {
             this.participantEditor.error = error instanceof Error ? error.message : 'Could not save participant emails.';

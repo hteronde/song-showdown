@@ -822,7 +822,7 @@
 
 .participant-email-row {
   display: grid;
-  grid-template-columns: minmax(110px,1fr) minmax(0,2fr) minmax(140px,1fr);
+  grid-template-columns: minmax(110px,1fr) minmax(0,2fr) minmax(120px,1fr) minmax(120px,1fr);
   align-items: center;
   gap: 12px;
   padding: 10px;
@@ -870,7 +870,7 @@
 }
 
 .participants-dialog {
-  max-width: 600px;
+  max-width: 960px;
 }
 
 .participants-dialog .participants {
@@ -1014,5 +1014,7 @@
   flex-wrap: wrap;
 }
 
-.participant-email-row > label:last-child { flex-direction: column; align-items: stretch; font-size: 12px; }
+.participant-email-row > label:nth-last-child(-n+2) { flex-direction: column; align-items: stretch; font-size: 12px; }
 @media (max-width: 650px) { .participant-email-row { grid-template-columns: 1fr; } }
+
+@media (min-width: 651px) and (max-width: 900px) { .participant-email-row { grid-template-columns: 1fr 1fr; } }

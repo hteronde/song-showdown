@@ -2,13 +2,23 @@ import type { BracketParticipant } from '../data-access/bracket.model';
 
 export class ParticipantEditor {
   ids: number[] = [];
+  originalStatuses: Record<number,'pending'|'accepted'|'declined'> = {};
+  invitationStatuses: Record<number,'pending'|'accepted'|'declined'> = {};
+  get invitationChanges(): {userId:number;previousStatus:'pending'|'accepted'|'declined';status:'accepted'|'declined'}[] {
+    return this.ids.flatMap(userId=>{
+      const previousStatus=this.originalStatuses[userId],status=this.invitationStatuses[userId];
+      return previousStatus && previousStatus!==status && (status==='accepted'||status==='declined') ? [{userId,previousStatus,status}] : [];
+    });
+  }
   roles: Record<number,'member'|'commissioner'> = {};
   emails: Record<number, string> = {};
   error = '';
   saving = false;
 
-  open(selectedIds: number[], members: BracketParticipant[], roles: Record<number,'member'|'commissioner'> = {}): void {
+  open(selectedIds: number[], members: BracketParticipant[], roles: Record<number,'member'|'commissioner'> = {}, invitations: {userId:number;status:'pending'|'accepted'|'declined'}[] = []): void {
     this.ids = [...selectedIds];
+    this.originalStatuses = Object.fromEntries(invitations.map(invite=>[invite.userId,invite.status]));
+    this.invitationStatuses = {...this.originalStatuses};
     this.roles = Object.fromEntries(members.map(member => [member.userId, roles[member.userId] ?? 'member']));
     this.emails = Object.fromEntries(members.map(member => [member.userId, member.email]));
     this.error = '';
