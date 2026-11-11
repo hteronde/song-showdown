@@ -1,6 +1,6 @@
 # Song Showdown
 
-A family song tournament application built with Angular, a Node API, and MySQL. Database-backed brackets support participant voting, administration, tournament progression, Finale Mode, and recorded history. The default Fleetwood Mac home page remains a separate local-storage demo.
+A family song tournament application built with Angular, a Node API, and MySQL. Database-backed brackets support participant voting, administration, tournament progression, Finale Mode, and recorded history. The default home page welcomes members to The Song Showdown.
 
 ## Implemented capabilities
 
@@ -19,7 +19,7 @@ The following table describes code paths present in the project. It does not est
 
 - `/brackets/:bracketId` loads a database-backed bracket, submits votes to the API, and polls for updates. Saved votes are separate from unsaved local edits.
 - `/history` and `/history/:bracketId` display database records; `/manage/*` provides administration.
-- `/brackets`, also the default home route, displays the Fleetwood Mac prototype. Its sample voting and results use browser local storage and do not represent shared database votes.
+- `/home`, the default route after a normal login, displays the welcome page. The old `/brackets` home address redirects to `/home`. Signing in from a bracket invitation preserves the requested bracket URL.
 - `AppComponent.copyInvite()` copies a link containing the fixed sample code `FLEETWOOD-2025`. There is no implemented invitation/join flow behind this control. This sample link is separate from the single-use password setup/recovery links.
 
 Manual Radiohead testing has covered the main participant, voting, advancement, anonymous-voting, administration, finale, and completion flows. This is limited test evidence, not a blanket runtime guarantee. Simultaneous participant submission was not verified in that manual test. Automated tests cover individual rules and regression cases; the optional MySQL security integration test has a narrower family-authorization and token-lifecycle scope.
@@ -27,7 +27,7 @@ Manual Radiohead testing has covered the main participant, voting, advancement, 
 ## Angular page layout
 
 - `src/app/app.component.ts` and `app.component.html` hold the shared navigation and page shell.
-- `src/app/home/feature/` holds the Fleetwood Mac demo page; `home/data-access/` holds its demo models.
+- `src/app/home/feature/` holds the welcome page.
 - `src/app/brackets/feature/` holds database-backed bracket voting and bracket management; `brackets/data-access/` holds their API services and models.
 - `src/app/history/feature/` holds the bracket history page; `history/data-access/` holds its API service and bracket models.
 - `src/app/family-members/feature/` holds family member management; `family-members/data-access/` holds its API service and models.
@@ -99,7 +99,7 @@ Run `database/migrate_bracket_playlists.sql` once on an existing database to add
 
 The voting endpoint requires an authenticated session cookie, an active bracket, an open voting session, and eligible participant membership. The JSON `userId` must match the signed-in user; it does not choose whose identity to use. Completed brackets do not accept participant votes.
 
-The API binds to `127.0.0.1` for local development. Authentication, persistence, advancement, and privacy code are implemented locally; public hosting and its operational configuration remain separate work. Email delivery is configurable but requires an actual sending service. The remaining local-storage voting behavior belongs to the default Fleetwood Mac demo, not the database-backed bracket page.
+The API binds to `127.0.0.1` for local development. Authentication, persistence, advancement, and privacy code are implemented locally; public hosting and its operational configuration remain separate work. Email delivery is configurable but requires an actual sending service. The home page displays a welcome message; voting takes place on database-backed bracket pages.
 
 Run automated rule, input-validation, security, and regression tests with `npm run test:api`. The optional MySQL security test is skipped unless explicitly enabled as described below. Passing these tests does not establish that every browser or deployment workflow has been verified.
 

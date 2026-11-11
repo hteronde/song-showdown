@@ -4,7 +4,6 @@ import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { BracketInvitationPageComponent } from './brackets/feature/bracket-invitation-page.component';
-import { HomePageComponent } from './home/feature/home-page.component';
 import { HistoryPageComponent } from './history/feature/history-page.component';
 import type { BracketsPageComponent } from './brackets/feature/brackets-page.component';
 import { FamilyMember } from './family-members/data-access/family-member.model';
@@ -53,7 +52,7 @@ export class AppComponent implements OnDestroy {
 
   selectPage(page: 'home' | 'history' | 'familyMembers' | 'songs' | 'playlists' | 'brackets'): void {
     if (!this.isAdmin && ['familyMembers', 'songs', 'playlists', 'brackets'].includes(page)) return;
-    const routes = { home: '/brackets', history: '/history', familyMembers: '/manage/family-members', songs: '/manage/songs', playlists: '/manage/playlists', brackets: '/manage/brackets' } as const;
+    const routes = { home: '/home', history: '/history', familyMembers: '/manage/family-members', songs: '/manage/songs', playlists: '/manage/playlists', brackets: '/manage/brackets' } as const;
     void this.router.navigateByUrl(routes[page]);
   }
 
@@ -61,10 +60,7 @@ export class AppComponent implements OnDestroy {
     this.bracketsPage = component !== null && typeof component === 'object'
       && 'showList' in component && typeof component.showList === 'function'
       ? component as Pick<BracketsPageComponent, 'showList'> : null;
-    if (component instanceof HomePageComponent) {
-      component.currentMember = this.currentMember;
-      component.toastMessage.subscribe(message => this.showToast(message));
-    } else if (component instanceof BracketInvitationPageComponent) {
+    if (component instanceof BracketInvitationPageComponent) {
       component.toastMessage.subscribe(message => this.showToast(message));
     } else if (component instanceof HistoryPageComponent) {
       component.returnToBracket.subscribe(() => this.selectPage('home'));
@@ -92,7 +88,7 @@ export class AppComponent implements OnDestroy {
 
   get pageTitle(): string {
     if (this.activeBracketId) return this.userBrackets.find(bracket => bracket.bracketId === this.activeBracketId)?.title ?? 'Bracket';
-    return ({ home: 'Fleetwood Mac', history: 'History', familyMembers: 'Family members', songs: 'Songs', playlists: 'Playlists', brackets: 'Brackets' } as const)[this.activePage];
+    return ({ home: 'Home', history: 'History', familyMembers: 'Family members', songs: 'Songs', playlists: 'Playlists', brackets: 'Brackets' } as const)[this.activePage];
   }
 
   get isSignedIn(): boolean { return this.authState === 'signedIn' && this.authUser !== null; }
@@ -143,7 +139,7 @@ export class AppComponent implements OnDestroy {
     finally {
       apiSession.end();
       this.clearSignedInState();
-      void this.router.navigateByUrl('/brackets');
+      void this.router.navigateByUrl('/home');
       this.authBusy = false;
       this.changeDetector.detectChanges();
     }
@@ -211,7 +207,7 @@ export class AppComponent implements OnDestroy {
     this.bracketRefreshTimer = setInterval(() => {
       if (this.isSignedIn) void this.loadUserBrackets();
     }, 15_000);
-    if (!this.isAdmin && this.router.url.startsWith('/manage/')) void this.router.navigateByUrl('/brackets');
+    if (!this.isAdmin && this.router.url.startsWith('/manage/')) void this.router.navigateByUrl('/home');
     this.changeDetector.detectChanges();
   }
 

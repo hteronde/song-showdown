@@ -12,7 +12,7 @@ const adminGuard: CanActivateFn = async () => {
     const user = await authApi.getCurrentUser();
     // Keep an unauthenticated deep link so an admin can sign in and continue
     // to the page they requested. The signed-out shell hides the routed view.
-    return !user || user.role === 'owner' ? true : router.parseUrl('/brackets');
+    return !user || user.role === 'owner' ? true : router.parseUrl('/home');
   } catch {
     return true;
   }
@@ -24,9 +24,10 @@ const loadSongsPage = () => import('./songs/feature/songs-page.component').then(
 const loadPlaylistsPage = () => import('./playlists/feature/playlists-page.component').then(module => module.PlaylistsPageComponent);
 
 export const appRoutes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'brackets' },
+  { path: '', pathMatch: 'full', redirectTo: 'home' },
   { path: 'brackets/:bracketId', component: BracketInvitationPageComponent },
-  { path: 'brackets', component: HomePageComponent },
+  { path: 'home', component: HomePageComponent, title: 'Welcome to The Song Showdown' },
+  { path: 'brackets', pathMatch: 'full', redirectTo: 'home' },
   { path: 'history', component: HistoryPageComponent },
   { path: 'history/:bracketId', component: HistoryPageComponent },
   { path: 'manage/brackets/new', loadComponent: loadBracketsPage, canActivate: [adminGuard], data: {pageMode:'add'}, title: 'Add bracket' },
@@ -41,5 +42,5 @@ export const appRoutes: Routes = [
   { path: 'manage/playlists/new', loadComponent: loadPlaylistsPage, canActivate: [adminGuard], data: {pageMode:'add'}, title: 'Add playlist' },
   { path: 'manage/playlists/:id/edit', loadComponent: loadPlaylistsPage, canActivate: [adminGuard], data: {pageMode:'edit'}, title: 'Edit playlist' },
   { path: 'manage/playlists', loadComponent: loadPlaylistsPage, canActivate: [adminGuard], data: {pageMode:'list'}, title: 'Playlists' },
-  { path: '**', redirectTo: 'brackets' }
+  { path: '**', redirectTo: 'home' }
 ];

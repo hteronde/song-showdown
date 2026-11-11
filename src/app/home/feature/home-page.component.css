@@ -1,0 +1,30 @@
+:host { display: block; }
+.welcome-page {
+  min-height: 65vh;
+  display: flex;
+  align-items: center;
+  padding: clamp(32px, 7vw, 96px) clamp(24px, 5vw, 72px);
+}
+.welcome-content { max-width: 800px; }
+.welcome-eyebrow {
+  margin: 0 0 24px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #607b74;
+}
+h1 {
+  margin: 0 0 28px;
+  font-size: clamp(36px, 5.5vw, 72px);
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+  font-weight: 500;
+}
+h1 em { color: #607b74; }
+.welcome-description {
+  max-width: 680px;
+  margin: 0;
+  font-size: clamp(17px, 1.8vw, 21px);
+  line-height: 1.8;
+  color: #57594f;
+}
