@@ -317,7 +317,7 @@
       <div class="session-date-actions"><button class="save" type="button" *ngIf="sessions.length" (click)="saveSessionDates()" [disabled]="sessionsSaving || saving || !canSaveSessionDates">{{ sessionsSaving ? 'Saving…' : 'Save session dates' }}</button><button class="cancel" type="button" (click)="closeSessionSettings()" [disabled]="sessionsSaving || saving">Close</button></div>
     </dialog>
     <p class="hint" *ngIf="canSaveDraft">Save as draft only requires Title and Theme. You can finish the remaining fields later.</p>
-    <div class="footer"><button class="save" type="button" (click)="save()" [disabled]="saving || sessionsSaving">{{ saving && !savingDraft ? 'Saving…' : editingId ? 'Save changes' : 'Create bracket' }}</button><button class="cancel" type="button" *ngIf="canSaveDraft" (click)="saveAsDraft()" [disabled]="saving || sessionsSaving" title="Save your unfinished bracket">{{ savingDraft ? 'Saving draft…' : 'Save as draft' }}</button><button class="cancel" type="button" (click)="closeForm()" [disabled]="saving || sessionsSaving">Cancel</button></div>
+    <div class="footer"><button class="save" type="button" (click)="save()" aria-haspopup="dialog" aria-controls="submit-bracket-dialog" [disabled]="saving || sessionsSaving">{{ saving && !savingDraft ? 'Saving…' : editingId ? 'Save changes' : 'Create bracket' }}</button><button class="cancel" type="button" *ngIf="canSaveDraft" (click)="saveAsDraft()" [disabled]="saving || sessionsSaving" title="Save your unfinished bracket">{{ savingDraft ? 'Saving draft…' : 'Save as draft' }}</button><button class="cancel" type="button" (click)="closeForm()" [disabled]="saving || sessionsSaving">Cancel</button></div>
   </article>
 
   <div class="empty" *ngIf="loading">Loading brackets…</div>
@@ -326,6 +326,19 @@
     <article class="card" *ngFor="let bracket of brackets"><div><h2>{{ bracket.title }}</h2><div class="muted">{{ bracket.artist }} · {{ bracket.songCount }} songs · {{ bracket.pausedAt ? 'on hold' : bracket.status }}<span *ngIf="bracket.startAt && bracket.status !== 'complete'"> · starts {{ bracket.startAt | date:'medium' }}</span></div><div class="muted">Tiebreaker option: {{ tiebreakerLabels[bracket.tiebreakerOption] }}</div></div><div class="actions"><button *ngIf="bracket.status === 'active'" [disabled]="pauseSavingId === bracket.bracketId" (click)="togglePaused(bracket)">{{ pauseSavingId === bracket.bracketId ? 'Saving…' : bracket.pausedAt ? 'Resume' : 'Pause' }}</button><button (click)="edit(bracket)">Edit</button><button (click)="duplicateBracket(bracket)" [disabled]="duplicatingId != null">{{ duplicatingId === bracket.bracketId ? 'Duplicating…' : 'Duplicate' }}</button><button (click)="remove(bracket)" [disabled]="deletingBracketIds.has(bracket.bracketId)">{{ deletingBracketIds.has(bracket.bracketId) ? 'Deleting…' : 'Delete' }}</button></div></article>
   </div>
 </section>
+
+<dialog #submitBracketDialog id="submit-bracket-dialog" class="song-dialog" aria-labelledby="submit-bracket-title" aria-describedby="submit-bracket-description">
+  <span class="stat-label">CONFIRM BRACKET SUBMISSION</span>
+  <h3 id="submit-bracket-title">Submit this bracket?</h3>
+  <p id="submit-bracket-description" *ngIf="editingStatus !== 'complete'">Submitting will set this bracket to active and invite the selected participants to join.</p>
+  <p id="submit-bracket-description" *ngIf="editingStatus === 'complete'">Submitting will save changes to this completed bracket and invite any newly selected participants. The bracket will remain complete.</p>
+  <p><strong>{{ title }}</strong><br>Theme: {{ artist }}<br>Starts: {{ startAt | date:'medium' }}<br>{{ participantIds.length }} {{ participantIds.length === 1 ? 'participant selected' : 'participants selected' }}</p>
+  <p>Invitations include the theme, start date, and a link to accept or decline. Participants must accept before viewing bracket details. Invitations already sent will not be sent again.</p>
+  <div class="song-modal-actions">
+    <button class="add-song" type="button" (click)="confirmBracketSubmission()" [disabled]="saving || sessionsSaving">Confirm and submit</button>
+    <button class="cancel" type="button" (click)="cancelBracketSubmission()" autofocus>Cancel</button>
+  </div>
+</dialog>
 
 <dialog #historyResetDialog class="song-dialog" aria-labelledby="history-reset-title">
   <h3 id="history-reset-title">Rebuild bracket and clear voting history?</h3>

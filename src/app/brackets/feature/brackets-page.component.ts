@@ -1015,7 +1015,16 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.changeDetector.markForCheck();
         }
     }
-    async save(resetHistory = false): Promise<void> {
+    @ViewChild('submitBracketDialog')
+    submitBracketDialog?: ElementRef<HTMLDialogElement>;
+    cancelBracketSubmission(): void { this.submitBracketDialog?.nativeElement.close(); }
+    async confirmBracketSubmission(): Promise<void> {
+        if (this.saving || this.sessionsSaving || !this.submitBracketDialog?.nativeElement.open)
+            return;
+        this.submitBracketDialog.nativeElement.close();
+        await this.save(false, true);
+    }
+    async save(resetHistory = false, confirmed = false): Promise<void> {
         if (this.saving || this.sessionsSaving)
             return;
         this.error = '';
@@ -1035,6 +1044,10 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         }
         if (this.finaleStartRound !== null && this.finaleStartRound > Math.log2(this.songCount)) {
             this.error = 'Choose a finale round available for this song count.';
+            return;
+        }
+        if (!confirmed && !resetHistory) {
+            this.submitBracketDialog?.nativeElement.showModal();
             return;
         }
         this.saving = true;
