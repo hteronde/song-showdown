@@ -18,3 +18,13 @@ test('Resend session retries use an idempotency header without including it in e
     assert.equal(options.headers['Idempotency-Key'],'session-test');assert.equal(JSON.parse(options.body).idempotencyKey,undefined);return {ok:true};
   }});
 });
+
+test('only the last online closing email announces the finale on its exact calendar date',()=>{
+  const planned={...row,isLastOnlineSession:1,finaleDate:'2026-11-20'};
+  const final=sessionEmail({...planned,eventType:'end'},'https://thesongshowdown.com');
+  assert.match(final.text,/last session held online/);assert.match(final.text,/Friday, November 20, 2026/);assert.match(final.text,/We hope to see you there!/);
+  assert.match(final.text,/https:\/\/thesongshowdown.com\/brackets\/8/);
+  assert.doesNotMatch(sessionEmail(planned,'https://thesongshowdown.com').text,/last session held online/);
+  assert.doesNotMatch(sessionEmail({...planned,eventType:'end',isLastOnlineSession:0},'https://thesongshowdown.com').text,/We hope to see you there/);
+  assert.match(sessionEmail({...planned,eventType:'end',finaleDate:null},'https://thesongshowdown.com').text,/date has not been set/);
+});

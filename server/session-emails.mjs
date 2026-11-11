@@ -7,12 +7,20 @@ export function sessionEmail(row,appUrl) {
   const session=`Session ${row.weekNumber} (${row.roundName})`;
   const link=new URL(`/brackets/${row.bracketId}`,appUrl).href;
   const deadline=row.closesAt ? new Intl.DateTimeFormat('en-US',{dateStyle:'full',timeStyle:'short',timeZone:'America/Chicago'}).format(new Date(row.closesAt)) : null;
+  // Finale Date is a calendar date, not an instant; keep it on the selected day.
+  const finaleDate=row.finaleDate ? new Intl.DateTimeFormat('en-US',{dateStyle:'full',timeZone:'UTC'}).format(new Date(`${row.finaleDate}T12:00:00Z`)) : null;
+  const lastOnlineEnd=row.eventType==='end' && Boolean(Number(row.isLastOnlineSession));
+  const closing=lastOnlineEnd
+    ? `${session} has ended. Voting for this session is now closed. This was the last session held online; the remaining matchups will take place at the finale.\n\n${finaleDate ? `The finale is scheduled for ${finaleDate}.` : 'The finale date has not been set yet. Please check the bracket page for updates.'} We hope to see you there!`
+    : `${session} has ended. Voting for this session is now closed. Open the bracket to follow the results and see the next session.`;
   const text=row.eventType==='start'
     ? `${session} begins now!\n\n${deadline ? `You have until ${deadline} (Central time / America/Chicago) to vote.` : 'This session has no fixed deadline. It closes once every participating member has voted on every matchup. Please cast your votes.'}`
-    : `${session} has ended. Voting for this session is now closed. Open the bracket to follow the results and see the next session.`;
+    : closing;
   return {to:row.email,subject:`${row.title}: ${session} ${row.eventType==='start'?'begins now':'has ended'}`,
     text:`${row.title}\nTheme: ${row.artist}\n\n${text}\n\nOpen the bracket:\n${link}`};
 }
+
+const finaleRound="COALESCE(b.finale_start_round,(SELECT f.start_round_number FROM bracket_finale_sessions f WHERE f.bracket_id=b.bracket_id))";
 
 const joins=`FROM bracket_weeks w JOIN brackets b ON b.bracket_id=w.bracket_id
   JOIN bracket_rounds r ON r.bracket_id=w.bracket_id AND r.round_id=w.round_id
@@ -56,7 +64,13 @@ export async function processSessionEmails(pool,{env=process.env,deliver=deliver
       OR (delivery_status='sending' AND attempt_at<DATE_SUB(NOW(6),INTERVAL 10 MINUTE)))`,[token,job.id]);
     if(!claimed.affectedRows)continue;
     try {
-      const [rows]=await pool.execute(`SELECT b.bracket_id AS bracketId,b.title,b.artist,w.week_number AS weekNumber,r.name AS roundName,w.closes_at AS closesAt,u.email,d.payload
+      const [rows]=await pool.execute(`SELECT b.bracket_id AS bracketId,b.title,b.artist,w.week_number AS weekNumber,r.name AS roundName,w.closes_at AS closesAt,u.email,d.payload,
+        DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleDate,
+        (${finaleRound} IS NOT NULL AND w.week_number=(
+          SELECT MAX(lastWeek.week_number) FROM bracket_weeks lastWeek
+          JOIN bracket_rounds lastRound ON lastRound.bracket_id=lastWeek.bracket_id AND lastRound.round_id=lastWeek.round_id
+          WHERE lastWeek.bracket_id=b.bracket_id AND lastRound.round_number<${finaleRound}
+        )) AS isLastOnlineSession
         ${joins} JOIN session_email_deliveries d ON d.bracket_id=b.bracket_id AND d.week_id=w.week_id AND d.user_id=u.user_id
         WHERE d.delivery_id=? AND ${eligible} AND ${due(job.eventType)}`,[job.id]);
       if(!rows.length) {

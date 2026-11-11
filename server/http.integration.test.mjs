@@ -442,6 +442,25 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const [[count]]=await db.pool.execute('SELECT COUNT(*) AS total FROM session_email_deliveries WHERE bracket_id=?',[br.id]);assert.equal(Number(count.total),0);
     });
 
+    await t.test('only the last of multiple online sessions announces the finale date',async()=>{
+      const br=await bracket(a);
+      const env={NODE_ENV:'production',APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'};
+      const messages=[];const deliver=async message=>{if(message.text.includes(`/brackets/${br.id}`))messages.push(message);};
+      await db.pool.execute('UPDATE session_email_settings SET enabled_at=NOW(6) WHERE settings_id=1');
+      await db.pool.execute("UPDATE brackets SET finale_start_round=2,finale_at='2026-11-20' WHERE bracket_id=?",[br.id]);
+      await db.pool.execute('UPDATE bracket_weeks SET week_number=3 WHERE week_id=?',[br.weeks[1]]);
+      const [[first]]=await db.pool.execute('SELECT round_id FROM bracket_weeks WHERE week_id=?',[br.weeks[0]]);
+      const [lastOnline]=await db.pool.execute('INSERT INTO bracket_weeks (bracket_id,round_id,week_number,opens_at) VALUES (?,?,2,DATE_SUB(NOW(6),INTERVAL 2 MINUTE))',[br.id,first.round_id]);
+      await db.pool.execute('UPDATE matchups SET week_id=? WHERE matchup_id=?',[lastOnline.insertId,br.matches[1]]);
+      await db.pool.execute('UPDATE bracket_weeks SET opens_at=DATE_SUB(NOW(6),INTERVAL 2 MINUTE),closes_at=NOW(6) WHERE week_id=?',[br.weeks[0]]);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,2);assert.ok(messages.every(m=>!m.text.includes('last session held online')));
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE matchup_id=?',[br.matches[0]]);
+      await db.pool.execute('UPDATE bracket_weeks SET closes_at=NOW(6) WHERE week_id=?',[lastOnline.insertId]);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,4);
+      assert.ok(messages.slice(-2).every(m=>m.text.includes('last session held online') && m.text.includes('Friday, November 20, 2026') && m.text.includes('We hope to see you there!')));
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,4,'no repeated finale announcement');
+    });
+
     await t.test('legacy role migration preserves accounts and assigns bracket role defaults',async()=>{
       await db.pool.query("ALTER TABLE users MODIFY user_role ENUM('super','viewer','owner','member') NULL");
       await db.pool.query("UPDATE users SET user_role=CASE user_role WHEN 'super' THEN 'owner' WHEN 'viewer' THEN 'member' ELSE user_role END");
