@@ -252,6 +252,21 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const [writes]=await db.pool.execute('SELECT matchup_id,COUNT(*) AS total FROM integration_winner_writes WHERE matchup_id IN (?,?) GROUP BY matchup_id ORDER BY matchup_id',[br.matches[0],br.matches[1]]);
       assert.equal(writes.length,2);assert.ok(writes.every(row=>Number(row.total)===1));
     });
+    await t.test('duplicating excludes votes and invitations, including after selecting draft participants',async()=>{
+      const source=await bracket(a);
+      assert.equal((await vote(source,a.member)).status,200);
+      const copied=await http(`/api/admin/brackets/${source.id}/duplicate`,{cookie:a.owner.cookie,method:'POST',body:{participantIds:[a.member.id],participantRoles:{[a.member.id]:'commissioner'}}});
+      assert.equal(copied.status,201);assert.equal(copied.body.status,'draft');
+      const id=copied.body.bracketId;
+      const [[counts]]=await db.pool.execute('SELECT (SELECT COUNT(*) FROM votes WHERE bracket_id=?) AS votes,(SELECT COUNT(*) FROM bracket_members WHERE bracket_id=?) AS members,(SELECT COUNT(*) FROM matchups WHERE bracket_id=?) AS matchups',[id,id,id]);
+      assert.deepEqual([Number(counts.votes),Number(counts.members),Number(counts.matchups)],[0,0,0]);
+      assert.equal((await http(`/api/admin/brackets/${id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[a.member.id]}})).status,200);
+      const delivered=[];
+      const sent=await sendBracketInvitations(db.pool,id,{deliver:async message=>delivered.push(message),env:{APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'}});
+      assert.deepEqual(sent,{sent:0,failed:0});assert.equal(delivered.length,0);
+      const [[original]]=await db.pool.execute('SELECT COUNT(*) AS total FROM votes WHERE bracket_id=?',[source.id]);assert.equal(Number(original.total),1);
+    });
+
     await t.test('legacy role migration preserves accounts and assigns bracket role defaults',async()=>{
       await db.pool.query("ALTER TABLE users MODIFY user_role ENUM('super','viewer','owner','member') NULL");
       await db.pool.query("UPDATE users SET user_role=CASE user_role WHEN 'super' THEN 'owner' WHEN 'viewer' THEN 'member' ELSE user_role END");
