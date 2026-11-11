@@ -26,8 +26,8 @@ export class ParticipantEditor {
     this.error = '';
   }
 
-  changes(members: BracketParticipant[]): {userId: number; email: string; previousEmail: string}[] | null {
-    if (!this.ids.length) {
+  changes(members: BracketParticipant[], allowEmpty = false): {userId: number; email: string; previousEmail: string}[] | null {
+    if (!this.ids.length && !allowEmpty) {
       this.error = 'Select at least one participant.';
       return null;
     }

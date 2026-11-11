@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router, Routes } from '@angular/router';
 import { AuthApiService } from './auth/data-access/auth-api.service';
-import { ActiveBracketPageComponent } from './brackets/feature/active-bracket-page.component';
+import { BracketInvitationPageComponent } from './brackets/feature/bracket-invitation-page.component';
 import { HistoryPageComponent } from './history/feature/history-page.component';
 import { HomePageComponent } from './home/feature/home-page.component';
 
@@ -25,7 +25,7 @@ const loadPlaylistsPage = () => import('./playlists/feature/playlists-page.compo
 
 export const appRoutes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'brackets' },
-  { path: 'brackets/:bracketId', component: ActiveBracketPageComponent },
+  { path: 'brackets/:bracketId', component: BracketInvitationPageComponent },
   { path: 'brackets', component: HomePageComponent },
   { path: 'history', component: HistoryPageComponent },
   { path: 'history/:bracketId', component: HistoryPageComponent },

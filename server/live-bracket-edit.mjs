@@ -47,5 +47,5 @@ export async function applyLiveBracketEdit(c,bracket,entries,input,seeds) {
   await c.execute('UPDATE brackets SET title=?,artist=?,session_duration_minutes=?,tiebreaker_option=?,anonymous=? WHERE bracket_id=?',[input.title.trim(),input.artist.trim(),input.sessionDurationMinutes,input.tiebreakerOption,input.anonymous??!!bracket.anonymous,bracketId]);
   if(Object.hasOwn(input,'finaleAt')||Object.hasOwn(input,'finaleStartRound')) await c.execute('UPDATE brackets SET finale_at=?,finale_start_round=? WHERE bracket_id=?',[input.finaleAt??null,input.finaleStartRound??null,bracketId]);
   await c.execute(`DELETE FROM bracket_members WHERE bracket_id=? AND user_id NOT IN (${input.participantIds.map(()=>'?').join(',')})`,[bracketId,...input.participantIds]);
-  for(const userId of input.participantIds) await c.execute('INSERT IGNORE INTO bracket_members (bracket_id,family_id,user_id,non_finale_participant,finale_participant) VALUES (?,?,?,TRUE,TRUE)',[bracketId,bracket.family_id,userId]);
+  for(const userId of input.participantIds) await c.execute('INSERT IGNORE INTO bracket_members (bracket_id,family_id,user_id,non_finale_participant,finale_participant,invitation_status) VALUES (?,?,?,TRUE,TRUE,\'pending\')',[bracketId,bracket.family_id,userId]);
 }

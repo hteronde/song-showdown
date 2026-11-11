@@ -33,6 +33,14 @@
       <div class="field wide">
         <span class="participant-label">Participants <span aria-hidden="true">*</span></span>
         <div class="participant-summary"><span>{{ participantIds.length }} {{ participantIds.length === 1 ? 'participant' : 'participants' }} assigned</span><button class="cancel" type="button" (click)="openParticipantsModal()">Manage Participants</button></div>
+        <p class="hint">Saving this bracket sends invitations to new participants. Drafts do not send email. Participants must accept before viewing bracket details.</p>
+        <p class="hint">To remove someone, uncheck them in Manage Participants and save. Their access is revoked; recorded voting history is preserved.</p>
+        <p role="status" *ngIf="invitationNotice">{{ invitationNotice }}</p>
+        <ul *ngIf="invitations.length" aria-label="Invitation statuses">
+          <li *ngFor="let invite of invitations">{{ invite.displayName }} — {{ invite.status | titlecase }}<span *ngIf="invite.status === 'pending'"> · Email: {{ invite.delivery }}</span></li>
+        </ul>
+        <button type="button" class="cancel" *ngIf="editingId && editingStatus !== 'draft'" [disabled]="invitationSending || saving || participantEditor.saving" (click)="retryInvitations()">{{ invitationSending ? 'Sending…' : 'Send unsent / retry failed invitations' }}</button>
+
         <p class="field-error" id="participants-error" *ngIf="fieldErrors.participants" role="alert">{{ fieldErrors.participants }}</p>
       </div>
 

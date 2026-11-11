@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import { randomBytes, createHash } from 'node:crypto';
 import { disposableMysql } from './test-support/disposable-mysql.mjs';
 import { createApiServer } from './api-server.mjs';
+import { sendBracketInvitations } from './bracket-invitations.mjs';
 import { hashPassword, verifyPassword } from './passwords.mjs';
 
 const enabled = process.env.HTTP_DB_TESTS === '1';
 test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, async t => {
   const db = await disposableMysql();
-  const app = createApiServer({pool: db.pool});
+  const app = createApiServer({pool: db.pool, sendInvitations: async () => ({sent:0,failed:0})});
   try {
     await new Promise((resolve,reject) => {app.server.once('error',reject);app.server.listen(0,'127.0.0.1',resolve);});
     const base = `http://127.0.0.1:${app.server.address().port}`;
@@ -54,6 +55,69 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
     }
     const a=families[0],b=families[1];
     const vote=(br,user,index=0,entry=br.entries[index*2])=>http(`/api/matchups/${br.matches[index]}/votes`,{cookie:user.cookie,method:'POST',body:{userId:user.id,selectedEntryId:entry,comment:'Test vote'}});
+
+    await t.test('invitations gate all bracket details until acceptance and removal revokes access',async()=>{
+      const br=await bracket(a);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      const invite=await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie});
+      assert.equal(invite.status,200);assert.equal(invite.body.canAccess,false);
+      assert.deepEqual(Object.keys(invite.body).sort(),['bracketId','title','artist','startAt','invitationStatus','canAccess'].sort());
+      for(const suffix of ['', '/voting','/finale-options'])assert.equal((await http(`/api/brackets/${br.id}${suffix}`,{cookie:a.member.cookie})).status,404);
+      assert.equal((await vote(br,a.member)).status,404);
+      const history=await http('/api/brackets',{cookie:a.member.cookie});
+      assert.ok(!history.body.brackets.some(row=>row.bracketId===br.id));
+      const navigation=await http('/api/my/brackets',{cookie:a.member.cookie});
+      assert.equal(navigation.body.brackets.find(row=>row.bracketId===br.id).invitationStatus,'pending');
+      assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:b.member.cookie})).status,404);
+      assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:b.member.cookie,method:'POST',body:{response:'accepted'}})).status,404);
+      assert.equal((await http(`/api/admin/brackets/${br.id}/invitations`,{cookie:a.member.cookie})).status,403);
+      assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie,method:'POST',body:{response:'accepted',userId:a.owner.id}})).status,200);
+      assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,200);
+      assert.equal((await vote(br,a.member)).status,200);
+      const removed=await http(`/api/admin/brackets/${br.id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[a.owner.id]}});
+      assert.equal(removed.status,200);
+      assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie})).status,404);
+      assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,404);
+      assert.equal((await vote(br,a.member)).status,404);
+      const [[votes]]=await db.pool.execute('SELECT COUNT(*) AS total FROM votes WHERE bracket_id=? AND user_id=?',[br.id,a.member.id]);assert.equal(Number(votes.total),1);
+      assert.equal((await http(`/api/admin/brackets/${br.id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[a.owner.id,a.member.id]}})).status,200);
+      assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie})).body.invitationStatus,'pending');
+      assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,404);
+    });
+
+    await t.test('declining is idempotent, keeps details private, and cannot be reversed by replay',async()=>{
+      const br=await bracket(a);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      for(let i=0;i<2;i++)assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie,method:'POST',body:{response:'declined'}})).status,200);
+      assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie,method:'POST',body:{response:'accepted'}})).status,409);
+      assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,404);
+      assert.ok(!(await http('/api/my/brackets',{cookie:a.member.cookie})).body.brackets.some(row=>row.bracketId===br.id));
+      assert.equal((await http(`/api/admin/brackets/${br.id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[]}})).status,200);
+      const [[count]]=await db.pool.execute('SELECT COUNT(*) AS total FROM bracket_members WHERE bracket_id=?',[br.id]);assert.equal(Number(count.total),0);
+    });
+
+    await t.test('publishing creates pending invitations; email retry and concurrent response preserve consent',async()=>{
+      const created=await http('/api/admin/brackets',{cookie:a.owner.cookie,method:'POST',body:{title:'Invitation test',artist:'Hidden songs',songCount:4,songList:'Secret A\nSecret B\nSecret C\nSecret D',participantIds:[a.owner.id,a.member.id],startAt:'2027-06-01T18:00:00Z',songsPerSession:2,sessionDurationMinutes:null,tiebreakerOption:'random'}});
+      assert.equal(created.status,201,JSON.stringify(created.body));
+      const id=created.body.bracketId;
+      const [members]=await db.pool.execute('SELECT invitation_status FROM bracket_members WHERE bracket_id=?',[id]);
+      assert.ok(members.every(row=>row.invitation_status==='pending'));
+      const env={APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'test',EMAIL_FROM:'sender@example.com'};
+      const delivered=[];
+      const first=await sendBracketInvitations(db.pool,id,{env,deliver:async message=>{if(message.to===a.member.email)throw Error('Temporary provider failure');delivered.push(message.to);}});
+      assert.deepEqual(first,{sent:1,failed:1});
+      await db.pool.execute("UPDATE bracket_members SET invitation_attempt_at=DATE_SUB(NOW(),INTERVAL 2 MINUTE) WHERE bracket_id=? AND invitation_delivery='failed'",[id]);
+      const retry=await sendBracketInvitations(db.pool,id,{env,deliver:async message=>{delivered.push(message.to);}});
+      assert.deepEqual(retry,{sent:1,failed:0});
+      assert.deepEqual(await sendBracketInvitations(db.pool,id,{env,deliver:async()=>assert.fail('must not resend')}),{sent:0,failed:0});
+      assert.equal(delivered.length,2);
+      const responses=await Promise.all(['accepted','declined'].map(response=>http(`/api/brackets/${id}/invitation`,{cookie:a.member.cookie,method:'POST',body:{response}})));
+      assert.deepEqual(responses.map(row=>row.status).sort(),[200,409]);
+      const status=(await http(`/api/brackets/${id}/invitation`,{cookie:a.member.cookie})).body.invitationStatus;
+      assert.ok(['accepted','declined'].includes(status));
+      assert.equal((await http(`/api/admin/brackets/${id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[a.owner.id,a.member.id]}})).status,200);
+      assert.equal((await http(`/api/brackets/${id}/invitation`,{cookie:a.member.cookie})).body.invitationStatus,status);
+    });
 
     await t.test('HTTP authorization blocks unrelated owners and members on history, voting, finale reads/writes',async()=>{
       const foreign=await bracket(b,{complete:true});

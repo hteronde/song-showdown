@@ -6,6 +6,7 @@ export interface UserBracketLink {
   title: string;
   artist: string;
   startAt: string | null;
+  invitationStatus?: 'pending'|'accepted'|'declined';
   navigationStatus: 'active' | 'upcoming';
 }
 

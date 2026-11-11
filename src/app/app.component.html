@@ -35,11 +35,11 @@
         </a>
         <div class="side-label">YOUR BRACKETS</div>
         <button class="bracket-link" [class.active]="activePage === 'home' && activeBracketId === null" routerLink="/brackets" title="Fleetwood Mac"><span class="bracket-icon">◒</span><span>Fleetwood Mac</span><small class="bracket-status">Active</small></button>
-        <button class="bracket-link" *ngFor="let bracket of activeBrackets" [class.active]="activeBracketId === bracket.bracketId" [routerLink]="['/brackets', bracket.bracketId]" [attr.title]="bracket.artist"><span class="bracket-icon">◒</span><span>{{ bracket.title }}</span><span class="link-dot" *ngIf="activeBracketId === bracket.bracketId"></span></button>
+        <button class="bracket-link" *ngFor="let bracket of activeBrackets" [class.active]="activeBracketId === bracket.bracketId" [routerLink]="['/brackets', bracket.bracketId]" [attr.title]="bracket.artist"><span class="bracket-icon">◒</span><span>{{ bracket.title }}</span><small *ngIf="bracket.invitationStatus === 'pending'">Invited</small><span class="link-dot" *ngIf="activeBracketId === bracket.bracketId"></span></button>
         <button class="bracket-link history-link" [class.active]="activePage === 'history'" routerLink="/history"><span class="bracket-icon">◷</span><span>History</span></button>
         <ng-container *ngIf="upcomingBrackets.length">
           <div class="side-label admin-nav-label">UPCOMING BRACKETS</div>
-          <button class="bracket-link" *ngFor="let bracket of upcomingBrackets" [class.active]="activeBracketId === bracket.bracketId" [routerLink]="['/brackets', bracket.bracketId]" [attr.title]="bracket.title"><span class="bracket-icon">◷</span><span>{{ bracket.title }}</span><span class="link-dot" *ngIf="activeBracketId === bracket.bracketId"></span></button>
+          <button class="bracket-link" *ngFor="let bracket of upcomingBrackets" [class.active]="activeBracketId === bracket.bracketId" [routerLink]="['/brackets', bracket.bracketId]" [attr.title]="bracket.title"><span class="bracket-icon">◷</span><span>{{ bracket.title }}</span><small *ngIf="bracket.invitationStatus === 'pending'">Invited</small><span class="link-dot" *ngIf="activeBracketId === bracket.bracketId"></span></button>
         </ng-container>
         <ng-container *ngIf="isAdmin">
           <div class="side-label admin-nav-label">MANAGE</div>

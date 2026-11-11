@@ -73,18 +73,24 @@ export async function deliverPasswordReset({ email, token }, { env = process.env
     subject: 'Set or reset your Song Showdown password',
     text: `Set or reset your password: ${link}\nThis link expires in 30 minutes and can only be used once. If you did not request it, ignore this email.`
   };
+  try { await deliverEmail(message, { env, fetchImpl }); }
+  catch { throw new Error('Password reset email delivery failed.'); }
+}
+
+export async function deliverEmail(message, { env = process.env, fetchImpl = globalThis.fetch } = {}) {
+  if (env.NODE_ENV === 'production' && !passwordEmailConfigured(env)) throw new Error('Email delivery is not configured.');
   let endpoint, headers, body;
   if (env.RESEND_API_KEY) {
     if (!env.EMAIL_FROM?.trim()) throw new Error('EMAIL_FROM is required for Resend.');
     endpoint = 'https://api.resend.com/emails';
     headers = { Authorization: `Bearer ${env.RESEND_API_KEY}` };
-    body = { ...message, from: env.EMAIL_FROM.trim(), to: [email] };
+    body = { ...message, from: env.EMAIL_FROM.trim(), to: [message.to] };
   } else if (env.PASSWORD_RESET_EMAIL_WEBHOOK) {
     endpoint = env.PASSWORD_RESET_EMAIL_WEBHOOK;
     headers = env.PASSWORD_RESET_EMAIL_SECRET ? { Authorization: `Bearer ${env.PASSWORD_RESET_EMAIL_SECRET}` } : {};
     body = message;
   } else {
-    console.log(`Password reset for ${email}: ${link}`);
+    console.log(`Email to ${message.to}: ${message.subject}\n${message.text}`);
     return;
   }
   try {
@@ -95,6 +101,6 @@ export async function deliverPasswordReset({ email, token }, { env = process.env
     if (!response.ok) throw new Error('Provider rejected email.');
   } catch {
     // Never expose provider responses, credentials, or reset links in errors.
-    throw new Error('Password reset email delivery failed.');
+    throw new Error('Email delivery failed.');
   }
 }

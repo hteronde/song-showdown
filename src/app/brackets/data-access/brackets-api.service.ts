@@ -2,17 +2,23 @@ import { apiRequest, ApiRequestOptions } from '../../shared/data-access/api-clie
 import { Injectable } from '@angular/core';
 import { SessionPlaylist, BracketSessionsData, BracketAlbum, BracketSong, BracketDetail, BracketInput, BracketParticipant, BracketRecord } from './bracket.model';
 
+export interface InvitationParticipant { userId:number; displayName:string; email:string; status:'pending'|'accepted'|'declined'; delivery:'unsent'|'sending'|'sent'|'failed'; sentAt:string|null; }
+export interface InvitationDelivery {sent:number;failed:number;}
+
 @Injectable({ providedIn: 'root' })
 export class BracketsApiService {
   private readonly baseUrl = '/api/admin/brackets';
+
+  getInvitations(id:number):Promise<{participants:InvitationParticipant[]}> { return this.request(`${this.baseUrl}/${id}/invitations`); }
+  sendInvitations(id:number):Promise<{participants:InvitationParticipant[];delivery:InvitationDelivery}> { return this.request(`${this.baseUrl}/${id}/invitations`,{method:'POST',timeoutMs:120000}); }
 
   async getAll(signal?: AbortSignal): Promise<BracketRecord[]> {
     const data = await this.request<{ brackets?: BracketRecord[] }>(this.baseUrl, {signal});
     return data.brackets ?? [];
   }
 
-  saveParticipants(bracketId:number|null,input:{participantIds:number[];changes:Array<{userId:number;email:string;previousEmail:string}>;title:string;artist:string}):Promise<{bracketId:number;participantIds:number[];members:Array<{userId:number;email:string}>}> {
-    return this.request(`${this.baseUrl}${bracketId?'/'+bracketId:''}/participants`,{method:'PUT',body:JSON.stringify(input)});
+  saveParticipants(bracketId:number|null,input:{participantIds:number[];changes:Array<{userId:number;email:string;previousEmail:string}>;title:string;artist:string}):Promise<{bracketId:number;participantIds:number[];members:Array<{userId:number;email:string}>;invitations?:InvitationDelivery}> {
+    return this.request(`${this.baseUrl}${bracketId?'/'+bracketId:''}/participants`,{method:'PUT',body:JSON.stringify(input),timeoutMs:120000});
   }
 
   saveSessionPlaylists(bracketId:number,sessionPlaylists:SessionPlaylist[]):Promise<{sessionPlaylists:SessionPlaylist[]}> {
@@ -47,12 +53,12 @@ export class BracketsApiService {
     return this.request(`${this.baseUrl}${bracketId?'/'+bracketId:''}/draft`,{method:bracketId?'PUT':'POST',body:JSON.stringify(input)});
   }
 
-  async create(input: BracketInput): Promise<void> {
-    await this.request(this.baseUrl, { method: 'POST', body: JSON.stringify(input) });
+  async create(input: BracketInput): Promise<{invitations?:InvitationDelivery}> {
+    return this.request(this.baseUrl, { method: 'POST', body: JSON.stringify(input),timeoutMs:120000 });
   }
 
-  async update(bracketId: number, input: BracketInput): Promise<void> {
-    await this.request(`${this.baseUrl}/${bracketId}`, { method: 'PUT', body: JSON.stringify(input) });
+  async update(bracketId: number, input: BracketInput): Promise<{invitations?:InvitationDelivery}> {
+    return this.request(`${this.baseUrl}/${bracketId}`, { method: 'PUT', body: JSON.stringify(input),timeoutMs:120000 });
   }
 
   async saveSongs(bracketId: number | null, songs: BracketSong[], title: string, artist: string, resetHistory = false): Promise<{ bracketId: number; songs: BracketSong[]; needsSetup: boolean }> {

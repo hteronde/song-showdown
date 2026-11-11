@@ -1,3 +1,4 @@
+import { getBracketInvitation, respondToInvitation, listBracketInvitations, sendBracketInvitations } from './bracket-invitations.mjs';
 import { originAllowed } from './hosting-config.mjs';
 import { serveStaticSite } from './static-site.mjs';
 import { createAuthRateLimiter, readAuthInput } from './auth-abuse.mjs';
@@ -31,7 +32,7 @@ import { parseVoteInput } from './vote-input.mjs';
 import { verifyPassword } from './passwords.mjs';
 
 // The caller owns the pool and listener. Importing this module opens no connections or timers.
-export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter(), hosting = {} }) {
+export function createApiServer({ pool, authRateLimiter = createAuthRateLimiter(), hosting = {}, sendInvitations = sendBracketInvitations }) {
 const sessionCookie = 'song_showdown_session';
 const sessionLifetimeSeconds = 14 * 24 * 60 * 60;
 const effectiveBracketStatus = `CASE
@@ -255,6 +256,26 @@ const server = createServer(async (request, response) => {
     }
   }
 
+  const invitationRoute = url.pathname.match(/^\/api\/brackets\/(\d+)\/invitation$/);
+  if (invitationRoute && ['GET','POST'].includes(request.method)) {
+    let connection;
+    try {
+      const id = Number(invitationRoute[1]);
+      if (request.method === 'GET') send(200, await getBracketInvitation(pool,id,authenticatedUser.userId));
+      else {
+        const input = await readJson(request);
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+        const result = await respondToInvitation(connection,id,authenticatedUser.userId,input.response);
+        await connection.commit(); send(200,result);
+      }
+    } catch(error) {
+      if(connection) await connection.rollback();
+      send(error.status || 500,{error:error.status ? error.message : 'Could not process invitation.'});
+    } finally { connection?.release(); }
+    return;
+  }
+
   if (authenticatedUser) {
     try { await authorizeBracketRequest(pool, authenticatedUser.userId, request.method, url.pathname); }
     catch (error) {
@@ -282,10 +303,16 @@ const server = createServer(async (request, response) => {
     try {
       const familyId = Number((await pool.execute('SELECT family_id FROM users WHERE user_id = ?', [authenticatedUser.userId]))[0][0]?.family_id);
       if (!familyId) { send(400, { error: 'Your account is not connected to a family.' }); return; }
+      const inviteAdminRoute=url.pathname.match(/^\/api\/admin\/brackets\/(\d+)\/invitations$/);
+      if (inviteAdminRoute && ['GET','POST'].includes(request.method)) {
+        const id=Number(inviteAdminRoute[1]);
+        const delivery=request.method==='POST' ? await sendInvitations(pool,id) : undefined;
+        send(200,{participants:await listBracketInvitations(pool,id),delivery});return;
+      }
       const participantsRoute=url.pathname.match(/^\/api\/admin\/brackets(?:\/(\d+))?\/participants$/);
       if(participantsRoute && request.method==='PUT') {
         const input=await readJson(request),connection=await pool.getConnection();
-        try{await connection.beginTransaction();const result=await saveBracketParticipants(connection,{bracketId:Number(participantsRoute[1])||null,familyId,userId:authenticatedUser.userId,input});await connection.commit();send(200,result);}
+        try{await connection.beginTransaction();const result=await saveBracketParticipants(connection,{bracketId:Number(participantsRoute[1])||null,familyId,userId:authenticatedUser.userId,input});await connection.commit();const invitations=await sendInvitations(pool,result.bracketId);send(200,{...result,invitations});}
         catch(error){await connection.rollback();send(error.status||400,{error:error.code==='ER_DUP_ENTRY'?'That email is already in use.':error.message});}
         finally{connection.release();}return;
       }
@@ -489,7 +516,7 @@ const server = createServer(async (request, response) => {
               await connection.execute("UPDATE brackets SET status=CASE WHEN status='draft' THEN 'active' ELSE status END,draft_settings=NULL WHERE bracket_id=?",[id]);
               await applySubmittedSessionSchedule(connection,id,familyId,input.sessionSchedule);
               await saveSessionPlaylists(connection,id,sessionPlaylists);
-              await connection.commit(); send(200,{bracketId:id,saved:true,historyPreserved:true}); return;
+              await connection.commit(); const invitations=await sendInvitations(pool,id); send(200,{bracketId:id,saved:true,historyPreserved:true,invitations}); return;
             }
             if(seedError){if(unchangedLegacySeeds)seeds=assignSongSeeds(titles.map(()=>({})));else throw seedError;}
             const [activity]=await connection.execute('SELECT (SELECT COUNT(*) FROM votes WHERE bracket_id=?) + (SELECT COUNT(*) FROM bracket_finale_sessions WHERE bracket_id=?) + (SELECT COUNT(*) FROM matchups WHERE bracket_id=? AND winner_entry_id IS NOT NULL) AS total',[id,id,id]);
@@ -505,7 +532,7 @@ const server = createServer(async (request, response) => {
             await connection.execute('DELETE FROM bracket_weeks WHERE bracket_id=?',[id]);
             await connection.execute('DELETE FROM bracket_rounds WHERE bracket_id=?',[id]);
             await connection.execute('DELETE FROM bracket_songs WHERE bracket_id=?',[id]);
-            await connection.execute('DELETE FROM bracket_members WHERE bracket_id=?',[id]);
+            // Preserve invitation responses when rebuilding tournament structure.
             await connection.execute('UPDATE brackets SET paused_at=NULL,status=\'active\',title=?,artist=?,start_at=?,songs_per_session=?,session_duration_minutes=?,tiebreaker_option=?,anonymous=?,randomization_mode=? WHERE bracket_id=?',[String(input.title).trim(),String(input.artist).trim(),new Date(input.startAt),sessionSize,duration,tiebreakerOption,anonymous??!!exists[0].anonymous,randomizationMode??exists[0].randomization_mode,id]);
           } else {
             seedingSize ??= null;
@@ -518,7 +545,8 @@ const server = createServer(async (request, response) => {
           if(finalePlan!==undefined) await connection.execute('UPDATE brackets SET finale_at=?,finale_start_round=? WHERE bracket_id=?',[finalePlan.finaleAt,finalePlan.finaleStartRound,id]);
           const [memberRows]=await connection.execute(`SELECT user_id FROM users WHERE family_id=? AND user_id IN (${participants.map(()=>'?').join(',')})`,[familyId,...participants]);
           if (memberRows.length!==participants.length) { await connection.rollback(); send(400,{error:'One or more participants are not members of your family.'}); return; }
-          for (const userId of participants) await connection.execute('INSERT INTO bracket_members (bracket_id,family_id,user_id,finale_participant,non_finale_participant) VALUES (?,?,?,TRUE,TRUE)',[id,familyId,userId]);
+          await connection.execute(`DELETE FROM bracket_members WHERE bracket_id=? AND user_id NOT IN (${participants.map(()=>'?').join(',')})`,[id,...participants]);
+          for (const userId of participants) await connection.execute("INSERT IGNORE INTO bracket_members (bracket_id,family_id,user_id,finale_participant,non_finale_participant,invitation_status) VALUES (?,?,?,TRUE,TRUE,'pending')",[id,familyId,userId]);
           const entries=[];
           for (let i=0;i<titles.length;i++) {
             const details = songDetails?.[i];
@@ -566,7 +594,7 @@ const server = createServer(async (request, response) => {
           if(randomSettings.mode!=='none') await connection.execute('UPDATE bracket_rounds SET randomized_at=NOW(6) WHERE bracket_id=? AND round_number=1',[id]);
           await applySubmittedSessionSchedule(connection,id,familyId,input.sessionSchedule);
               await saveSessionPlaylists(connection,id,sessionPlaylists);
-          await connection.commit(); send(isUpdate?200:201,{bracketId:id,saved:true}); return;
+          await connection.commit(); const invitations=await sendInvitations(pool,id); send(isUpdate?200:201,{bracketId:id,saved:true,invitations}); return;
         } catch(error) { await connection.rollback(); throw error; } finally { connection.release(); }
       }
       if (request.method==='DELETE' && /^\/api\/admin\/brackets\/\d+$/.test(url.pathname)) {
@@ -595,14 +623,14 @@ const server = createServer(async (request, response) => {
   if (request.method === 'GET' && url.pathname === '/api/my/brackets') {
     try {
       const [brackets] = await pool.execute(
-        `SELECT b.bracket_id AS bracketId,b.title,b.artist,b.logo_url AS logoUrl,b.start_at AS startAt,
+        `SELECT b.bracket_id AS bracketId,b.title,b.artist,CASE WHEN bm.invitation_status='accepted' THEN b.logo_url ELSE NULL END AS logoUrl,b.start_at AS startAt,bm.invitation_status AS invitationStatus,
                 CASE WHEN b.start_at > NOW() THEN 'upcoming' ELSE 'active' END AS navigationStatus
          FROM brackets b
          JOIN bracket_members bm ON bm.bracket_id=b.bracket_id
          WHERE bm.user_id=?
            AND (bm.non_finale_participant=TRUE OR bm.finale_participant=TRUE)
-           AND (${effectiveBracketStatus}='active'
-                OR (${effectiveBracketStatus}='draft' AND b.start_at > NOW()))
+           AND b.status<>'draft' AND bm.invitation_status<>'declined'
+           AND (${effectiveBracketStatus}='active' OR bm.invitation_status='pending')
          ORDER BY b.start_at DESC,b.created_at DESC`,[authenticatedUser.userId]);
       send(200,{brackets});
     } catch(error) {
@@ -624,7 +652,7 @@ const server = createServer(async (request, response) => {
                 (SELECT COUNT(*) FROM bracket_songs bs WHERE bs.bracket_id=b.bracket_id) AS songCount,
                 (SELECT COUNT(*) FROM bracket_rounds r WHERE r.bracket_id=b.bracket_id) AS roundCount
          FROM brackets b JOIN families f ON f.family_id=b.family_id
-         WHERE b.family_id=? ORDER BY b.created_at DESC,b.bracket_id DESC`,[familyId]);
+         WHERE b.family_id=? AND (?='owner' OR (b.status<>'draft' AND EXISTS (SELECT 1 FROM bracket_members bm WHERE bm.bracket_id=b.bracket_id AND bm.user_id=? AND bm.invitation_status='accepted'))) ORDER BY b.created_at DESC,b.bracket_id DESC`,[familyId,authenticatedUser.role,authenticatedUser.userId]);
       send(200,{brackets});
     } catch(error) {
       console.error('Bracket list request failed:',error.message);
@@ -701,7 +729,7 @@ const server = createServer(async (request, response) => {
       }
 
       const [members] = await connection.execute(
-        'SELECT 1 FROM bracket_members WHERE bracket_id = ? AND user_id = ? AND non_finale_participant = TRUE',
+        'SELECT 1 FROM bracket_members WHERE bracket_id = ? AND user_id = ? AND non_finale_participant = TRUE AND invitation_status=\'accepted\'',
         [matchup.bracketId, authenticatedUser.userId]
       );
       if (members.length === 0) {
@@ -753,7 +781,7 @@ const server = createServer(async (request, response) => {
 
       if (authenticatedUser.role !== 'owner') {
         const [members] = await pool.execute(
-          'SELECT 1 FROM bracket_members WHERE bracket_id=? AND user_id=? AND (non_finale_participant=TRUE OR finale_participant=TRUE)',
+          'SELECT 1 FROM bracket_members WHERE bracket_id=? AND user_id=? AND (non_finale_participant=TRUE OR finale_participant=TRUE) AND invitation_status=\'accepted\'',
           [bracketId, authenticatedUser.userId]);
         if (!members.length) { send(403, { error: 'You are not a participant in this bracket.' }); return; }
       }
@@ -766,7 +794,7 @@ const server = createServer(async (request, response) => {
       }
 
       const [votingMembers]=await pool.execute(
-        'SELECT 1 FROM bracket_members WHERE bracket_id=? AND user_id=? AND non_finale_participant=TRUE',
+        'SELECT 1 FROM bracket_members WHERE bracket_id=? AND user_id=? AND non_finale_participant=TRUE AND invitation_status=\'accepted\'',
         [bracketId,authenticatedUser.userId]);
       const canParticipateOnline=votingMembers.length>0;
 
@@ -957,7 +985,7 @@ const server = createServer(async (request, response) => {
       }
 
       const [participants] = await connection.execute(
-        'SELECT user_id AS userId FROM bracket_members WHERE bracket_id=? AND finale_participant=TRUE FOR UPDATE',
+        'SELECT user_id AS userId FROM bracket_members WHERE bracket_id=? AND finale_participant=TRUE AND invitation_status=\'accepted\' FOR UPDATE',
         [bracketId]);
       const expectedIds = participants.map(person => Number(person.userId));
       if (expectedIds.length !== submittedIds.length || expectedIds.some(id => !submittedIds.includes(id))) {
@@ -1032,7 +1060,7 @@ const server = createServer(async (request, response) => {
       const [rounds] = await pool.execute('SELECT round_id FROM bracket_rounds WHERE bracket_id=? AND round_number=?', [bracketId, startRoundNumber]);
       if (!rounds.length) { send(400, { error: 'The selected round does not exist in this bracket.' }); return; }
       const [members] = await pool.execute(
-        `SELECT user_id FROM bracket_members WHERE bracket_id=? AND family_id=? AND user_id IN (${participantIds.map(() => '?').join(',')})`,
+        `SELECT user_id FROM bracket_members WHERE bracket_id=? AND family_id=? AND invitation_status='accepted' AND user_id IN (${participantIds.map(() => '?').join(',')})`,
         [bracketId, brackets[0].familyId, ...participantIds]);
       if (members.length !== participantIds.length) { send(400, { error: 'Every finale participant must already belong to this bracket.' }); return; }
 
@@ -1074,7 +1102,7 @@ const server = createServer(async (request, response) => {
                   COUNT(v.vote_id) AS voteCount,bm.finale_participant AS selectedByDefault
            FROM bracket_members bm JOIN users u ON u.user_id=bm.user_id
            LEFT JOIN votes v ON v.bracket_id=bm.bracket_id AND v.user_id=bm.user_id AND v.submitted_at IS NOT NULL
-           WHERE bm.bracket_id=? GROUP BY bm.user_id,u.display_name,bm.finale_participant
+           WHERE bm.bracket_id=? AND bm.invitation_status='accepted' GROUP BY bm.user_id,u.display_name,bm.finale_participant
            ORDER BY u.display_name`, [bracketId]),
         pool.execute('SELECT start_round_number AS startRoundNumber,status FROM bracket_finale_sessions WHERE bracket_id=?', [bracketId])
       ]);
@@ -1166,7 +1194,7 @@ const server = createServer(async (request, response) => {
         `SELECT bm.user_id AS userId,u.display_name AS displayName,
                 bm.finale_participant AS finaleParticipant,bm.non_finale_participant AS nonFinaleParticipant
          FROM bracket_members bm JOIN users u ON u.user_id=bm.user_id
-         WHERE bm.bracket_id=? ORDER BY u.display_name`, [bracketId]),
+         WHERE bm.bracket_id=? AND bm.invitation_status='accepted' ORDER BY u.display_name`, [bracketId]),
       pool.execute(
         `SELECT p.playlist_id AS playlistId,p.playlist_name AS playlistName,p.playlist_url AS playlistUrl,w.week_number AS weekNumber
          FROM bracket_playlists p LEFT JOIN bracket_weeks w ON w.bracket_id=p.bracket_id AND w.week_id=p.week_id

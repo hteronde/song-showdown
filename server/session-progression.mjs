@@ -82,9 +82,9 @@ export async function closeFullyVotedWeeks(c) {
       AND ${readyRoundSql('b','r')} AND ${priorSessionsReadySql('b','w')}
       AND EXISTS (SELECT 1 FROM matchups m WHERE m.week_id=w.week_id AND m.bracket_id=b.bracket_id)
       AND NOT EXISTS (SELECT 1 FROM matchups m JOIN matchups feeder ON feeder.next_matchup_id=m.matchup_id AND feeder.bracket_id=m.bracket_id WHERE m.week_id=w.week_id AND feeder.winner_entry_id IS NULL)
-      AND EXISTS (SELECT 1 FROM bracket_members bm WHERE bm.bracket_id=b.bracket_id AND bm.non_finale_participant=TRUE)
+      AND EXISTS (SELECT 1 FROM bracket_members bm WHERE bm.bracket_id=b.bracket_id AND bm.invitation_status='accepted' AND bm.non_finale_participant=TRUE)
       AND NOT EXISTS (SELECT 1 FROM bracket_members bm JOIN matchups m ON m.bracket_id=bm.bracket_id AND m.week_id=w.week_id
-        WHERE bm.bracket_id=b.bracket_id AND bm.non_finale_participant=TRUE AND NOT EXISTS (SELECT 1 FROM votes v WHERE v.bracket_id=b.bracket_id AND v.matchup_id=m.matchup_id AND v.user_id=bm.user_id AND v.submitted_at IS NOT NULL AND v.selected_entry_id IN (m.song_a_entry_id,m.song_b_entry_id)))
+        WHERE bm.bracket_id=b.bracket_id AND bm.invitation_status='accepted' AND bm.non_finale_participant=TRUE AND NOT EXISTS (SELECT 1 FROM votes v WHERE v.bracket_id=b.bracket_id AND v.matchup_id=m.matchup_id AND v.user_id=bm.user_id AND v.submitted_at IS NOT NULL AND v.selected_entry_id IN (m.song_a_entry_id,m.song_b_entry_id)))
     FOR UPDATE`);
   for(const week of weeks)await c.execute('UPDATE bracket_weeks SET closes_at=NOW(6) WHERE week_id=?',[week.week_id]);
 }

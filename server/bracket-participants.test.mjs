@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {saveBracketParticipants} from './bracket-participants.mjs';
 test('participant saves enforce bracket scope and validate selection before writes',async()=>{
  const calls=[];const c={async execute(sql){calls.push(sql);return [[]];}};
- await assert.rejects(saveBracketParticipants(c,{bracketId:1,familyId:2,userId:3,input:{participantIds:[]}}),{status:400});assert.equal(calls.length,0);
+ await assert.rejects(saveBracketParticipants(c,{bracketId:1,familyId:2,userId:3,input:{participantIds:[-1]}}),{status:400});assert.equal(calls.length,0);
  await assert.rejects(saveBracketParticipants(c,{bracketId:1,familyId:2,userId:3,input:{participantIds:[3]}}),{status:404});assert.equal(calls.length,1);
 });
 test('participant selections persist without changing votes, matchups, or other bracket settings',async()=>{
@@ -12,4 +12,12 @@ test('participant selections persist without changing votes, matchups, or other 
  assert.deepEqual(result.participantIds,[3]);assert.ok(calls.some(({sql})=>sql.startsWith('INSERT IGNORE INTO bracket_members')));
  assert.ok(calls.some(({sql,args})=>sql.startsWith('UPDATE brackets SET draft_settings')&&args[0]==='[3]'));
  assert.ok(!calls.some(({sql})=>/votes|matchups|start_at|title=/.test(sql)));
+});
+
+test('admin can remove the final participant without deleting votes',async()=>{
+ const calls=[];const c={async execute(sql){calls.push(sql);return sql.startsWith('SELECT')?[[{bracket_id:1}]]:[{affectedRows:1}];}};
+ const result=await saveBracketParticipants(c,{bracketId:1,familyId:2,userId:3,input:{participantIds:[]}});
+ assert.deepEqual(result.participantIds,[]);
+ assert.ok(calls.some(sql=>sql.startsWith('DELETE FROM bracket_members')));
+ assert.ok(!calls.some(sql=>sql.includes('DELETE FROM votes')));
 });

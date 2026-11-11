@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
-import { ActiveBracketPageComponent } from './brackets/feature/active-bracket-page.component';
+import { BracketInvitationPageComponent } from './brackets/feature/bracket-invitation-page.component';
 import { HomePageComponent } from './home/feature/home-page.component';
 import { HistoryPageComponent } from './history/feature/history-page.component';
 import type { BracketsPageComponent } from './brackets/feature/brackets-page.component';
@@ -64,7 +64,7 @@ export class AppComponent implements OnDestroy {
     if (component instanceof HomePageComponent) {
       component.currentMember = this.currentMember;
       component.toastMessage.subscribe(message => this.showToast(message));
-    } else if (component instanceof ActiveBracketPageComponent) {
+    } else if (component instanceof BracketInvitationPageComponent) {
       component.toastMessage.subscribe(message => this.showToast(message));
     } else if (component instanceof HistoryPageComponent) {
       component.returnToBracket.subscribe(() => this.selectPage('home'));

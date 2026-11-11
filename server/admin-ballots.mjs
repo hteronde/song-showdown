@@ -80,7 +80,7 @@ export async function loadAdminBallots(c,bracketId,matchupId,familyId,lock=false
     v.selected_entry_id AS selectedEntryId,v.submitted_at AS submittedAt
     FROM bracket_members bm JOIN users u ON u.user_id=bm.user_id
     LEFT JOIN votes v ON v.bracket_id=bm.bracket_id AND v.user_id=bm.user_id AND v.matchup_id=? AND v.submitted_at IS NOT NULL
-    WHERE bm.bracket_id=? AND (CASE WHEN ?=1 THEN bm.finale_participant ELSE bm.non_finale_participant END = TRUE OR v.vote_id IS NOT NULL)
+    WHERE bm.bracket_id=? AND bm.invitation_status='accepted' AND (CASE WHEN ?=1 THEN bm.finale_participant ELSE bm.non_finale_participant END = TRUE OR v.vote_id IS NOT NULL)
     ORDER BY u.user_id${lock?' FOR UPDATE':''}`,[matchupId,bracketId,match.inFinale?1:0]);
   return {...match,participants,revision:ballotRevision(match,participants),canEdit:!editRestriction,editRestriction};
 }

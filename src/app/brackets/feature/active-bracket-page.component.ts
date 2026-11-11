@@ -1,3 +1,4 @@
+import { ApiError } from '../../shared/data-access/api-client';
 import { BracketRequests, VoteDrafts } from '../state/voting-state';
 import { BracketChampionComponent, BracketChampion } from '../ui/bracket-champion.component';
 import { BracketConnectorsDirective } from '../ui/bracket-connectors.directive';
@@ -214,8 +215,15 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
                 this.viewMode = 'bracket';
         }
         catch (error) {
-            if (this.requests.isCurrent(version, bracketId))
+            if (this.requests.isCurrent(version, bracketId)) {
+                if (error instanceof ApiError && [401,403,404].includes(error.status ?? 0)) {
+                    this.data = null;
+                    this.voteDrafts.clear();
+                    this.closeMatchupDetails();
+                    this.error = 'This bracket is no longer available to your account.';
+                }
                 throw error;
+            }
         }
         finally {
             if (this.requests.pollingVersion === version)

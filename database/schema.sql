@@ -82,6 +82,11 @@ CREATE TABLE bracket_members (
   user_id BIGINT UNSIGNED NOT NULL,
   finale_participant BOOLEAN NOT NULL DEFAULT TRUE,
   non_finale_participant BOOLEAN NOT NULL DEFAULT TRUE,
+  invitation_status ENUM('pending','accepted','declined') NOT NULL DEFAULT 'accepted',
+  invitation_sent_at DATETIME(6) NULL,
+  invitation_attempt_at DATETIME(6) NULL,
+  invitation_delivery ENUM('unsent','sending','sent','failed') NOT NULL DEFAULT 'unsent',
+  invitation_responded_at DATETIME(6) NULL,
   joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (bracket_id, user_id),
   CONSTRAINT fk_bracket_members_bracket FOREIGN KEY (bracket_id, family_id)
