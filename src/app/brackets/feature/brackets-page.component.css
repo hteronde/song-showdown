@@ -822,7 +822,7 @@
 
 .participant-email-row {
   display: grid;
-  grid-template-columns: minmax(110px,1fr) minmax(0,2fr);
+  grid-template-columns: minmax(110px,1fr) minmax(0,2fr) minmax(140px,1fr);
   align-items: center;
   gap: 12px;
   padding: 10px;
@@ -843,7 +843,8 @@
   margin: 0;
 }
 
-.participant-email-row input[type=email] {
+.participant-email-row input[type=email],
+.participant-email-row select {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -1012,3 +1013,6 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+
+.participant-email-row > label:last-child { flex-direction: column; align-items: stretch; font-size: 12px; }
+@media (max-width: 650px) { .participant-email-row { grid-template-columns: 1fr; } }

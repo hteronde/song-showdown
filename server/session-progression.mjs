@@ -12,7 +12,7 @@ export async function finalizeClosedMatchups(connection,bracketId=null,weekId=nu
                 (SELECT CASE WHEN b.seeding_size IS NOT NULL THEN assigned_seed ELSE seed_number END FROM bracket_songs WHERE bracket_song_id=m.song_a_entry_id) AS songASeed,
                 (SELECT CASE WHEN b.seeding_size IS NOT NULL THEN assigned_seed ELSE seed_number END FROM bracket_songs WHERE bracket_song_id=m.song_b_entry_id) AS songBSeed,
                 (SELECT v.selected_entry_id FROM votes v JOIN users u ON u.user_id=v.user_id
-                 WHERE v.matchup_id=m.matchup_id AND v.bracket_id=m.bracket_id AND v.submitted_at IS NOT NULL AND u.role='owner'
+                 WHERE v.matchup_id=m.matchup_id AND v.bracket_id=m.bracket_id AND v.submitted_at IS NOT NULL AND (u.user_role='super' OR EXISTS (SELECT 1 FROM bracket_members cm WHERE cm.bracket_id=m.bracket_id AND cm.user_id=u.user_id AND cm.bracket_role='commissioner' AND cm.invitation_status='accepted'))
                  ORDER BY (u.user_id=b.created_by_user_id) DESC,u.user_id LIMIT 1) AS adminPick,
                 (SELECT MAX(last_round.round_number) FROM bracket_rounds last_round WHERE last_round.bracket_id=m.bracket_id) AS finalRoundNumber,
                 (SELECT COUNT(*) FROM votes v WHERE v.matchup_id=m.matchup_id AND v.submitted_at IS NOT NULL AND v.selected_entry_id=m.song_a_entry_id) AS votesForA,

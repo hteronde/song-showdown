@@ -20,25 +20,25 @@ SET @morgan_family_id = (
   LIMIT 1
 );
 
-INSERT INTO users (family_id, email, display_name, `role`)
-SELECT @morgan_family_id, 'alex@example.com', 'Alex Morgan', 'owner'
+INSERT INTO users (family_id, email, display_name, `user_role`)
+SELECT @morgan_family_id, 'alex@example.com', 'Alex Morgan', 'super'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'alex@example.com');
 
-INSERT INTO users (family_id, email, display_name, `role`)
-SELECT @morgan_family_id, 'sam@example.com', 'Sam Morgan', 'member'
+INSERT INTO users (family_id, email, display_name, `user_role`)
+SELECT @morgan_family_id, 'sam@example.com', 'Sam Morgan', 'viewer'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'sam@example.com');
 
-INSERT INTO users (family_id, email, display_name, `role`)
-SELECT @morgan_family_id, 'jules@example.com', 'Jules Morgan', 'member'
+INSERT INTO users (family_id, email, display_name, `user_role`)
+SELECT @morgan_family_id, 'jules@example.com', 'Jules Morgan', 'viewer'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'jules@example.com');
 
-INSERT INTO users (family_id, email, display_name, `role`)
-SELECT @morgan_family_id, 'mama@example.com', 'Mama', 'member'
+INSERT INTO users (family_id, email, display_name, `user_role`)
+SELECT @morgan_family_id, 'mama@example.com', 'Mama', 'viewer'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'mama@example.com');
 
 UPDATE users
 SET family_id = @morgan_family_id,
-    `role` = CASE WHEN email = 'alex@example.com' THEN 'owner' ELSE 'member' END
+    `user_role` = CASE WHEN email = 'alex@example.com' THEN 'super' ELSE 'viewer' END
 WHERE email IN (
   'alex@example.com',
   'sam@example.com',

@@ -18,6 +18,7 @@ test('requires reset confirmation for structural song changes with activity', as
     calls.push(sql);
     if (sql.startsWith('SELECT * FROM brackets')) return [[{bracket_id:6,artist:'Tool'}]];
     if (sql.includes('AS total')) return [[{total:1}]];
+    if (sql.includes('song_id=? AND bracket_id<>?')) return [[]];
     if (sql.startsWith('SELECT bracket_song_id')) return [[{bracket_song_id:100,song_id:50,seed_number:1}]];
     throw new Error('Unexpected mutation');
   }};
@@ -31,6 +32,7 @@ test('edits existing song metadata without rebuilding matchups or saving other s
     calls.push({sql,params});
     if (sql.startsWith('SELECT * FROM brackets')) return [[{bracket_id:6,artist:'Tool',start_at:null,songs_per_session:2}]];
     if (sql.includes('AS total')) return [[{total:0}]];
+    if (sql.includes('song_id=? AND bracket_id<>?')) return [[]];
     if (sql.startsWith('SELECT bracket_song_id')) return [[{bracket_song_id:100,song_id:50,seed_number:1}]];
     if (sql.startsWith('SELECT w.week_id')) return [[{week_id:1,round_number:1},{week_id:2,round_number:2}]];
     if (sql.startsWith('INSERT INTO bracket_songs')) return [{insertId:101}];
@@ -53,6 +55,7 @@ test('reordering saves explicit positions and retains song-entry IDs', async () 
     calls.push({sql,params});
     if(sql.startsWith('SELECT * FROM brackets'))return [[{bracket_id:6,artist:'Tool',start_at:null}]];
     if(sql.includes('AS total'))return [[{total:0}]];
+    if(sql.includes('song_id=? AND bracket_id<>?'))return [[]];
     if(sql.startsWith('SELECT bracket_song_id'))return [entries];
     if(sql.startsWith('SELECT w.week_id'))return [[]];
     if(sql.startsWith('UPDATE')||sql.startsWith('DELETE'))return [{affectedRows:1}];

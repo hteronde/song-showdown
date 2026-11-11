@@ -7,7 +7,7 @@ import { AdminBallotEditorComponent } from '../ui/admin-ballot-editor.component'
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, EventEmitter, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../../auth/data-access/auth-api.service';
 import { AdvanceWeekPlan, ActiveBracketApiService, ActiveBracketVotingData, VotingMatchup, VotingWeek } from '../data-access/active-bracket-api.service';
 interface RevealedRound {
@@ -20,7 +20,7 @@ interface RevealedRound {
     }>;
 }
 @Component({
-    selector: 'app-active-bracket-page', standalone: true, imports: [FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent],
+    selector: 'app-active-bracket-page', standalone: true, imports: [RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent],
     templateUrl: './active-bracket-page.component.html',
     styleUrls: ['./active-bracket-page.component.css', '../ui/bracket-connectors.css']
 })
@@ -205,6 +205,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
             if ((data.awaitingFinale && !this.data?.awaitingFinale) || (data.bracket.status === 'complete' && !this.isComplete))
                 this.firstVisibleRound = 1;
             this.data = data;
+            this.isAdmin = !!data.canManage;
             for (const week of data.weeks)
                 for (const match of week.matchups) {
                     if (this.savingMatchupId !== match.matchupId)
@@ -391,9 +392,10 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
                 return;
             this.firstVisibleRound = 1;
             this.data = data;
+            this.isAdmin = !!data.canManage;
             this.viewMode = this.hasOnlineVoting ? 'vote' : 'bracket';
             this.currentMemberId = user?.userId ?? null;
-            this.isAdmin = user?.role === 'owner';
+            this.isAdmin = !!data.canManage;
         }
         catch (error) {
             if (this.requests.isCurrent(version, bracketId))

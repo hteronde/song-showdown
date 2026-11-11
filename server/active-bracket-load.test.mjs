@@ -20,7 +20,7 @@ function fixture(){
   const requests=[];
   const saves=[];
   let checks=0;
-  const component=new Component({}, {}, {getVotingPage(id,signal){const request={id,signal,...deferred()};requests.push(request);return request.promise;},saveVote(...args){const save={args,...deferred()};saves.push(save);return save.promise;}}, {async getCurrentUser(){return {userId:7,role:'member'};}}, {markForCheck(){checks++;}});
+  const component=new Component({}, {}, {getVotingPage(id,signal){const request={id,signal,...deferred()};requests.push(request);return request.promise;},saveVote(...args){const save={args,...deferred()};saves.push(save);return save.promise;}}, {async getCurrentUser(){return {userId:7,user_role:'viewer'};}}, {markForCheck(){checks++;}});
   return {component,requests,saves,get checks(){return checks;}};
 }
 

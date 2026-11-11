@@ -19,7 +19,7 @@ CREATE TABLE users (
   family_id BIGINT UNSIGNED NULL,
   email VARCHAR(254) NOT NULL,
   display_name VARCHAR(120) NOT NULL,
-  `role` ENUM('owner', 'member') NULL,
+  `user_role` ENUM('super', 'viewer') NULL,
   family_joined_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   -- Store a scrypt hash here. NULL means the account has not set a password yet.
   password_hash VARCHAR(255) NULL,
@@ -82,6 +82,7 @@ CREATE TABLE bracket_members (
   user_id BIGINT UNSIGNED NOT NULL,
   finale_participant BOOLEAN NOT NULL DEFAULT TRUE,
   non_finale_participant BOOLEAN NOT NULL DEFAULT TRUE,
+  bracket_role ENUM('member','commissioner') NOT NULL DEFAULT 'member',
   invitation_status ENUM('pending','accepted','declined') NOT NULL DEFAULT 'accepted',
   invitation_sent_at DATETIME(6) NULL,
   invitation_attempt_at DATETIME(6) NULL,

@@ -9,7 +9,7 @@ const source=readFileSync(new URL('../src/app/app.component.ts',import.meta.url)
 const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true}}).outputText;
 const context=createContext({exports:{},Error,URLSearchParams,setInterval,clearInterval,setTimeout,clearTimeout,window:{location:{hash:''}},require:name=>name==='@angular/core'?{Component:()=>()=>{}}:name==='./shared/data-access/api-client'?client:{}});
 runInContext(compiled,context);
-const user={userId:7,email:'user@example.com',displayName:'Test User',role:'member'};
+const user={userId:7,email:'user@example.com',displayName:'Test User',user_role:'viewer'};
 
 test('session expiry signs out the shell, clears private navigation, and stops polling',async()=>{
   const app=new context.exports.AppComponent({async getCurrentUser(){return null;}},{detectChanges(){},markForCheck(){}},{url:'/brackets',async navigateByUrl(){}},{async getParticipating(){return [];}});

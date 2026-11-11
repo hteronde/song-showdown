@@ -1,3 +1,5 @@
+import { isolateBracketSong } from './bracket-song-ownership.mjs';
+import { saveBracketRoles } from './bracket-roles.mjs';
 import { getBracketInvitation, respondToInvitation, listBracketInvitations, sendBracketInvitations } from './bracket-invitations.mjs';
 import { originAllowed } from './hosting-config.mjs';
 import { serveStaticSite } from './static-site.mjs';
@@ -79,7 +81,7 @@ async function findAuthenticatedUser(request) {
   const token = cookieValue(request, sessionCookie);
   if (!token) return null;
   const [rows] = await pool.execute(
-    `SELECT u.user_id AS userId, u.display_name AS displayName, u.email, u.role
+    `SELECT u.user_id AS userId, u.display_name AS displayName, u.email, u.user_role, EXISTS (SELECT 1 FROM bracket_members cm WHERE cm.user_id=u.user_id AND cm.family_id=u.family_id AND cm.bracket_role='commissioner' AND cm.invitation_status='accepted') AS canManageBrackets
      FROM auth_sessions s JOIN users u ON u.user_id = s.user_id
      WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > NOW()`,
     [hashSessionToken(token)]
@@ -97,7 +99,7 @@ async function startSession(userId) {
 }
 
 function publicUser(user) {
-  return { userId: user.userId, displayName: user.displayName, email: user.email, role: user.role };
+  return { userId: user.userId, displayName: user.displayName, email: user.email, user_role: user.user_role, canManageBrackets: user.user_role==='super' || !!Number(user.canManageBrackets) };
 }
 
 
@@ -199,8 +201,8 @@ const server = createServer(async (request, response) => {
         const username = typeof input.username === 'string' ? input.username.trim() : '';
         const password = typeof input.password === 'string' ? input.password : '';
         const [rows] = await pool.execute(
-          `SELECT user_id AS userId, display_name AS displayName, email, \`role\` AS role, password_hash AS passwordHash
-           FROM users WHERE family_id IS NOT NULL AND LOWER(email) = LOWER(?) LIMIT 1`,
+          `SELECT user_id AS userId, display_name AS displayName, email, \`user_role\` AS user_role, password_hash AS passwordHash, EXISTS (SELECT 1 FROM bracket_members cm WHERE cm.user_id=u.user_id AND cm.family_id=u.family_id AND cm.bracket_role='commissioner' AND cm.invitation_status='accepted') AS canManageBrackets
+           FROM users u WHERE family_id IS NOT NULL AND LOWER(email) = LOWER(?) LIMIT 1`,
           [username]
         );
         const user = rows[0];
@@ -248,11 +250,20 @@ const server = createServer(async (request, response) => {
       return;
     }
     if (!authenticatedUser) { send(401, { error: 'Please log in to continue.' }); return; }
-    const adminOnlyPaths = ['/api/family-members', '/api/songs', '/api/playlists', '/api/playlist-options', '/api/admin/brackets'];
+    const adminOnlyPaths = ['/api/family-members', '/api/songs', '/api/playlists', '/api/playlist-options'];
     if (adminOnlyPaths.some(path => url.pathname === path || url.pathname.startsWith(`${path}/`))
-      && authenticatedUser.role !== 'owner') {
+      && authenticatedUser.user_role !== 'super') {
       send(403, { error: 'Only an admin can access the Manage section.' });
       return;
+    }
+  }
+
+  if (authenticatedUser?.user_role !== 'super' && url.pathname.startsWith('/api/admin/brackets')) {
+    const scoped = /^\/api\/admin\/brackets\/\d+(?:\/|$)/.test(url.pathname);
+    const list = request.method === 'GET' && url.pathname === '/api/admin/brackets';
+    const roster = request.method === 'GET' && url.pathname === '/api/admin/brackets/participants' && url.searchParams.has('bracketId');
+    if ((!scoped && !list && !roster) || request.method === 'DELETE' && /^\/api\/admin\/brackets\/\d+$/.test(url.pathname) || /\/duplicate$/.test(url.pathname)) {
+      send(403,{error:'Only a super user can create, duplicate, or delete brackets and manage family accounts.'}); return;
     }
   }
 
@@ -276,8 +287,9 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  let bracketAccess = null;
   if (authenticatedUser) {
-    try { await authorizeBracketRequest(pool, authenticatedUser.userId, request.method, url.pathname); }
+    try { bracketAccess = await authorizeBracketRequest(pool, authenticatedUser.userId, request.method, url.pathname); }
     catch (error) {
       if (!error.status) console.error('Bracket authorization failed:', error.message);
       send(error.status || 500, { error: error.status ? error.message : 'Could not check bracket access.' });
@@ -312,7 +324,7 @@ const server = createServer(async (request, response) => {
       const participantsRoute=url.pathname.match(/^\/api\/admin\/brackets(?:\/(\d+))?\/participants$/);
       if(participantsRoute && request.method==='PUT') {
         const input=await readJson(request),connection=await pool.getConnection();
-        try{await connection.beginTransaction();const result=await saveBracketParticipants(connection,{bracketId:Number(participantsRoute[1])||null,familyId,userId:authenticatedUser.userId,input});await connection.commit();const invitations=await sendInvitations(pool,result.bracketId);send(200,{...result,invitations});}
+        try{await connection.beginTransaction();const result=await saveBracketParticipants(connection,{bracketId:Number(participantsRoute[1])||null,familyId,userId:authenticatedUser.userId,input,canAssignRoles:authenticatedUser.user_role==='super'});await connection.commit();const invitations=await sendInvitations(pool,result.bracketId);send(200,{...result,invitations});}
         catch(error){await connection.rollback();send(error.status||400,{error:error.code==='ER_DUP_ENTRY'?'That email is already in use.':error.message});}
         finally{connection.release();}return;
       }
@@ -383,6 +395,7 @@ const server = createServer(async (request, response) => {
         return;
       }
       if (request.method === 'GET' && url.pathname === '/api/admin/brackets/participants') {
+        if(authenticatedUser.user_role!=='super') await authorizeBracket(pool,authenticatedUser.userId,Number(url.searchParams.get('bracketId')),{manageOnly:true});
         const [members] = await pool.execute('SELECT user_id AS userId,display_name AS displayName,email FROM users WHERE family_id=? ORDER BY display_name',[familyId]);
         send(200,{members}); return;
       }
@@ -430,6 +443,7 @@ const server = createServer(async (request, response) => {
         const input=await readJson(request),connection=await pool.getConnection();
         try {
           await connection.beginTransaction();
+          if (authenticatedUser.user_role!=='super') await saveBracketRoles(connection,Number(draftRoute[1]),input.participantIds??[],input.participantRoles,false);
           const result=await saveBracketDraft(connection,{bracketId:draftRoute[1]?Number(draftRoute[1]):null,familyId,userId:authenticatedUser.userId,input});
           await connection.commit();send(draftRoute[1]?200:201,result);
         } catch(error){await connection.rollback();send(error.status||400,{error:error.message});}
@@ -442,7 +456,7 @@ const server = createServer(async (request, response) => {
                   b.songs_per_session AS songsPerSession,b.session_duration_minutes AS sessionDurationMinutes,b.tiebreaker_option AS tiebreakerOption,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound,
                   COUNT(DISTINCT bs.bracket_song_id) AS songCount
            FROM brackets b LEFT JOIN bracket_songs bs ON bs.bracket_id=b.bracket_id
-           WHERE b.family_id=? GROUP BY b.bracket_id ORDER BY b.created_at DESC`, [familyId]);
+           WHERE b.family_id=? AND (?='super' OR EXISTS (SELECT 1 FROM bracket_members cm WHERE cm.bracket_id=b.bracket_id AND cm.user_id=? AND cm.bracket_role='commissioner' AND cm.invitation_status='accepted')) GROUP BY b.bracket_id ORDER BY b.created_at DESC`, [familyId,authenticatedUser.user_role,authenticatedUser.userId]);
         send(200, { brackets: rows.map(({draftSettings,...row})=>({...row,songCount:row.status==='draft' ? parseDraftSettings(draftSettings).songCount??row.songCount : row.songCount})) }); return;
       }
       if (request.method === 'GET' && /^\/api\/admin\/brackets\/\d+$/.test(url.pathname)) {
@@ -454,12 +468,12 @@ const server = createServer(async (request, response) => {
         if (!rows.length) { send(404, { error:'Bracket not found.' }); return; }
         const [[songs],[members],[rounds]] = await Promise.all([
           pool.execute('SELECT bs.bracket_song_id AS bracketSongId,bs.position,bs.bracket_album_id AS albumId,bs.seed_number AS seed,bs.assigned_seed AS assignedSeed,s.title,s.category,COALESCE(ba.title,s.album) AS album,CASE WHEN ba.bracket_album_id IS NOT NULL THEN ba.year ELSE s.year END AS year,s.youtube_url AS youtubeUrl,s.spotify_url AS spotifyUrl,CASE WHEN ba.bracket_album_id IS NOT NULL THEN ba.album_cover_url ELSE s.album_cover_url END AS albumCoverUrl FROM bracket_songs bs JOIN songs s ON s.song_id=bs.song_id LEFT JOIN bracket_albums ba ON ba.bracket_id=bs.bracket_id AND ba.bracket_album_id=bs.bracket_album_id WHERE bs.bracket_id=? ORDER BY bs.position,bs.bracket_song_id',[id]),
-          pool.execute('SELECT user_id AS userId FROM bracket_members WHERE bracket_id=? ORDER BY user_id',[id]),
+          pool.execute('SELECT user_id AS userId,bracket_role FROM bracket_members WHERE bracket_id=? ORDER BY user_id',[id]),
           pool.execute('SELECT MAX(round_number) AS roundCount FROM bracket_rounds WHERE bracket_id=?',[id])
         ]);
         const lockedSongIds=await getSongOrderLocks(pool,id);
         const restored=restoreBracketDraft(rows[0],songs.map(song=>({...song,reorderLocked:lockedSongIds.has(Number(song.bracketSongId))})));
-        send(200, { bracket: { ...rows[0], ...restored.settings, albums:await getBracketAlbums(pool,id), sessionPlaylists:restored.settings.sessionPlaylists??await getSessionPlaylists(pool,id), songCount:restored.settings.songCount??(rounds[0].roundCount ? 2 ** Number(rounds[0].roundCount) : Math.max(16,2 ** Math.ceil(Math.log2(songs.length || 1)))), songs:restored.songs.map(song=>({...song,category:song.category??'',album:song.album??'',youtubeUrl:song.youtubeUrl??'',spotifyUrl:song.spotifyUrl??'',albumCoverUrl:song.albumCoverUrl??''})), songList:songs.map(song=>song.title).join('\n'), participantIds:restored.settings.participantIds??members.map(member=>Number(member.userId)) } }); return;
+        send(200, { bracket: { ...rows[0], ...restored.settings, albums:await getBracketAlbums(pool,id), sessionPlaylists:restored.settings.sessionPlaylists??await getSessionPlaylists(pool,id), songCount:restored.settings.songCount??(rounds[0].roundCount ? 2 ** Number(rounds[0].roundCount) : Math.max(16,2 ** Math.ceil(Math.log2(songs.length || 1)))), songs:restored.songs.map(song=>({...song,category:song.category??'',album:song.album??'',youtubeUrl:song.youtubeUrl??'',spotifyUrl:song.spotifyUrl??'',albumCoverUrl:song.albumCoverUrl??''})), songList:songs.map(song=>song.title).join('\n'), canAssignRoles:authenticatedUser.user_role==='super', participantRoles:restored.settings.participantRoles??Object.fromEntries(members.map(member=>[member.userId,member.bracket_role])), participantIds:restored.settings.participantIds??members.map(member=>Number(member.userId)) } }); return;
       }
       if (['POST','PUT'].includes(request.method) && (url.pathname === '/api/admin/brackets' || /^\/api\/admin\/brackets\/\d+$/.test(url.pathname))) {
         const input = await readJson(request), isUpdate = request.method === 'PUT';
@@ -516,6 +530,7 @@ const server = createServer(async (request, response) => {
               await connection.execute("UPDATE brackets SET status=CASE WHEN status='draft' THEN 'active' ELSE status END,draft_settings=NULL WHERE bracket_id=?",[id]);
               await applySubmittedSessionSchedule(connection,id,familyId,input.sessionSchedule);
               await saveSessionPlaylists(connection,id,sessionPlaylists);
+              await saveBracketRoles(connection,id,participants,input.participantRoles,authenticatedUser.user_role==='super');
               await connection.commit(); const invitations=await sendInvitations(pool,id); send(200,{bracketId:id,saved:true,historyPreserved:true,invitations}); return;
             }
             if(seedError){if(unchangedLegacySeeds)seeds=assignSongSeeds(titles.map(()=>({})));else throw seedError;}
@@ -556,6 +571,7 @@ const server = createServer(async (request, response) => {
             if (!songs.length) {
               const [res]=await connection.execute('INSERT INTO songs (artist,title,album,year,category,youtube_url,spotify_url,album_cover_url) VALUES (?,?,?,?,?,?,?,?)',[String(input.artist).trim(),titles[i],...metadata]); songs=[{song_id:res.insertId}];
             } else if (details) {
+              songs[0].song_id=await isolateBracketSong(connection,id,songs[0].song_id);
               await connection.execute('UPDATE songs SET album=COALESCE(?,album),year=COALESCE(?,year),category=COALESCE(?,category),youtube_url=COALESCE(?,youtube_url),spotify_url=COALESCE(?,spotify_url),album_cover_url=COALESCE(?,album_cover_url) WHERE song_id=?',[...metadata,songs[0].song_id]);
             }
             const region=Math.floor(i/16)+1, seed=seeds[i];
@@ -594,7 +610,8 @@ const server = createServer(async (request, response) => {
           if(randomSettings.mode!=='none') await connection.execute('UPDATE bracket_rounds SET randomized_at=NOW(6) WHERE bracket_id=? AND round_number=1',[id]);
           await applySubmittedSessionSchedule(connection,id,familyId,input.sessionSchedule);
               await saveSessionPlaylists(connection,id,sessionPlaylists);
-          await connection.commit(); const invitations=await sendInvitations(pool,id); send(isUpdate?200:201,{bracketId:id,saved:true,invitations}); return;
+          await saveBracketRoles(connection,id,participants,input.participantRoles,authenticatedUser.user_role==='super');
+              await connection.commit(); const invitations=await sendInvitations(pool,id); send(isUpdate?200:201,{bracketId:id,saved:true,invitations}); return;
         } catch(error) { await connection.rollback(); throw error; } finally { connection.release(); }
       }
       if (request.method==='DELETE' && /^\/api\/admin\/brackets\/\d+$/.test(url.pathname)) {
@@ -623,7 +640,7 @@ const server = createServer(async (request, response) => {
   if (request.method === 'GET' && url.pathname === '/api/my/brackets') {
     try {
       const [brackets] = await pool.execute(
-        `SELECT b.bracket_id AS bracketId,b.title,b.artist,CASE WHEN bm.invitation_status='accepted' THEN b.logo_url ELSE NULL END AS logoUrl,b.start_at AS startAt,bm.invitation_status AS invitationStatus,
+        `SELECT b.bracket_id AS bracketId,b.title,b.artist,CASE WHEN bm.invitation_status='accepted' THEN b.logo_url ELSE NULL END AS logoUrl,b.start_at AS startAt,bm.invitation_status AS invitationStatus,bm.bracket_role,
                 CASE WHEN b.start_at > NOW() THEN 'upcoming' ELSE 'active' END AS navigationStatus
          FROM brackets b
          JOIN bracket_members bm ON bm.bracket_id=b.bracket_id
@@ -652,7 +669,7 @@ const server = createServer(async (request, response) => {
                 (SELECT COUNT(*) FROM bracket_songs bs WHERE bs.bracket_id=b.bracket_id) AS songCount,
                 (SELECT COUNT(*) FROM bracket_rounds r WHERE r.bracket_id=b.bracket_id) AS roundCount
          FROM brackets b JOIN families f ON f.family_id=b.family_id
-         WHERE b.family_id=? AND (?='owner' OR (b.status<>'draft' AND EXISTS (SELECT 1 FROM bracket_members bm WHERE bm.bracket_id=b.bracket_id AND bm.user_id=? AND bm.invitation_status='accepted'))) ORDER BY b.created_at DESC,b.bracket_id DESC`,[familyId,authenticatedUser.role,authenticatedUser.userId]);
+         WHERE b.family_id=? AND (?='super' OR (b.status<>'draft' AND EXISTS (SELECT 1 FROM bracket_members bm WHERE bm.bracket_id=b.bracket_id AND bm.user_id=? AND bm.invitation_status='accepted'))) ORDER BY b.created_at DESC,b.bracket_id DESC`,[familyId,authenticatedUser.user_role,authenticatedUser.userId]);
       send(200,{brackets});
     } catch(error) {
       console.error('Bracket list request failed:',error.message);
@@ -779,7 +796,7 @@ const server = createServer(async (request, response) => {
          FROM brackets b WHERE b.bracket_id=?`, [bracketId]);
       if (!bracketRows.length) { send(404, { error: 'Bracket not found.' }); return; }
 
-      if (authenticatedUser.role !== 'owner') {
+      if (!bracketAccess?.canManage) {
         const [members] = await pool.execute(
           'SELECT 1 FROM bracket_members WHERE bracket_id=? AND user_id=? AND (non_finale_participant=TRUE OR finale_participant=TRUE) AND invitation_status=\'accepted\'',
           [bracketId, authenticatedUser.userId]);
@@ -789,7 +806,7 @@ const server = createServer(async (request, response) => {
       if (bracketRows[0].isUpcoming) {
         send(200, { bracket: bracketRows[0], isUpcoming: true, weeks: [], playlists: [],
           finaleModeActive: false, awaitingFinale: false, canViewBallots: false,
-          currentWeekNumber: null, ballotEditingRound: null });
+          currentWeekNumber: null, canManage:!!bracketAccess?.canManage, ballotEditingRound: null });
         return;
       }
 
@@ -898,7 +915,7 @@ const server = createServer(async (request, response) => {
           selectedEntryId: row.selectedEntryId === null ? null : Number(row.selectedEntryId),
           comment: row.comment,
           ballots: [...(ballotsByMatchup.get(Number(row.matchupId)) ?? []), ...(row.winnerEntryId != null && row.randomTiebreakerVoteEntryId != null ? [{ displayName: row.adminTieBreakEntryId != null ? 'Admin tiebreaker' : 'Tiebreaker vote', selectedEntryId: Number(row.randomTiebreakerVoteEntryId) }] : [])]
-        },{isAdmin:authenticatedUser.role==='owner',roundNumber:Number(row.roundNumber),isUpcoming:revealAllSongs ? false : !!row.isUpcoming,revealedEntries,songAPending:!!row.isDrawPending||!!row.songAPending,songBPending:!!row.isDrawPending||!!row.songBPending}));
+        },{isAdmin:!!bracketAccess?.canManage,roundNumber:Number(row.roundNumber),isUpcoming:revealAllSongs ? false : !!row.isUpcoming,revealedEntries,songAPending:!!row.isDrawPending||!!row.songAPending,songBPending:!!row.isDrawPending||!!row.songBPending}));
       }
       const weeks = [...weeksByNumber.values()];
       if (bracketRows[0].finaleStatus != null) {
@@ -911,12 +928,12 @@ const server = createServer(async (request, response) => {
           week.isClosed=week.matchups.length>0 && week.matchups.every(match=>match.winnerEntryId!=null);
         }
       }
-      const canViewBallots=!bracketRows[0].anonymous || authenticatedUser.role==='owner';
-      for(const week of weeks) week.matchups=week.matchups.map(match=>applyBallotPrivacy(match,!!bracketRows[0].anonymous,authenticatedUser.role==='owner',authenticatedUser.userId));
+      const canViewBallots=!bracketRows[0].anonymous || !!bracketAccess?.canManage;
+      for(const week of weeks) week.matchups=week.matchups.map(match=>applyBallotPrivacy(match,!!bracketRows[0].anonymous,!!bracketAccess?.canManage,authenticatedUser.userId));
       const activeWeek = weeks.find(week => week.isCurrent);
       const assignedPlaylists=await getSessionPlaylists(pool,bracketId);
-      const playlists=assignedPlaylists.filter(playlist=>weeks.some(week=>week.weekNumber===playlist.weekNumber && (authenticatedUser.role==='owner'||week.isCurrent||week.isClosed||((finaleModeActive||awaitingFinale)&&week.roundNumber>=Number(bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound??999)))));
-      send(200, { playlists, canParticipateOnline, bracket: {...bracketRows[0],finaleStartRound:bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound}, finaleModeActive, awaitingFinale, canViewBallots, currentWeekNumber: activeWeek?.weekNumber ?? null, weeks, ballotEditingRound:authenticatedUser.role === 'owner' ? await getBallotEditingRound(pool,bracketId) : null });
+      const playlists=assignedPlaylists.filter(playlist=>weeks.some(week=>week.weekNumber===playlist.weekNumber && (!!bracketAccess?.canManage||week.isCurrent||week.isClosed||((finaleModeActive||awaitingFinale)&&week.roundNumber>=Number(bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound??999)))));
+      send(200, { playlists, canParticipateOnline, bracket: {...bracketRows[0],finaleStartRound:bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound}, finaleModeActive, awaitingFinale, canViewBallots, currentWeekNumber: activeWeek?.weekNumber ?? null, weeks, canManage:!!bracketAccess?.canManage, ballotEditingRound:!!bracketAccess?.canManage ? await getBallotEditingRound(pool,bracketId) : null });
     } catch (error) {
       console.error('Weekly bracket request failed:', error.message);
       send(500, { error: 'Could not load current bracket matchups.' });
@@ -929,7 +946,7 @@ const server = createServer(async (request, response) => {
   const finaleVotesMatch = url.pathname.match(/^\/api\/brackets\/(\d+)\/finale\/votes$/);
   const finaleOptionsMatch = url.pathname.match(/^\/api\/brackets\/(\d+)\/finale-options$/);
   if (request.method === 'POST' && finaleVotesMatch) {
-    if (authenticatedUser.role !== 'owner') { send(403, { error: 'Only an admin can record finale ballots.' }); return; }
+    if (!bracketAccess?.canManage) { send(403, { error: 'Only an admin can record finale ballots.' }); return; }
     const bracketId = Number(finaleVotesMatch[1]);
     let connection;
     try {
@@ -950,7 +967,7 @@ const server = createServer(async (request, response) => {
 
       connection = await pool.getConnection();
       await connection.beginTransaction();
-      await authorizeBracket(connection,authenticatedUser.userId,bracketId,{ownerOnly:true});
+      await authorizeBracket(connection,authenticatedUser.userId,bracketId,{manageOnly:true});
       const [sessions] = await connection.execute(
         'SELECT f.start_round_number AS startRoundNumber,f.status,b.paused_at AS pausedAt FROM bracket_finale_sessions f JOIN brackets b ON b.bracket_id=f.bracket_id WHERE f.bracket_id=? FOR UPDATE',
         [bracketId]);
@@ -1040,7 +1057,7 @@ const server = createServer(async (request, response) => {
   }
 
   if (request.method === 'POST' && startFinaleMatch) {
-    if (authenticatedUser.role !== 'owner') { send(403, { error: 'Only an admin can enter finale mode.' }); return; }
+    if (!bracketAccess?.canManage) { send(403, { error: 'Only an admin can enter finale mode.' }); return; }
     const bracketId = Number(startFinaleMatch[1]);
     try {
       const input = await readJson(request);
@@ -1138,8 +1155,8 @@ const server = createServer(async (request, response) => {
     }
 
     // Members use the voting endpoint for unfinished brackets, where song reveals are enforced.
-    if (authenticatedUser.role !== 'owner' && bracketRows[0].status !== 'complete') {
-      send(200,{bracket:bracketRows[0],songs:[],rounds:[],playlists:[],participants:[],champion:null,finaleSession:null,ballotEditingRound:null});
+    if (!bracketAccess?.canManage && bracketRows[0].status !== 'complete') {
+      send(200,{bracket:bracketRows[0],songs:[],rounds:[],playlists:[],participants:[],champion:null,finaleSession:null,canManage:!!bracketAccess?.canManage, ballotEditingRound:null});
       return;
     }
     const [roundRows] = await pool.execute(
@@ -1259,13 +1276,13 @@ const server = createServer(async (request, response) => {
     }
 
     const rounds = [...roundsById.values()].sort((a, b) => a.roundNumber - b.roundNumber);
-    const canViewBallots=!bracketRows[0].anonymous || authenticatedUser.role==='owner';
-    for(const round of rounds) round.matchups=round.matchups.map(match=>applyBallotPrivacy(match,!!bracketRows[0].anonymous,authenticatedUser.role==='owner',authenticatedUser.userId));
+    const canViewBallots=!bracketRows[0].anonymous || !!bracketAccess?.canManage;
+    for(const round of rounds) round.matchups=round.matchups.map(match=>applyBallotPrivacy(match,!!bracketRows[0].anonymous,!!bracketAccess?.canManage,authenticatedUser.userId));
     const championship = rounds.at(-1)?.matchups[0];
     send(200, {
       bracket: bracketRows[0],
       canViewBallots,
-      ballotEditingRound:authenticatedUser.role === 'owner' ? await getBallotEditingRound(pool,bracketId) : null,
+      canManage:!!bracketAccess?.canManage, ballotEditingRound:!!bracketAccess?.canManage ? await getBallotEditingRound(pool,bracketId) : null,
       songs: songRows.map(row => row.title),
       champion: championship?.winner ?? null,
       playlists: playlistRows,

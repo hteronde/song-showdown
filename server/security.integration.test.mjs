@@ -22,7 +22,7 @@ test('MySQL: two-family isolation and verified initial setup, expiry and replay'
       const [family]=await c.execute('INSERT INTO families (name) VALUES (?)',[`Security regression ${suffix} ${i}`]);
       families.push(Number(family.insertId));
       owners.push(await bootstrapOwner(c,{familyId:families[i],email:`security-owner-${suffix}-${i}@example.com`,displayName:'Test owner',appUrl:'https://example.com'}));
-      const [member]=await c.execute("INSERT INTO users (family_id,email,display_name,role) VALUES (?,?,?,'member')",[families[i],`security-member-${suffix}-${i}@example.com`,'Test participant']);
+      const [member]=await c.execute("INSERT INTO users (family_id,email,display_name,user_role) VALUES (?,?,?,'viewer')",[families[i],`security-member-${suffix}-${i}@example.com`,'Test participant']);
       members.push(Number(member.insertId));
       const [bracket]=await c.execute("INSERT INTO brackets (family_id,created_by_user_id,title,artist,status) VALUES (?,?,?,?,'complete')",[families[i],owners[i].userId,'Security regression','Test']);
       brackets.push(Number(bracket.insertId));

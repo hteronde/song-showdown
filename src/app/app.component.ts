@@ -51,7 +51,7 @@ export class AppComponent implements OnDestroy {
   private bracketsPage: Pick<BracketsPageComponent, 'showList'> | null = null;
 
   selectPage(page: 'home' | 'history' | 'familyMembers' | 'songs' | 'playlists' | 'brackets'): void {
-    if (!this.isAdmin && ['familyMembers', 'songs', 'playlists', 'brackets'].includes(page)) return;
+    if (!this.isAdmin && (['familyMembers', 'songs', 'playlists'].includes(page) || page === 'brackets' && !this.canManageBrackets)) return;
     const routes = { home: '/home', history: '/history', familyMembers: '/manage/family-members', songs: '/manage/songs', playlists: '/manage/playlists', brackets: '/manage/brackets' } as const;
     void this.router.navigateByUrl(routes[page]);
   }
@@ -68,7 +68,7 @@ export class AppComponent implements OnDestroy {
   }
 
   showBracketsList(): void {
-    if (this.isAdmin) this.bracketsPage?.showList();
+    if (this.canManageBrackets) this.bracketsPage?.showList();
   }
 
   get activePage(): 'home' | 'history' | 'familyMembers' | 'songs' | 'playlists' | 'brackets' {
@@ -92,7 +92,8 @@ export class AppComponent implements OnDestroy {
   }
 
   get isSignedIn(): boolean { return this.authState === 'signedIn' && this.authUser !== null; }
-  get isAdmin(): boolean { return this.authUser?.role === 'owner'; }
+  get canManageBrackets(): boolean { return this.isAdmin || !!this.authUser?.canManageBrackets; }
+  get isAdmin(): boolean { return this.authUser?.user_role === 'super'; }
 
   async submitAuth(): Promise<void> {
     if (this.authBusy) return;
@@ -207,7 +208,7 @@ export class AppComponent implements OnDestroy {
     this.bracketRefreshTimer = setInterval(() => {
       if (this.isSignedIn) void this.loadUserBrackets();
     }, 15_000);
-    if (!this.isAdmin && this.router.url.startsWith('/manage/')) void this.router.navigateByUrl('/home');
+    if (!this.isAdmin && this.router.url.startsWith('/manage/') && !(this.canManageBrackets && this.router.url.startsWith('/manage/brackets') && !this.router.url.startsWith('/manage/brackets/new'))) void this.router.navigateByUrl('/home');
     this.changeDetector.detectChanges();
   }
 

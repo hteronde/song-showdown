@@ -12,10 +12,16 @@ const adminGuard: CanActivateFn = async () => {
     const user = await authApi.getCurrentUser();
     // Keep an unauthenticated deep link so an admin can sign in and continue
     // to the page they requested. The signed-out shell hides the routed view.
-    return !user || user.role === 'owner' ? true : router.parseUrl('/home');
+    return !user || user.user_role === 'super' ? true : router.parseUrl('/home');
   } catch {
     return true;
   }
+};
+
+const bracketAdminGuard: CanActivateFn = async () => {
+  const auth = inject(AuthApiService), router = inject(Router);
+  try { const user = await auth.getCurrentUser(); return !user || user.user_role === 'super' || user.canManageBrackets ? true : router.parseUrl('/home'); }
+  catch { return true; }
 };
 
 const loadBracketsPage = () => import('./brackets/feature/brackets-page.component').then(module => module.BracketsPageComponent);
@@ -31,8 +37,8 @@ export const appRoutes: Routes = [
   { path: 'history', component: HistoryPageComponent },
   { path: 'history/:bracketId', component: HistoryPageComponent },
   { path: 'manage/brackets/new', loadComponent: loadBracketsPage, canActivate: [adminGuard], data: {pageMode:'add'}, title: 'Add bracket' },
-  { path: 'manage/brackets/:id/edit', loadComponent: loadBracketsPage, canActivate: [adminGuard], data: {pageMode:'edit'}, title: 'Edit bracket' },
-  { path: 'manage/brackets', loadComponent: loadBracketsPage, canActivate: [adminGuard], data: {pageMode:'list'}, title: 'Brackets' },
+  { path: 'manage/brackets/:id/edit', loadComponent: loadBracketsPage, canActivate: [bracketAdminGuard], data: {pageMode:'edit'}, title: 'Edit bracket' },
+  { path: 'manage/brackets', loadComponent: loadBracketsPage, canActivate: [bracketAdminGuard], data: {pageMode:'list'}, title: 'Brackets' },
   { path: 'manage/family-members/new', loadComponent: loadFamilyMembersPage, canActivate: [adminGuard], data: {pageMode:'add'}, title: 'Add family member' },
   { path: 'manage/family-members/:id/edit', loadComponent: loadFamilyMembersPage, canActivate: [adminGuard], data: {pageMode:'edit'}, title: 'Edit family member' },
   { path: 'manage/family-members', loadComponent: loadFamilyMembersPage, canActivate: [adminGuard], data: {pageMode:'list'}, title: 'Family members' },

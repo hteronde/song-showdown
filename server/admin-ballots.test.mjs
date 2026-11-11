@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { correctedWinner, validateBallotEdits, ballotRevision, roundAllowsBallotEditing } from './admin-ballots.mjs';
 const match={songAEntryId:10,songBEntryId:20,songASeed:1,songBSeed:2,isClosed:1,tiebreakerOption:'random',createdBy:1,winnerEntryId:10,randomVote:10};
-const people=[{userId:1,role:'owner',selectedEntryId:10},{userId:2,role:'member',selectedEntryId:20},{userId:3,role:'member',selectedEntryId:null}];
+const people=[{userId:1,user_role:'super',selectedEntryId:10},{userId:2,user_role:'viewer',selectedEntryId:20},{userId:3,user_role:'viewer',selectedEntryId:null}];
 test('late votes replace a previous random tie with a majority',()=>{
   assert.deepEqual(correctedWinner(match,people.map(p=>p.userId===3?{...p,selectedEntryId:20}:p),null),{winner:20,randomVote:null});
 });
@@ -77,5 +77,5 @@ test('finale can use the configured admin vote to break a tie',()=>{
   const finale={...match,inFinale:1,tiebreakerOption:'admin_pick',randomVote:null};
   assert.deepEqual(correctedWinner(finale,people,'admin_vote'),{winner:10,randomVote:10});
   assert.deepEqual(correctedWinner(finale,people.map(p=>({...p,selectedEntryId:20})),'admin_vote'),{winner:20,randomVote:null});
-  assert.deepEqual(correctedWinner(finale,people.filter(p=>p.role!=='owner').concat({userId:4,role:'member',selectedEntryId:10}),'admin_vote'),{winner:null,randomVote:null});
+  assert.deepEqual(correctedWinner(finale,people.filter(p=>p.user_role!=='super').concat({userId:4,user_role:'viewer',selectedEntryId:10}),'admin_vote'),{winner:null,randomVote:null});
 });

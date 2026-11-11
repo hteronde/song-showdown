@@ -48,6 +48,7 @@ export interface VotingWeek {
 }
 
 export interface ActiveBracketVotingData {
+  canManage?:boolean;
   canParticipateOnline?: boolean;
   isUpcoming?: boolean;
   playlists?:Array<{weekNumber:number;playlistName:string;playlistUrl:string}>;

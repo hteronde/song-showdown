@@ -10,12 +10,12 @@ export interface FamilyMemberRecord {
   familyId: number;
   displayName: string;
   email: string;
-  role: 'owner' | 'member';
+  user_role: 'super' | 'viewer';
   joinedAt: string;
 }
 
 export interface FamilyMemberInput {
   displayName: string;
   email: string;
-  role: 'owner' | 'member';
+  user_role: 'super' | 'viewer';
 }

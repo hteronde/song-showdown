@@ -1,6 +1,6 @@
 import {validateSessionPlaylists} from './session-playlists.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
-const draftKeys=['sessionPlaylists','sessionSchedule','logoUrl','songCount','songs','participantIds','startAt','songsPerSession','sessionDurationMinutes','durationValue','durationUnit','finaleAt','finaleStartRound','seedingSize','randomizationMode','tiebreakerOption','anonymous'];
+const draftKeys=['sessionPlaylists','sessionSchedule','logoUrl','songCount','songs','participantIds','participantRoles','startAt','songsPerSession','sessionDurationMinutes','durationValue','durationUnit','finaleAt','finaleStartRound','seedingSize','randomizationMode','tiebreakerOption','anonymous'];
 export function parseDraftSettings(value) {
   if(!value)return {};
   return typeof value==='string'?JSON.parse(value):value;

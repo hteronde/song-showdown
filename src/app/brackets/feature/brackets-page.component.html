@@ -1,14 +1,14 @@
 <ng-template #sessionToastTemplate><div class="session-toast" [class.toast-error]="sessionToastType === 'error'" [attr.role]="sessionToastType === 'error' ? 'alert' : 'status'" aria-atomic="true" *ngIf="sessionToastMessage"><span>{{ sessionToastMessage }}</span><button type="button" aria-label="Dismiss notification" (click)="clearSessionToast()">×</button></div></ng-template>
 <ng-container *ngIf="!sessionModalOpen"><ng-container *ngTemplateOutlet="sessionToastTemplate"></ng-container></ng-container>
 <section>
-  <div class="head"><div><div class="muted">MANAGE</div><h1>{{ pageMode === 'list' ? 'Brackets' : pageMode === 'edit' || editingId ? 'Edit bracket' : 'Add bracket' }}</h1></div><button class="primary" *ngIf="pageMode === 'list'" (click)="newBracket()">＋ New bracket</button></div>
+  <div class="head"><div><div class="muted">MANAGE</div><h1>{{ pageMode === 'list' ? 'Brackets' : pageMode === 'edit' || editingId ? 'Edit bracket' : 'Add bracket' }}</h1></div><button class="primary" *ngIf="pageMode === 'list' && isSuper" (click)="newBracket()">＋ New bracket</button></div>
   <button class="cancel" type="button" *ngIf="pageMode !== 'list'" (click)="closeForm()" [disabled]="saving || sessionsSaving">← Back to brackets</button>
   <div class="form-error-banner" role="alert" *ngIf="formErrorMessage"><span>{{ formErrorMessage }}</span><button type="button" aria-label="Dismiss error" (click)="dismissFormError()">×</button></div>
   <p class="success" role="status" *ngIf="success">{{ success }}</p>
 
   <article class="form-card" *ngIf="formOpen">
     <p class="hint">Commissioner changes save while the bracket is active. Existing votes are kept unless you explicitly confirm a tournament rebuild.</p>
-    <div class="form-head"><h2>{{ editingId ? 'Edit bracket' : 'Create bracket' }}</h2><div class="actions"><button class="cancel" type="button" *ngIf="editingId" (click)="duplicateCurrentBracket()" [disabled]="duplicatingId != null || saving || sessionsSaving">{{ duplicatingId === editingId ? 'Duplicating…' : 'Duplicate' }}</button><button class="cancel" type="button" *ngIf="canSaveDraft" (click)="saveAsDraft()" [disabled]="saving || sessionsSaving" title="Save your unfinished bracket">{{ savingDraft ? 'Saving draft…' : 'Save as draft' }}</button><button class="cancel" type="button" (click)="closeForm()" [disabled]="saving || sessionsSaving">Close</button></div></div>
+    <div class="form-head"><h2>{{ editingId ? 'Edit bracket' : 'Create bracket' }}</h2><div class="actions"><button class="cancel" type="button" *ngIf="editingId && isSuper" (click)="duplicateCurrentBracket()" [disabled]="duplicatingId != null || saving || sessionsSaving">{{ duplicatingId === editingId ? 'Duplicating…' : 'Duplicate' }}</button><button class="cancel" type="button" *ngIf="canSaveDraft" (click)="saveAsDraft()" [disabled]="saving || sessionsSaving" title="Save your unfinished bracket">{{ savingDraft ? 'Saving draft…' : 'Save as draft' }}</button><button class="cancel" type="button" (click)="closeForm()" [disabled]="saving || sessionsSaving">Close</button></div></div>
     <div class="form-grid">
       <div class="field">
         <label for="bracket-title">Title <span aria-hidden="true">*</span></label>
@@ -37,7 +37,7 @@
         <p class="hint">To remove someone, uncheck them in Manage Participants and save. Their access is revoked; recorded voting history is preserved.</p>
         <p role="status" *ngIf="invitationNotice">{{ invitationNotice }}</p>
         <ul *ngIf="invitations.length" aria-label="Invitation statuses">
-          <li *ngFor="let invite of invitations">{{ invite.displayName }} — {{ invite.status | titlecase }}<span *ngIf="invite.status === 'pending'"> · Email: {{ invite.delivery }}</span></li>
+          <li *ngFor="let invite of invitations">{{ invite.displayName }} ({{ invite.bracket_role | titlecase }}) — {{ invite.status | titlecase }}<span *ngIf="invite.status === 'pending'"> · Email: {{ invite.delivery }}</span></li>
         </ul>
         <button type="button" class="cancel" *ngIf="editingId && editingStatus !== 'draft'" [disabled]="invitationSending || saving || participantEditor.saving" (click)="retryInvitations()">{{ invitationSending ? 'Sending…' : 'Send unsent / retry failed invitations' }}</button>
 
@@ -224,12 +224,13 @@
       <div class="participants" role="group" aria-label="Participants">
         <div class="participant-email-row" *ngFor="let member of members">
           <label><input type="checkbox" [disabled]="participantEditor.saving" [checked]="participantEditor.ids.includes(member.userId)" (change)="toggleParticipant(member.userId,$any($event.target).checked)"> {{ member.displayName }}</label>
-          <input type="email" [id]="'participant-email-' + member.userId" [name]="'participant-email-' + member.userId" [(ngModel)]="participantEditor.emails[member.userId]" [disabled]="participantEditor.saving" maxlength="254" [attr.aria-label]="member.displayName + ' email'" autocomplete="off">
+          <input type="email" [id]="'participant-email-' + member.userId" [name]="'participant-email-' + member.userId" [(ngModel)]="participantEditor.emails[member.userId]" [disabled]="participantEditor.saving || !isSuper" maxlength="254" [attr.aria-label]="member.displayName + ' email'" autocomplete="off">
+          <label>Bracket role<select [name]="'bracket-role-' + member.userId" [(ngModel)]="participantEditor.roles[member.userId]" [disabled]="!isSuper || participantEditor.saving || !participantEditor.ids.includes(member.userId)" [attr.aria-label]="member.displayName + ' bracket role'"><option value="member">Member</option><option value="commissioner">Commissioner</option></select></label>
         </div>
       </div>
       <p class="hint" *ngIf="!members.length">No family members are available.</p>
       <p class="field-error" *ngIf="participantEditor.error" role="alert">{{ participantEditor.error }}</p>
-      <p class="hint">Save Changes saves participant selections and email updates together immediately.</p>
+      <p class="hint">Save Changes saves participant selections immediately. Super users can also update emails and assign bracket roles. Commissioners can edit this bracket after accepting their invitation.</p>
       <div class="song-modal-actions"><button class="add-song" type="button" [disabled]="participantEditor.saving" (click)="saveParticipants()">{{ participantEditor.saving ? 'SAVING…' : 'SAVE CHANGES' }}</button><button class="cancel" type="button" [disabled]="participantEditor.saving" (click)="closeParticipantsModal()">Cancel</button></div>
     </dialog>
     <dialog #songDialog class="song-dialog" aria-labelledby="song-dialog-title" (close)="onSongModalClosed()" (cancel)="songSaving && $event.preventDefault()">
@@ -323,7 +324,7 @@
   <div class="empty" *ngIf="loading">Loading brackets…</div>
   <div class="empty" *ngIf="pageMode === 'list' && !loading && brackets.length===0">No brackets yet. Create one to get started.</div>
   <div class="list" *ngIf="pageMode === 'list' && !loading && brackets.length">
-    <article class="card" *ngFor="let bracket of brackets"><div><h2>{{ bracket.title }}</h2><div class="muted">{{ bracket.artist }} · {{ bracket.songCount }} songs · {{ bracket.pausedAt ? 'on hold' : bracket.status }}<span *ngIf="bracket.startAt && bracket.status !== 'complete'"> · starts {{ bracket.startAt | date:'medium' }}</span></div><div class="muted">Tiebreaker option: {{ tiebreakerLabels[bracket.tiebreakerOption] }}</div></div><div class="actions"><button *ngIf="bracket.status === 'active'" [disabled]="pauseSavingId === bracket.bracketId" (click)="togglePaused(bracket)">{{ pauseSavingId === bracket.bracketId ? 'Saving…' : bracket.pausedAt ? 'Resume' : 'Pause' }}</button><button (click)="edit(bracket)">Edit</button><button (click)="duplicateBracket(bracket)" [disabled]="duplicatingId != null">{{ duplicatingId === bracket.bracketId ? 'Duplicating…' : 'Duplicate' }}</button><button (click)="remove(bracket)" [disabled]="deletingBracketIds.has(bracket.bracketId)">{{ deletingBracketIds.has(bracket.bracketId) ? 'Deleting…' : 'Delete' }}</button></div></article>
+    <article class="card" *ngFor="let bracket of brackets"><div><h2>{{ bracket.title }}</h2><div class="muted">{{ bracket.artist }} · {{ bracket.songCount }} songs · {{ bracket.pausedAt ? 'on hold' : bracket.status }}<span *ngIf="bracket.startAt && bracket.status !== 'complete'"> · starts {{ bracket.startAt | date:'medium' }}</span></div><div class="muted">Tiebreaker option: {{ tiebreakerLabels[bracket.tiebreakerOption] }}</div></div><div class="actions"><button *ngIf="bracket.status === 'active'" [disabled]="pauseSavingId === bracket.bracketId" (click)="togglePaused(bracket)">{{ pauseSavingId === bracket.bracketId ? 'Saving…' : bracket.pausedAt ? 'Resume' : 'Pause' }}</button><button (click)="edit(bracket)">Edit</button><button *ngIf="isSuper" (click)="duplicateBracket(bracket)" [disabled]="duplicatingId != null">{{ duplicatingId === bracket.bracketId ? 'Duplicating…' : 'Duplicate' }}</button><button *ngIf="isSuper" (click)="remove(bracket)" [disabled]="deletingBracketIds.has(bracket.bracketId)">{{ deletingBracketIds.has(bracket.bracketId) ? 'Deleting…' : 'Delete' }}</button></div></article>
   </div>
 </section>
 

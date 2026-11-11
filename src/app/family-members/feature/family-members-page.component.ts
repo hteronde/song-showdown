@@ -65,7 +65,7 @@ export class FamilyMembersPageComponent implements OnInit, OnDestroy {
 
   private populateDraft(member: FamilyMemberRecord): void {
     this.editingId = member.userId;
-    this.draft = { displayName: member.displayName, email: member.email, role: member.role };
+    this.draft = { displayName: member.displayName, email: member.email, user_role: member.user_role };
     this.success = '';
   }
 
@@ -96,7 +96,7 @@ export class FamilyMembersPageComponent implements OnInit, OnDestroy {
     } catch (error) { this.error = apiErrorMessage(error, 'Could not remove this family member.'); }
   }
 
-  private emptyDraft(): { displayName: string; email: string; role: 'owner' | 'member' } {
-    return { displayName: '', email: '', role: 'member' };
+  private emptyDraft(): { displayName: string; email: string; user_role: 'super' | 'viewer' } {
+    return { displayName: '', email: '', user_role: 'viewer' };
   }
 }

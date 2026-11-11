@@ -5,7 +5,8 @@ export interface AuthUser {
   userId: number;
   displayName: string;
   email: string;
-  role: 'owner' | 'member' | null;
+  canManageBrackets?: boolean;
+  user_role: 'super' | 'viewer' | null;
 }
 interface AuthResponse { authenticated?: boolean; user?: AuthUser | null; }
 

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, createHash } from 'node:crypto';
-import { disposableMysql } from './test-support/disposable-mysql.mjs';
+import { readFile } from 'node:fs/promises';
+import { schemaStatements, disposableMysql } from './test-support/disposable-mysql.mjs';
 import { createApiServer } from './api-server.mjs';
 import { sendBracketInvitations } from './bracket-invitations.mjs';
 import { hashPassword, verifyPassword } from './passwords.mjs';
@@ -23,9 +24,9 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
     for(let i=0;i<2;i++) {
       const [family]=await db.pool.execute('INSERT INTO families (name) VALUES (?)',[`Integration family ${i}`]);
       const familyId=Number(family.insertId),users=[];
-      for(const role of ['owner','member']) {
-        const email=`${role}-${i}@integration.example`;
-        const [user]=await db.pool.execute('INSERT INTO users (family_id,email,display_name,role,password_hash) VALUES (?,?,?,?,?)',[familyId,email,`${role} ${i}`,role,passwordHash]);
+      for(const user_role of ['super','viewer']) {
+        const email=`${user_role}-${i}@integration.example`;
+        const [user]=await db.pool.execute('INSERT INTO users (family_id,email,display_name,user_role,password_hash) VALUES (?,?,?,?,?)',[familyId,email,`${user_role} ${i}`,user_role,passwordHash]);
         const login=await http('/api/auth/login',{method:'POST',body:{username:email,password}});
         assert.equal(login.status,200);assert.ok(login.cookie);assert.match(login.headers.get('set-cookie'),/HttpOnly/);
         users.push({id:Number(user.insertId),email,cookie:login.cookie});
@@ -56,6 +57,40 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
     const a=families[0],b=families[1];
     const vote=(br,user,index=0,entry=br.entries[index*2])=>http(`/api/matchups/${br.matches[index]}/votes`,{cookie:user.cookie,method:'POST',body:{userId:user.id,selectedEntryId:entry,comment:'Test vote'}});
 
+    await t.test('commissioner permissions are scoped, accepted, and revocable; roles remain super-managed',async()=>{
+      const br=await bracket(a),other=await bracket(a),foreign=await bracket(b);
+      const path=`/api/admin/brackets/${br.id}`;
+      const members=[a.owner.id,a.member.id];
+      const assign=(role)=>http(`${path}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:members,participantRoles:{[a.member.id]:role}}});
+      assert.equal((await assign('commissioner')).status,200);
+      assert.equal((await http(path,{cookie:a.member.cookie})).body.bracket.participantRoles[a.member.id],'commissioner');
+      assert.equal((await http(`${path}/pause`,{cookie:a.member.cookie,method:'POST',body:{}})).status,200);
+      assert.equal((await http(`${path}/resume`,{cookie:a.member.cookie,method:'POST',body:{}})).status,200);
+      assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).body.canManage,true);
+      const list=await http('/api/admin/brackets',{cookie:a.member.cookie});
+      assert.deepEqual(list.body.brackets.map(row=>row.bracketId),[br.id]);
+      for(const id of [other.id,foreign.id])assert.equal((await http(`/api/admin/brackets/${id}`,{cookie:a.member.cookie})).status,404);
+      assert.equal((await http('/api/family-members',{cookie:a.member.cookie})).status,403);
+      assert.equal((await http('/api/admin/brackets',{cookie:a.member.cookie,method:'POST',body:{}})).status,403);
+      assert.equal((await http(`${path}/participants`,{cookie:a.member.cookie,method:'PUT',body:{participantIds:members,participantRoles:{[a.owner.id]:'commissioner'}}})).status,403);
+      assert.equal((await assign('super')).status,400);
+      // Shared songs are isolated when a commissioner edits only their bracket.
+      const [[source]]=await db.pool.execute('SELECT song_id FROM bracket_songs WHERE bracket_song_id=?',[br.entries[0]]);
+      await db.pool.execute('UPDATE bracket_songs SET song_id=? WHERE bracket_song_id=?',[source.song_id,other.entries[0]]);
+      const detail=(await http(path,{cookie:a.member.cookie})).body.bracket;
+      const edited=await http(`${path}/songs`,{cookie:a.member.cookie,method:'PUT',body:{songs:detail.songs.map((song,i)=>({...song,title:i===0?'Commissioner edit':song.title}))}});
+      assert.equal(edited.status,200,JSON.stringify(edited.body));
+      const [[original]]=await db.pool.execute('SELECT title FROM songs WHERE song_id=?',[source.song_id]);
+      assert.notEqual(original.title,'Commissioner edit');
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      assert.equal((await http(path,{cookie:a.member.cookie})).status,404);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='accepted' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      assert.equal((await assign('member')).status,200);
+      assert.equal((await http(path,{cookie:a.member.cookie})).status,404);
+      assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).body.canManage,false);
+      assert.equal((await vote(br,a.member)).status,200);
+    });
+
     await t.test('invitations gate all bracket details until acceptance and removal revokes access',async()=>{
       const br=await bracket(a);
       await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
@@ -70,7 +105,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal(navigation.body.brackets.find(row=>row.bracketId===br.id).invitationStatus,'pending');
       assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:b.member.cookie})).status,404);
       assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:b.member.cookie,method:'POST',body:{response:'accepted'}})).status,404);
-      assert.equal((await http(`/api/admin/brackets/${br.id}/invitations`,{cookie:a.member.cookie})).status,403);
+      assert.equal((await http(`/api/admin/brackets/${br.id}/invitations`,{cookie:a.member.cookie})).status,404);
       assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie,method:'POST',body:{response:'accepted',userId:a.owner.id}})).status,200);
       assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,200);
       assert.equal((await vote(br,a.member)).status,200);
@@ -132,7 +167,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal((await vote(foreign,a.owner)).status,404);
       assert.equal((await vote(foreign,a.member)).status,404);
       assert.equal((await http(`/api/brackets/${foreign.id}`,{cookie:b.member.cookie})).status,200);
-      assert.equal((await http(`/api/admin/brackets/${foreign.id}`,{cookie:b.member.cookie})).status,403);
+      assert.equal((await http(`/api/admin/brackets/${foreign.id}`,{cookie:b.member.cookie})).status,404);
     });
     await t.test('login → vote → refreshed API data preserves selection; edits replace rather than duplicate votes',async()=>{
       const br=await bracket(a);
@@ -155,7 +190,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
     });
     await t.test('HTTP setup rejects email-only claims, expired tokens and token replay; logout revokes its session',async()=>{
       const email='initial@integration.example';
-      const [created]=await db.pool.execute("INSERT INTO users (family_id,email,display_name,role) VALUES (?,?,?,'member')",[a.id,email,'Initial user']);
+      const [created]=await db.pool.execute("INSERT INTO users (family_id,email,display_name,user_role) VALUES (?,?,?,'viewer')",[a.id,email,'Initial user']);
       assert.equal((await http('/api/auth/setup-password',{method:'POST',body:{username:email,password}})).status,400);
       const token=randomBytes(32).toString('base64url'),hash=createHash('sha256').update(token).digest('hex');
       await db.pool.execute('INSERT INTO password_reset_tokens (token_hash,user_id,expires_at) VALUES (?,?,DATE_SUB(NOW(),INTERVAL 1 MINUTE))',[hash,created.insertId]);
@@ -216,6 +251,20 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const [after]=await db.pool.execute('SELECT * FROM matchups WHERE bracket_id=? ORDER BY matchup_id',[br.id]);assert.deepEqual(after,before);
       const [writes]=await db.pool.execute('SELECT matchup_id,COUNT(*) AS total FROM integration_winner_writes WHERE matchup_id IN (?,?) GROUP BY matchup_id ORDER BY matchup_id',[br.matches[0],br.matches[1]]);
       assert.equal(writes.length,2);assert.ok(writes.every(row=>Number(row.total)===1));
+    });
+    await t.test('legacy role migration preserves accounts and assigns bracket role defaults',async()=>{
+      await db.pool.query("ALTER TABLE users MODIFY user_role ENUM('super','viewer','owner','member') NULL");
+      await db.pool.query("UPDATE users SET user_role=CASE user_role WHEN 'super' THEN 'owner' WHEN 'viewer' THEN 'member' ELSE user_role END");
+      await db.pool.query("ALTER TABLE users CHANGE user_role role ENUM('owner','member') NULL");
+      await db.pool.query('ALTER TABLE bracket_members DROP COLUMN bracket_role');
+      const sql=await readFile(new URL('../database/migrate_user_and_bracket_roles.sql',import.meta.url),'utf8');
+      for(const statement of schemaStatements(sql))await db.pool.query(statement);
+      const [users]=await db.pool.query('SELECT user_id,user_role FROM users WHERE user_id IN (?,?)',[a.owner.id,a.member.id]);
+      assert.equal(users.find(u=>u.user_id===a.owner.id).user_role,'super');
+      assert.equal(users.find(u=>u.user_id===a.member.id).user_role,'viewer');
+      const [roles]=await db.pool.query('SELECT bm.bracket_role,u.user_role FROM bracket_members bm JOIN users u ON u.user_id=bm.user_id');
+      assert.ok(roles.length>0);assert.ok(roles.every(r=>r.bracket_role===(r.user_role==='super'?'commissioner':'member')));
+      assert.equal((await http('/api/auth/session',{cookie:a.owner.cookie})).body.user.user_role,'super');
     });
   } finally {
     try { await app.close(); }

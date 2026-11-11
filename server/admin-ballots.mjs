@@ -21,7 +21,7 @@ export function correctedWinner(match, participants, tieBreakEntryId, draw) {
   const votesForB=participants.filter(p=>Number(p.selectedEntryId)===b).length;
   if (!match.isClosed && !match.winnerEntryId && !match.inFinale) return {winner:null,randomVote:null};
   const policy=match.inFinale ? (['random','seed','seed_low'].includes(tieBreakEntryId) ? tieBreakEntryId : 'admin_pick') : match.tiebreakerOption;
-  const admin=participants.filter(p=>p.role==='owner' && p.selectedEntryId!=null).sort((x,y)=>(Number(y.userId)===Number(match.createdBy))-(Number(x.userId)===Number(match.createdBy)) || Number(x.userId)-Number(y.userId))[0];
+  const admin=participants.filter(p=>(p.user_role==='super' || p.bracket_role==='commissioner') && p.selectedEntryId!=null).sort((x,y)=>(Number(y.userId)===Number(match.createdBy))-(Number(x.userId)===Number(match.createdBy)) || Number(x.userId)-Number(y.userId))[0];
   const pick=match.inFinale ? (tieBreakEntryId==='admin_vote' ? (admin ? Number(admin.selectedEntryId) : null) : tieBreakEntryId) : tieBreakEntryId ?? (match.tieBreakEntryId != null ? Number(match.tieBreakEntryId) : admin ? Number(admin.selectedEntryId):null);
   // Retain an already-recorded random draw while the participant count remains tied.
   const existingRandom=match.randomVote == null ? null : Number(match.randomVote);
@@ -76,7 +76,7 @@ export async function loadAdminBallots(c,bracketId,matchupId,familyId,lock=false
   const currentRound=await getBallotEditingRound(c,bracketId);
   const roundAllowed=roundAllowsBallotEditing(Number(match.roundNumber),currentRound);
   const editRestriction=match.plannedFinaleRound!=null && Number(match.roundNumber)>=Number(match.plannedFinaleRound) && match.finaleSessionId==null ? 'This round is reserved for the finale. Begin Finale Mode to record in-person votes.' : !match.roundReady ? 'Every winner from the previous round must be known before this round can be randomized and edited.' : !roundAllowed ? 'Only the current round and the immediately previous round can be edited. Older rounds are locked.' : !(match.hasOpened||match.inFinale)||Number(match.pendingFeeders) ? 'This matchup must open and both feeder winners must be decided before its ballots can be edited.' : '';
-  const [participants]=await c.execute(`SELECT u.user_id AS userId,u.display_name AS displayName,u.role,
+  const [participants]=await c.execute(`SELECT u.user_id AS userId,u.display_name AS displayName,u.user_role,bm.bracket_role,
     v.selected_entry_id AS selectedEntryId,v.submitted_at AS submittedAt
     FROM bracket_members bm JOIN users u ON u.user_id=bm.user_id
     LEFT JOIN votes v ON v.bracket_id=bm.bracket_id AND v.user_id=bm.user_id AND v.matchup_id=? AND v.submitted_at IS NOT NULL
@@ -93,7 +93,7 @@ export async function saveAdminBallots(c,bracketId,matchupId,familyId,input) {
   if (!(Array.isArray(input.ballots) && input.ballots.length===0 && Object.hasOwn(input,'tieBreakEntryId'))) validateBallotEdits(input.ballots,match.participants,match);
   let tiePick=Object.hasOwn(input,'tieBreakEntryId') ? input.tieBreakEntryId : match.tieBreakEntryId??null;
   if(tiePick==='admin_vote' && !match.inFinale && match.tiebreakerOption==='admin_pick') {
-    const admin=match.participants.filter(p=>p.role==='owner').sort((a,b)=>(Number(b.userId)===Number(match.createdBy))-(Number(a.userId)===Number(match.createdBy)) || Number(a.userId)-Number(b.userId)).find(p=>{
+    const admin=match.participants.filter(p=>(p.user_role==='super' || p.bracket_role==='commissioner')).sort((a,b)=>(Number(b.userId)===Number(match.createdBy))-(Number(a.userId)===Number(match.createdBy)) || Number(a.userId)-Number(b.userId)).find(p=>{
       const edit=input.ballots.find(ballot=>ballot.userId===Number(p.userId));
       return (edit ? edit.selectedEntryId : p.selectedEntryId)!=null;
     });

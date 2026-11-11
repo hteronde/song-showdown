@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {memberInput,adminPageRequest} from './admin-pages.mjs';
 test('member forms normalize valid input and reject invalid fields',()=>{
- assert.deepEqual(memberInput({displayName:' Test ',email:'TEST@example.com',role:'member'}),{displayName:'Test',email:'test@example.com',role:'member'});
- for(const input of [{displayName:'',email:'test@example.com',role:'member'},{displayName:'Test',email:'bad',role:'member'},{displayName:'Test',email:'test@example.com',role:'admin'}])assert.throws(()=>memberInput(input),{status:400});
+ assert.deepEqual(memberInput({displayName:' Test ',email:'TEST@example.com',user_role:'viewer'}),{displayName:'Test',email:'test@example.com',user_role:'viewer'});
+ for(const input of [{displayName:'',email:'test@example.com',user_role:'viewer'},{displayName:'Test',email:'bad',user_role:'viewer'},{displayName:'Test',email:'test@example.com',user_role:'admin'}])assert.throws(()=>memberInput(input),{status:400});
 });
 test('member edit and playlist delete enforce family ownership before mutation',async()=>{
  for(const path of ['/api/family-members/50','/api/playlists/60']){
@@ -13,7 +13,7 @@ test('member edit and playlist delete enforce family ownership before mutation',
  }
 });
 test('member removal cannot detach the signed-in owner',async()=>{
- const c={async execute(sql){if(sql.startsWith('SELECT'))return [[{user_id:1,role:'owner'}]];throw new Error('Unexpected write');}};
+ const c={async execute(sql){if(sql.startsWith('SELECT'))return [[{user_id:1,user_role:'super'}]];throw new Error('Unexpected write');}};
  await assert.rejects(adminPageRequest(c,{path:'/api/family-members/1',method:'DELETE',familyId:7,userId:1}),{status:400});
 });
 test('playlist creation rejects sessions from another bracket before writes',async()=>{

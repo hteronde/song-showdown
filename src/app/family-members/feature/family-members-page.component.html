@@ -10,14 +10,14 @@
     <form class="admin-form" (ngSubmit)="saveMember()">
       <label>Display name<input name="displayName" [(ngModel)]="draft.displayName" required maxlength="120" autocomplete="name"></label>
       <label>Email address<input name="email" [(ngModel)]="draft.email" required maxlength="254" type="email" autocomplete="email"></label>
-      <label>Family role<select name="role" [(ngModel)]="draft.role"><option value="member">Member</option><option value="owner">Owner</option></select></label>
+      <label>User role<select name="user_role" [(ngModel)]="draft.user_role"><option value="viewer">Viewer</option><option value="super">Super</option></select></label>
       <div class="admin-form-actions"><button class="admin-primary" type="submit" [disabled]="saving">{{ saving ? 'SAVING…' : editingId === null ? 'ADD MEMBER' : 'SAVE CHANGES' }}</button><button class="admin-secondary" type="button" (click)="cancelEdit()">CANCEL</button></div>
     </form>
   </section>
   <section class="admin-panel admin-table-panel" *ngIf="pageMode === 'list'">
     <div class="admin-panel-heading"><div><span class="stat-label">PEOPLE WITH ACCESS</span><h3>Current members</h3></div></div>
     <div class="admin-empty" *ngIf="!loading && !members.length && !error">No family members found.</div>
-    <div class="admin-table-wrap" *ngIf="members.length"><table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead><tbody><tr *ngFor="let member of members"><td>{{ member.displayName }}</td><td>{{ member.email }}</td><td><span class="role-chip">{{ member.role }}</span></td><td class="admin-row-actions"><button type="button" (click)="edit(member)">Edit</button><button type="button" class="danger-action" (click)="deleteMember(member)">Delete</button></td></tr></tbody></table></div>
+    <div class="admin-table-wrap" *ngIf="members.length"><table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead><tbody><tr *ngFor="let member of members"><td>{{ member.displayName }}</td><td>{{ member.email }}</td><td><span class="role-chip">{{ member.user_role }}</span></td><td class="admin-row-actions"><button type="button" (click)="edit(member)">Edit</button><button type="button" class="danger-action" (click)="deleteMember(member)">Delete</button></td></tr></tbody></table></div>
   </section>
   <footer class="page-footer" *ngIf="pageMode === 'list'"><span>FAMILY BRACKET SETTINGS <b>✳</b></span><span>PERMISSIONS WILL BE ADDED LATER</span></footer>
 </div>

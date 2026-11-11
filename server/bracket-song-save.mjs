@@ -1,3 +1,4 @@
+import { isolateBracketSong } from './bracket-song-ownership.mjs';
 import { getSongOrderLocks, assertSongOrderUnlocked } from './song-order-locks.mjs';
 import { validateAssignedSeeds, seededOrder } from './bracket-seeding.mjs';
 import { shuffled } from './round-randomization.mjs';
@@ -77,6 +78,7 @@ export async function saveBracketSongs(connection, { bracketId, familyId, userId
       songId=matches[0]?.song_id;
     }
     const metadata=[song.title.trim(),song.album?.trim()||null,song.year??null,song.category?.trim()||null,song.youtubeUrl?.trim()||null,song.spotifyUrl?.trim()||null,song.albumCoverUrl?.trim()||null];
+    if (songId) songId=await isolateBracketSong(connection,bracketId,songId);
     if (songId) await connection.execute('UPDATE songs SET title=?,album=?,year=?,category=?,youtube_url=?,spotify_url=?,album_cover_url=? WHERE song_id=?',[...metadata,songId]);
     else {
       const [created]=await connection.execute('INSERT INTO songs (title,album,year,category,youtube_url,spotify_url,album_cover_url,artist) VALUES (?,?,?,?,?,?,?,?)',[...metadata,bracket.artist]);

@@ -2,12 +2,14 @@ import type { BracketParticipant } from '../data-access/bracket.model';
 
 export class ParticipantEditor {
   ids: number[] = [];
+  roles: Record<number,'member'|'commissioner'> = {};
   emails: Record<number, string> = {};
   error = '';
   saving = false;
 
-  open(selectedIds: number[], members: BracketParticipant[]): void {
+  open(selectedIds: number[], members: BracketParticipant[], roles: Record<number,'member'|'commissioner'> = {}): void {
     this.ids = [...selectedIds];
+    this.roles = Object.fromEntries(members.map(member => [member.userId, roles[member.userId] ?? 'member']));
     this.emails = Object.fromEntries(members.map(member => [member.userId, member.email]));
     this.error = '';
   }

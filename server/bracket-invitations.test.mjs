@@ -10,14 +10,14 @@ test('invitation email includes theme, zoned start date and website link, withou
 });
 
 test('pending invitation response projects only safe metadata',async()=>{
- const c={async execute(){return [[{bracketId:1,title:'Title',artist:'Theme',startAt:'2027-01-01',status:'active',role:'member',invitationStatus:'pending',songs:['Secret']}]];}};
+ const c={async execute(){return [[{bracketId:1,title:'Title',artist:'Theme',startAt:'2027-01-01',status:'active',user_role:'viewer',invitationStatus:'pending',songs:['Secret']}]];}};
  const data=await getBracketInvitation(c,1,2);
  assert.deepEqual(Object.keys(data).sort(),['artist','bracketId','canAccess','invitationStatus','startAt','title'].sort());
  assert.equal(data.canAccess,false);
 });
 
 test('missing and draft invitations are unavailable to members',async()=>{
- for(const row of [undefined,{role:'member',status:'draft',invitationStatus:'pending'},{role:'member',status:'active',invitationStatus:null}]) {
+ for(const row of [undefined,{user_role:'viewer',status:'draft',invitationStatus:'pending'},{user_role:'viewer',status:'active',invitationStatus:null}]) {
   await assert.rejects(getBracketInvitation({async execute(){return [row?[row]:[]];}},1,2),{status:404});
  }
 });

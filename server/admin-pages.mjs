@@ -1,26 +1,26 @@
 import {validateBracketSongs} from './bracket-song-save.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export function memberInput(input) {
- const displayName=String(input.displayName??'').trim(),email=String(input.email??'').trim().toLowerCase(),role=input.role;
- if(!displayName||displayName.length>120||email.length>254||!/^\S+@\S+\.\S+$/.test(email)||!['owner','member'].includes(role))throw fail(400,'Enter a valid name, email, and family role.');
- return {displayName,email,role};
+ const displayName=String(input.displayName??'').trim(),email=String(input.email??'').trim().toLowerCase(),user_role=input.user_role;
+ if(!displayName||displayName.length>120||email.length>254||!/^\S+@\S+\.\S+$/.test(email)||!['super','viewer'].includes(user_role))throw fail(400,'Enter a valid name, email, and user role.');
+ return {displayName,email,user_role};
 }
 export async function adminPageRequest(c,{path,method,input,familyId,userId}) {
  const memberRoute=path.match(/^\/api\/family-members(?:\/(\d+))?$/);
  if(memberRoute){
   const id=Number(memberRoute[1]);
-  if(method==='GET'&&!id){const [members]=await c.execute('SELECT user_id AS userId,family_id AS familyId,display_name AS displayName,email,role,family_joined_at AS joinedAt FROM users WHERE family_id=? ORDER BY display_name,user_id',[familyId]);return {members};}
-  if(method==='POST'&&!id){const value=memberInput(input);const [created]=await c.execute('INSERT INTO users (family_id,display_name,email,role) VALUES (?,?,?,?)',[familyId,value.displayName,value.email,value.role]);return {userId:Number(created.insertId)};}
+  if(method==='GET'&&!id){const [members]=await c.execute('SELECT user_id AS userId,family_id AS familyId,display_name AS displayName,email,user_role,family_joined_at AS joinedAt FROM users WHERE family_id=? ORDER BY display_name,user_id',[familyId]);return {members};}
+  if(method==='POST'&&!id){const value=memberInput(input);const [created]=await c.execute('INSERT INTO users (family_id,display_name,email,user_role) VALUES (?,?,?,?)',[familyId,value.displayName,value.email,value.user_role]);return {userId:Number(created.insertId)};}
   if(id&&['PUT','DELETE'].includes(method)){
-   const [members]=await c.execute('SELECT user_id,role FROM users WHERE user_id=? AND family_id=? FOR UPDATE',[id,familyId]);if(!members.length)throw fail(404,'Family member not found.');
+   const [members]=await c.execute('SELECT user_id,user_role FROM users WHERE user_id=? AND family_id=? FOR UPDATE',[id,familyId]);if(!members.length)throw fail(404,'Family member not found.');
    if(method==='DELETE'){
     if(id===userId)throw fail(400,'You cannot remove your own account from the family.');
-    if(members[0].role==='owner'){const [[owners]]=await c.execute("SELECT COUNT(*) AS count FROM users WHERE family_id=? AND role='owner'",[familyId]);if(Number(owners.count)<=1)throw fail(400,'Keep at least one family owner.');}
-    await c.execute('DELETE FROM bracket_members WHERE family_id=? AND user_id=?',[familyId,id]);await c.execute('UPDATE users SET family_id=NULL,role=NULL,family_joined_at=NULL WHERE user_id=?',[id]);return {removed:true};
+    if(members[0].user_role==='super'){const [[owners]]=await c.execute("SELECT COUNT(*) AS count FROM users WHERE family_id=? AND user_role='super'",[familyId]);if(Number(owners.count)<=1)throw fail(400,'Keep at least one family super user.');}
+    await c.execute('DELETE FROM bracket_members WHERE family_id=? AND user_id=?',[familyId,id]);await c.execute('UPDATE users SET family_id=NULL,user_role=NULL,family_joined_at=NULL WHERE user_id=?',[id]);return {removed:true};
    }
    const value=memberInput(input);
-   if(members[0].role==='owner'&&value.role!=='owner'){const [[owners]]=await c.execute("SELECT COUNT(*) AS count FROM users WHERE family_id=? AND role='owner'",[familyId]);if(Number(owners.count)<=1)throw fail(400,'Keep at least one family owner.');}
-   await c.execute('UPDATE users SET display_name=?,email=?,role=? WHERE user_id=? AND family_id=?',[value.displayName,value.email,value.role,id,familyId]);return {saved:true};
+   if(members[0].user_role==='super'&&value.user_role!=='super'){const [[owners]]=await c.execute("SELECT COUNT(*) AS count FROM users WHERE family_id=? AND user_role='super'",[familyId]);if(Number(owners.count)<=1)throw fail(400,'Keep at least one family super user.');}
+   await c.execute('UPDATE users SET display_name=?,email=?,user_role=? WHERE user_id=? AND family_id=?',[value.displayName,value.email,value.user_role,id,familyId]);return {saved:true};
   }
  }
  const songRoute=path.match(/^\/api\/songs(?:\/(\d+))?$/);

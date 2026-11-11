@@ -1,3 +1,4 @@
+import { AuthApiService } from '../../auth/data-access/auth-api.service';
 import { apiErrorMessage } from '../../shared/data-access/api-client';
 import { BracketFieldErrors, enteredSongCount, validateBracketSettings } from '../state/bracket-settings';
 import { canReorderSong, reorderSong, seedGroupSongs, seedAssignmentError } from '../state/song-editing';
@@ -16,7 +17,7 @@ import { SessionPlaylist, BracketSession, BracketSessionsData, BracketInput, Bra
     templateUrl: './brackets-page.component.html', styleUrls: ['./brackets-page.component.css']
 })
 export class BracketsPageComponent implements OnInit, OnDestroy {
-    constructor(private readonly route: ActivatedRoute, private readonly router: Router, private readonly location: Location, private readonly bracketsApi: BracketsApiService, private readonly changeDetector: ChangeDetectorRef) { }
+    constructor(private readonly authApi: AuthApiService, private readonly route: ActivatedRoute, private readonly router: Router, private readonly location: Location, private readonly bracketsApi: BracketsApiService, private readonly changeDetector: ChangeDetectorRef) { }
     brackets: BracketRecord[] = [];
     members: BracketParticipant[] = [];
     loading = true;
@@ -416,6 +417,8 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             : 'Songs saved.';
     }
     private syncSongs(): void { this.songList = this.songs.map(song => song.title).join('\n'); this.refreshFieldErrors(); }
+    isSuper = false;
+    participantRoles: Record<number,'member'|'commissioner'> = {};
     invitations: InvitationParticipant[] = [];
     invitationNotice = '';
     invitationSending = false;
@@ -440,7 +443,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     participantIds: number[] = [];
     @ViewChild('participantsDialog')
     participantsDialog?: ElementRef<HTMLDialogElement>;
-    openParticipantsModal(): void { this.participantEditor.open(this.participantIds, this.members); this.participantsDialog?.nativeElement.showModal(); }
+    openParticipantsModal(): void { this.participantEditor.open(this.participantIds, this.members, this.participantRoles); this.participantsDialog?.nativeElement.showModal(); }
     closeParticipantsModal(): void {
         if (!this.participantEditor.saving)
             this.participantsDialog?.nativeElement.close();
@@ -456,10 +459,11 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         this.participantEditor.saving = true;
         this.participantEditor.error = '';
         try {
-            const result = await this.bracketsApi.saveParticipants(this.editingId, { participantIds: this.participantEditor.ids, changes, title: this.title, artist: this.artist });
+            const result = await this.bracketsApi.saveParticipants(this.editingId, { participantIds: this.participantEditor.ids, participantRoles: Object.fromEntries(this.participantEditor.ids.map(id => [id,this.participantEditor.roles[id] ?? 'member'])), changes, title: this.title, artist: this.artist });
             this.editingId = result.bracketId;
             this.members = this.members.map(member => ({ ...member, email: result.members.find(item => item.userId === member.userId)?.email ?? member.email }));
             this.participantIds = [...result.participantIds];
+            this.participantRoles = Object.fromEntries(this.participantIds.map(id => [id,this.participantEditor.roles[id] ?? 'member']));
             this.refreshFieldErrors();
             this.participantsDialog?.nativeElement.close();
             await this.loadInvitations();
@@ -565,7 +569,10 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         this.loading = true;
         this.error = '';
         try {
-            const [brackets, members] = await Promise.all([this.bracketsApi.getAll(signal), this.bracketsApi.getParticipants(signal)]);
+            const user = await this.authApi.getCurrentUser(signal);
+            this.isSuper = user?.user_role === 'super';
+            const bracketId = Number(this.route.snapshot.paramMap.get('id')) || undefined;
+            const [brackets, members] = await Promise.all([this.bracketsApi.getAll(signal), this.isSuper || bracketId ? this.bracketsApi.getParticipants(signal, bracketId) : Promise.resolve([])]);
             if (signal.aborted) return;
             this.brackets = brackets;
             this.members = members;
@@ -618,6 +625,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.songDraft = this.emptySong();
             this.songError = '';
             this.participantIds = item.participantIds ?? [];
+            this.participantRoles = item.participantRoles ?? {};
             await this.loadInvitations();
             this.startAt = item.startAt ? this.toLocalInput(item.startAt) : '';
             this.finaleDate = item.finaleAt ? item.finaleAt.slice(0, 10) : '';
@@ -1001,7 +1009,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         this.savingDraft = true;
         try {
             const duration = durationMinutes(this.durationValue, this.durationUnit);
-            const result = await this.bracketsApi.saveDraft(this.editingId, { title: this.title, artist: this.artist, logoUrl: this.logoUrl, songCount: this.songCount, songs: this.songs, sessionPlaylists: this.sessionPlaylistsPayload(), participantIds: this.participantIds, startAt: this.startAt || null, songsPerSession: this.songsPerSession, sessionDurationMinutes: this.noSessionTimer ? null : duration, durationValue: this.durationValue, durationUnit: this.durationUnit, finaleAt: this.finaleDate || null, finaleStartRound: this.finaleStartRound, seedingSize: this.useSeeds ? this.seedingSize : null, randomizationMode: this.randomizationMode, tiebreakerOption: this.tiebreakerOption, anonymous: this.anonymous, sessionSchedule: this.sessions.length ? this.sessionSchedulePayload() : undefined });
+            const result = await this.bracketsApi.saveDraft(this.editingId, { title: this.title, artist: this.artist, logoUrl: this.logoUrl, songCount: this.songCount, songs: this.songs, sessionPlaylists: this.sessionPlaylistsPayload(), participantIds: this.participantIds, participantRoles: this.participantRoles, startAt: this.startAt || null, songsPerSession: this.songsPerSession, sessionDurationMinutes: this.noSessionTimer ? null : duration, durationValue: this.durationValue, durationUnit: this.durationUnit, finaleAt: this.finaleDate || null, finaleStartRound: this.finaleStartRound, seedingSize: this.useSeeds ? this.seedingSize : null, randomizationMode: this.randomizationMode, tiebreakerOption: this.tiebreakerOption, anonymous: this.anonymous, sessionSchedule: this.sessions.length ? this.sessionSchedulePayload() : undefined });
             this.editingId = result.bracketId;
             this.editingStatus = 'draft';
             await this.router.navigate(['/manage/brackets'], { state: { message: 'Draft saved. You can reopen it and finish setting up the bracket later.' } });
@@ -1053,7 +1061,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         this.saving = true;
         try {
             const sessionDurationMinutes = durationMinutes(this.durationValue, this.durationUnit);
-            const body: BracketInput = { seedingSize: this.useSeeds ? this.seedingSize : null, logoUrl: this.logoUrl.trim() || null, finaleAt: this.finaleDate || null, finaleStartRound: this.finaleStartRound, resetHistory, anonymous: this.anonymous, randomizationMode: this.randomizationMode, title: this.title, artist: this.artist, songCount: this.songCount, songList: this.songList, songs: this.songs, sessionPlaylists: this.sessionPlaylistsPayload(), participantIds: this.participantIds, startAt: new Date(this.startAt).toISOString(), songsPerSession: this.songsPerSession, tiebreakerOption: this.tiebreakerOption, sessionDurationMinutes: this.noSessionTimer ? null : sessionDurationMinutes, sessionSchedule: this.changedSessionSchedule(), sessionScheduleRevision: this.savedSessions.length ? this.sessionsRevision : undefined };
+            const body: BracketInput = { seedingSize: this.useSeeds ? this.seedingSize : null, logoUrl: this.logoUrl.trim() || null, finaleAt: this.finaleDate || null, finaleStartRound: this.finaleStartRound, resetHistory, anonymous: this.anonymous, randomizationMode: this.randomizationMode, title: this.title, artist: this.artist, songCount: this.songCount, songList: this.songList, songs: this.songs, sessionPlaylists: this.sessionPlaylistsPayload(), participantIds: this.participantIds, participantRoles: this.participantRoles, startAt: new Date(this.startAt).toISOString(), songsPerSession: this.songsPerSession, tiebreakerOption: this.tiebreakerOption, sessionDurationMinutes: this.noSessionTimer ? null : sessionDurationMinutes, sessionSchedule: this.changedSessionSchedule(), sessionScheduleRevision: this.savedSessions.length ? this.sessionsRevision : undefined };
             const wasEditing = this.editingId !== null;
             const result = wasEditing ? await this.bracketsApi.update(this.editingId!, body) : await this.bracketsApi.create(body);
             this.saving = false;
@@ -1118,7 +1126,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         if (!this.editingId)
             return;
         const duration = durationMinutes(this.durationValue, this.durationUnit);
-        await this.createDuplicate(this.editingId, { title: this.title, artist: this.artist, logoUrl: this.logoUrl, songCount: this.songCount, songs: this.songs, sessionPlaylists: this.sessionPlaylistsPayload(), participantIds: this.participantIds, startAt: this.startAt || null, songsPerSession: this.songsPerSession, sessionDurationMinutes: this.noSessionTimer ? null : duration, durationValue: this.durationValue, durationUnit: this.durationUnit, finaleAt: this.finaleDate || null, finaleStartRound: this.finaleStartRound, seedingSize: this.useSeeds ? this.seedingSize : null, randomizationMode: this.randomizationMode, tiebreakerOption: this.tiebreakerOption, anonymous: this.anonymous, sessionSchedule: this.sessions.length ? this.sessionSchedulePayload() : undefined });
+        await this.createDuplicate(this.editingId, { title: this.title, artist: this.artist, logoUrl: this.logoUrl, songCount: this.songCount, songs: this.songs, sessionPlaylists: this.sessionPlaylistsPayload(), participantIds: this.participantIds, participantRoles: this.participantRoles, startAt: this.startAt || null, songsPerSession: this.songsPerSession, sessionDurationMinutes: this.noSessionTimer ? null : duration, durationValue: this.durationValue, durationUnit: this.durationUnit, finaleAt: this.finaleDate || null, finaleStartRound: this.finaleStartRound, seedingSize: this.useSeeds ? this.seedingSize : null, randomizationMode: this.randomizationMode, tiebreakerOption: this.tiebreakerOption, anonymous: this.anonymous, sessionSchedule: this.sessions.length ? this.sessionSchedulePayload() : undefined });
     }
     private async createDuplicate(bracketId: number, input: Record<string, unknown> = {}): Promise<void> {
         if (this.duplicatingId != null || this.saving || this.sessionsSaving)
@@ -1178,7 +1186,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         this.fieldErrors = validateBracketSettings(this);
         return Object.keys(this.fieldErrors).length === 0;
     }
-    private resetForm(): void { this.invitations = []; this.invitationNotice = ''; this.editingId = null; this.sessionPlaylists = []; this.playlistDraft = []; this.sessionStoredDraft = false; this.savedSessions = []; this.scheduleBaseline = null; this.lastPreviewTimingKey = ''; this.sessions = []; this.sessionsError = ''; this.sessionsNotice = ''; this.sessionsRevision = ''; this.editingStatus = null; this.useSeeds = false; this.seedingSize = 4; this.randomizationMode = 'none'; this.randomizeSongs = false; this.anonymous = false; this.albums = []; this.tiebreakerOption = 'admin_pick'; this.title = ''; this.artist = ''; this.logoUrl = ''; this.songCount = 16; this.songList = ''; this.songs = []; this.songDraft = this.emptySong(); this.songError = ''; this.participantIds = []; this.startAt = ''; this.finaleDate = ''; this.finaleStartRound = null; this.songsPerSession = 2; this.noSessionTimer = false; this.durationValue = 1; this.durationUnit = 'weeks'; this.error = ''; this.success = ''; this.showValidationErrors = false; this.fieldErrors = {}; }
+    private resetForm(): void { this.participantRoles = {}; this.invitations = []; this.invitationNotice = ''; this.editingId = null; this.sessionPlaylists = []; this.playlistDraft = []; this.sessionStoredDraft = false; this.savedSessions = []; this.scheduleBaseline = null; this.lastPreviewTimingKey = ''; this.sessions = []; this.sessionsError = ''; this.sessionsNotice = ''; this.sessionsRevision = ''; this.editingStatus = null; this.useSeeds = false; this.seedingSize = 4; this.randomizationMode = 'none'; this.randomizeSongs = false; this.anonymous = false; this.albums = []; this.tiebreakerOption = 'admin_pick'; this.title = ''; this.artist = ''; this.logoUrl = ''; this.songCount = 16; this.songList = ''; this.songs = []; this.songDraft = this.emptySong(); this.songError = ''; this.participantIds = []; this.startAt = ''; this.finaleDate = ''; this.finaleStartRound = null; this.songsPerSession = 2; this.noSessionTimer = false; this.durationValue = 1; this.durationUnit = 'weeks'; this.error = ''; this.success = ''; this.showValidationErrors = false; this.fieldErrors = {}; }
     private setDuration(minutes: number): void {
         if (minutes % 10080 === 0) {
             this.durationUnit = 'weeks';

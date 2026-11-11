@@ -40,18 +40,18 @@
           <div class="side-label admin-nav-label">UPCOMING BRACKETS</div>
           <button class="bracket-link" *ngFor="let bracket of upcomingBrackets" [class.active]="activeBracketId === bracket.bracketId" [routerLink]="['/brackets', bracket.bracketId]" [attr.title]="bracket.title"><span class="bracket-icon">◷</span><span>{{ bracket.title }}</span><small *ngIf="bracket.invitationStatus === 'pending'">Invited</small><span class="link-dot" *ngIf="activeBracketId === bracket.bracketId"></span></button>
         </ng-container>
-        <ng-container *ngIf="isAdmin">
+        <ng-container *ngIf="canManageBrackets">
           <div class="side-label admin-nav-label">MANAGE</div>
           <button class="bracket-link" [class.active]="activePage === 'brackets'" routerLink="/manage/brackets" (click)="showBracketsList()"><span class="bracket-icon">▦</span><span>Brackets</span></button>
-          <button class="bracket-link" [class.active]="activePage === 'familyMembers'" routerLink="/manage/family-members"><span class="bracket-icon">♙</span><span>Family members</span></button>
-          <button class="bracket-link" [class.active]="activePage === 'songs'" routerLink="/manage/songs"><span class="bracket-icon">♫</span><span>Songs</span></button>
-          <button class="bracket-link" [class.active]="activePage === 'playlists'" routerLink="/manage/playlists"><span class="bracket-icon">▤</span><span>Playlists</span></button>
+          <button *ngIf="isAdmin" class="bracket-link" [class.active]="activePage === 'familyMembers'" routerLink="/manage/family-members"><span class="bracket-icon">♙</span><span>Family members</span></button>
+          <button *ngIf="isAdmin" class="bracket-link" [class.active]="activePage === 'songs'" routerLink="/manage/songs"><span class="bracket-icon">♫</span><span>Songs</span></button>
+          <button *ngIf="isAdmin" class="bracket-link" [class.active]="activePage === 'playlists'" routerLink="/manage/playlists"><span class="bracket-icon">▤</span><span>Playlists</span></button>
         </ng-container>
         <div class="sidebar-bottom">
           <div class="help-card" *ngIf="isAdmin"><span class="help-icon">✳</span><div><strong>Family invitations</strong><p>Preview a sample link. Joining by invitation is not available yet.</p></div><button class="invite-button" (click)="copyInvite()">{{ inviteCopied ? 'Demo link copied!' : 'Copy demo invite link ↗' }}</button></div>
           <div class="profile-switch">
             <span class="avatar" [style.background]="currentMember.color">{{ currentMember.initials }}</span>
-            <span class="profile-name"><strong>{{ currentMember.name }}</strong><small>{{ isAdmin ? 'Admin' : 'Family member' }}</small></span>
+            <span class="profile-name"><strong>{{ currentMember.name }}</strong><small>{{ isAdmin ? 'Super' : 'Viewer' }}</small></span>
           </div>
           <button class="sidebar-logout" type="button" (click)="logout()" [disabled]="authBusy">Log out</button>
         </div>

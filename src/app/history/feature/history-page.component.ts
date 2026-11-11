@@ -129,7 +129,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
     private async loadPermissions(): Promise<void> {
         try {
             const user = await this.authApi.getCurrentUser(this.pageController.signal);
-            this.isAdmin = user?.role === 'owner';
+            this.isAdmin = user?.user_role === 'super';
         }
         catch {
             this.isAdmin = false;
@@ -169,6 +169,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
             await this.permissionsReady;
             const payload = await this.historyApi.getBracket(bracketId, controller.signal);
             if (controller.signal.aborted) return;
+            this.isAdmin = !!payload.canManage;
             const finaleOptions = await this.historyApi.getFinaleOptions(bracketId, controller.signal);
             if (controller.signal.aborted) return;
             if (!this.isAdmin && payload.bracket.status !== 'complete') {

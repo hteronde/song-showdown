@@ -2,7 +2,7 @@ import { apiRequest, ApiRequestOptions } from '../../shared/data-access/api-clie
 import { Injectable } from '@angular/core';
 import { SessionPlaylist, BracketSessionsData, BracketAlbum, BracketSong, BracketDetail, BracketInput, BracketParticipant, BracketRecord } from './bracket.model';
 
-export interface InvitationParticipant { userId:number; displayName:string; email:string; status:'pending'|'accepted'|'declined'; delivery:'unsent'|'sending'|'sent'|'failed'; sentAt:string|null; }
+export interface InvitationParticipant { bracket_role: 'member'|'commissioner'; userId:number; displayName:string; email:string; status:'pending'|'accepted'|'declined'; delivery:'unsent'|'sending'|'sent'|'failed'; sentAt:string|null; }
 export interface InvitationDelivery {sent:number;failed:number;}
 
 @Injectable({ providedIn: 'root' })
@@ -17,7 +17,7 @@ export class BracketsApiService {
     return data.brackets ?? [];
   }
 
-  saveParticipants(bracketId:number|null,input:{participantIds:number[];changes:Array<{userId:number;email:string;previousEmail:string}>;title:string;artist:string}):Promise<{bracketId:number;participantIds:number[];members:Array<{userId:number;email:string}>;invitations?:InvitationDelivery}> {
+  saveParticipants(bracketId:number|null,input:{participantRoles?:Record<number,'member'|'commissioner'>;participantIds:number[];changes:Array<{userId:number;email:string;previousEmail:string}>;title:string;artist:string}):Promise<{bracketId:number;participantIds:number[];members:Array<{userId:number;email:string}>;invitations?:InvitationDelivery}> {
     return this.request(`${this.baseUrl}${bracketId?'/'+bracketId:''}/participants`,{method:'PUT',body:JSON.stringify(input),timeoutMs:120000});
   }
 
@@ -34,8 +34,8 @@ export class BracketsApiService {
     await this.request(`${this.baseUrl}/${bracketId}/session-settings`,{method:'PUT',body:JSON.stringify(input)});
   }
 
-  async getParticipants(signal?: AbortSignal): Promise<BracketParticipant[]> {
-    const data = await this.request<{ members?: BracketParticipant[] }>(`${this.baseUrl}/participants`, {signal});
+  async getParticipants(signal?: AbortSignal, bracketId?: number): Promise<BracketParticipant[]> {
+    const data = await this.request<{ members?: BracketParticipant[] }>(`${this.baseUrl}/participants${bracketId ? `?bracketId=${bracketId}` : ''}`, {signal});
     return data.members ?? [];
   }
 

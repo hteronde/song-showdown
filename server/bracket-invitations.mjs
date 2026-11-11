@@ -16,14 +16,14 @@ export function invitationEmail(invite, appUrl) {
 // Only title/theme/start date are available before acceptance. Owners retain management access.
 export async function getBracketInvitation(c, bracketId, userId) {
   const [rows] = await c.execute(`SELECT b.bracket_id AS bracketId,b.title,b.artist,b.start_at AS startAt,b.status,
-    u.role,bm.invitation_status AS invitationStatus
+    u.user_role,bm.bracket_role,bm.invitation_status AS invitationStatus
     FROM brackets b JOIN users u ON u.family_id=b.family_id
     LEFT JOIN bracket_members bm ON bm.bracket_id=b.bracket_id AND bm.user_id=u.user_id AND bm.family_id=b.family_id
     WHERE b.bracket_id=? AND u.user_id=?`, [bracketId, userId]);
   const row = rows[0];
-  if (!row || (row.role !== 'owner' && (!row.invitationStatus || row.status === 'draft'))) throw fail(404, 'Invitation not found or no longer available.');
+  if (!row || (row.user_role !== 'super' && (!row.invitationStatus || row.status === 'draft' && !(row.bracket_role === 'commissioner' && row.invitationStatus === 'accepted')))) throw fail(404, 'Invitation not found or no longer available.');
   return { bracketId: Number(row.bracketId), title: row.title, artist: row.artist, startAt: row.startAt,
-    invitationStatus: row.invitationStatus, canAccess: row.role === 'owner' || row.invitationStatus === 'accepted' };
+    invitationStatus: row.invitationStatus, canAccess: row.user_role === 'super' || row.invitationStatus === 'accepted' };
 }
 
 export async function respondToInvitation(c, bracketId, userId, response) {
@@ -43,7 +43,7 @@ export async function respondToInvitation(c, bracketId, userId, response) {
 
 export async function listBracketInvitations(c, bracketId) {
   const [rows] = await c.execute(`SELECT bm.user_id AS userId,u.display_name AS displayName,u.email,
-    bm.invitation_status AS status,bm.invitation_delivery AS delivery,bm.invitation_sent_at AS sentAt
+    bm.bracket_role,bm.invitation_status AS status,bm.invitation_delivery AS delivery,bm.invitation_sent_at AS sentAt
     FROM bracket_members bm JOIN users u ON u.user_id=bm.user_id AND u.family_id=bm.family_id
     WHERE bm.bracket_id=? ORDER BY u.display_name`, [bracketId]);
   return rows;

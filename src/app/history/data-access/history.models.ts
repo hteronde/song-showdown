@@ -48,6 +48,7 @@ export interface BracketHistoryListResponse {
 }
 
 export interface BracketHistoryResponse {
+  canManage?:boolean;
   canViewBallots: boolean;
   ballotEditingRound: number | null;
   bracket: BracketHistoryInfo;

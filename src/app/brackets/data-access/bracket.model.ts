@@ -35,6 +35,8 @@ export interface BracketParticipant {
 }
 
 export interface BracketDetail extends BracketRecord {
+  canAssignRoles?:boolean;
+  participantRoles?:Record<number,'member'|'commissioner'>;
   durationValue?: number;
   durationUnit?: 'minutes' | 'hours' | 'days' | 'weeks';
   albums: BracketAlbum[];
@@ -44,6 +46,7 @@ export interface BracketDetail extends BracketRecord {
 }
 
 export interface BracketInput {
+  participantRoles?:Record<number,'member'|'commissioner'>;
   sessionPlaylists?:SessionPlaylist[];
   sessionSchedule?: Array<{weekNumber:number;opensAt:string|null;closesAt:string|null}>;
   sessionScheduleRevision?:string;
