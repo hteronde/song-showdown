@@ -32,7 +32,7 @@ interface Invitation {
         </div>
       </ng-container>
       <ng-container *ngIf="invitation.invitationStatus === 'declined'">
-        <p>You declined this invitation. Changed your mind? You can still join the bracket. Voting follows the scheduled session times.</p>
+        <p>You declined this invitation. Changed your mind? You can still join the bracket.</p>
         <div class="actions"><button type="button" [disabled]="saving" (click)="respond('accepted')">{{ saving ? 'Joining…' : 'Change my mind — join bracket' }}</button></div>
       </ng-container>
       <button *ngIf="invitation.canAccess" class="secondary" type="button" (click)="showBracket=true">View bracket as admin</button>
