@@ -1,5 +1,5 @@
 import { validateInvitationChanges } from './admin-invitation-response.mjs';
-import { saveBracketRoles } from './bracket-roles.mjs';
+import { saveBracketRoles, commissionerRequiredMessage } from './bracket-roles.mjs';
 import {saveParticipantEmails} from './participant-emails.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
 export async function saveBracketParticipants(c,{bracketId,familyId,userId,input,canAssignRoles=false}) {
@@ -15,12 +15,7 @@ export async function saveBracketParticipants(c,{bracketId,familyId,userId,input
     const [created]=await c.execute("INSERT INTO brackets (family_id,created_by_user_id,title,artist,status) VALUES (?,?,?,?,'draft')",[familyId,userId,title,theme]);bracketId=Number(created.insertId);
   }
   const invitationChanges=await validateInvitationChanges(c,bracketId,ids,input.invitationChanges);
-  if (!ids.length) {
-    const updated=input.changes?.length?await saveParticipantEmails(c,familyId,{changes:input.changes}):{members:[]};
-    await c.execute('DELETE FROM bracket_members WHERE bracket_id=?',[bracketId]);
-    await c.execute("UPDATE brackets SET draft_settings=CASE WHEN draft_settings IS NULL THEN NULL ELSE JSON_SET(draft_settings,'$.participantIds',JSON_ARRAY(),'$.participantRoles',JSON_OBJECT()) END WHERE bracket_id=?",[bracketId]);
-    return {bracketId,participantIds:[],members:updated.members};
-  }
+  if (!ids.length) throw fail(400,commissionerRequiredMessage);
   const [members]=await c.execute(`SELECT user_id FROM users WHERE family_id=? AND user_id IN (${ids.map(()=>'?').join(',')})`,[familyId,...ids]);
   if(members.length!==ids.length)throw fail(403,'One or more participants do not belong to your family.');
   const updated=input.changes?.length?await saveParticipantEmails(c,familyId,{changes:input.changes}):{members:[]};

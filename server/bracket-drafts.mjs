@@ -1,3 +1,4 @@
+import {requireCommissioner} from './bracket-roles.mjs';
 import {saveAutomaticEmailSetting} from './bracket-email-settings.mjs';
 import {validateSessionPlaylists} from './session-playlists.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
@@ -12,6 +13,7 @@ export function prepareBracketDraft(input) {
   if(!title||!artist)throw fail(400,'Title and Theme are required to save a draft.');
   if(title.length>160||artist.length>160)throw fail(400,'Title and Theme must each be 160 characters or fewer.');
   const settings=Object.fromEntries(draftKeys.filter(key=>Object.hasOwn(input,key)).map(key=>[key,input[key]]));
+  if(Array.isArray(settings.participantIds) && settings.participantIds.length)requireCommissioner(settings.participantIds,settings.participantRoles??{});
   if(settings.sessionPlaylists!==undefined)settings.sessionPlaylists=validateSessionPlaylists(settings.sessionPlaylists);
   return {title,artist,settings};
 }

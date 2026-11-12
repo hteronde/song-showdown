@@ -454,6 +454,10 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     async saveParticipants(): Promise<void> {
         if (this.participantEditor.saving)
             return;
+        if (!this.participantEditor.ids.some(id=>this.participantEditor.roles[id]==='commissioner')) {
+            this.participantEditor.error = 'Keep at least one selected participant with the Commissioner role. Assign another commissioner before removing or changing the last one.';
+            return;
+        }
         const changes = this.participantEditor.changes(this.members, this.editingId !== null);
         if (changes === null)
             return;
@@ -1010,6 +1014,10 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.error = 'Title and Theme are required to save a draft.';
             return;
         }
+        if(this.participantIds.length && !this.participantIds.some(id=>this.participantRoles[id]==='commissioner')) {
+            this.error='Select at least one participant with the Commissioner role.';
+            return;
+        }
         this.saving = true;
         this.savingDraft = true;
         try {
@@ -1210,6 +1218,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     }
     private validateFields(): boolean {
         this.fieldErrors = validateBracketSettings(this);
+        if (!this.participantIds.some(id=>this.participantRoles[id]==='commissioner'))this.fieldErrors.participants='Select at least one participant with the Commissioner role.';
         return Object.keys(this.fieldErrors).length === 0;
     }
     private resetForm(): void { this.participantRoles = {}; this.invitations = []; this.invitationNotice = ''; this.editingId = null; this.sessionPlaylists = []; this.playlistDraft = []; this.sessionStoredDraft = false; this.savedSessions = []; this.scheduleBaseline = null; this.lastPreviewTimingKey = ''; this.sessions = []; this.sessionsError = ''; this.sessionsNotice = ''; this.sessionsRevision = ''; this.editingStatus = null; this.useSeeds = false; this.seedingSize = 4; this.randomizationMode = 'none'; this.randomizeSongs = false; this.anonymous = false; this.automaticEmailsDisabled = false; this.albums = []; this.tiebreakerOption = 'admin_pick'; this.title = ''; this.artist = ''; this.logoUrl = ''; this.songCount = 16; this.songList = ''; this.songs = []; this.songDraft = this.emptySong(); this.songError = ''; this.participantIds = []; this.startAt = ''; this.finaleDate = ''; this.finaleStartRound = null; this.songsPerSession = 2; this.noSessionTimer = false; this.durationValue = 1; this.durationUnit = 'weeks'; this.error = ''; this.success = ''; this.showValidationErrors = false; this.fieldErrors = {}; }

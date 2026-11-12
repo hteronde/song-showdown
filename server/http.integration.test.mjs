@@ -50,7 +50,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
     async function bracket(family,{complete=false,anonymous=false,finale=false}={}) {
       const [created]=await db.pool.execute("INSERT INTO brackets (family_id,created_by_user_id,title,artist,status,start_at,completed_at,anonymous,session_duration_minutes,tiebreaker_option,finale_at,finale_start_round) VALUES (?,?,?,?,?,DATE_SUB(NOW(),INTERVAL 1 HOUR),?,?,NULL,'random',?,?)",[family.id,family.owner.id,`Test bracket ${++sequence}`,'Test artist',complete?'complete':'active',complete?new Date():null,anonymous,finale?new Date():null,finale?1:null]);
       const id=Number(created.insertId),entries=[],weeks=[],matches=[];
-      for(const user of [family.owner,family.member])await db.pool.execute('INSERT INTO bracket_members (bracket_id,family_id,user_id) VALUES (?,?,?)',[id,family.id,user.id]);
+      for(const user of [family.owner,family.member])await db.pool.execute('INSERT INTO bracket_members (bracket_id,family_id,user_id,bracket_role) VALUES (?,?,?,?)',[id,family.id,user.id,user.id===family.owner.id?'commissioner':'member']);
       for(let i=0;i<4;i++) {
         const [song]=await db.pool.execute('INSERT INTO songs (artist,title) VALUES (?,?)',['Test artist',`Song ${sequence}-${i}`]);
         const [entry]=await db.pool.execute('INSERT INTO bracket_songs (bracket_id,position,region_number,song_id,seed_number) VALUES (?,?,1,?,?)',[id,i+1,song.insertId,i+1]);entries.push(Number(entry.insertId));
@@ -116,7 +116,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       for(const id of [other.id,foreign.id])assert.equal((await http(`/api/admin/brackets/${id}`,{cookie:a.member.cookie})).status,404);
       assert.equal((await http('/api/family-members',{cookie:a.member.cookie})).status,403);
       assert.equal((await http('/api/admin/brackets',{cookie:a.member.cookie,method:'POST',body:{}})).status,403);
-      assert.equal((await http(`${path}/participants`,{cookie:a.member.cookie,method:'PUT',body:{participantIds:members,participantRoles:{[a.owner.id]:'commissioner'}}})).status,403);
+      assert.equal((await http(`${path}/participants`,{cookie:a.member.cookie,method:'PUT',body:{participantIds:members,participantRoles:{[a.owner.id]:'member'}}})).status,403);
       assert.equal((await assign('super')).status,400);
       // Shared songs are isolated when a commissioner edits only their bracket.
       const [[source]]=await db.pool.execute('SELECT song_id FROM bracket_songs WHERE bracket_song_id=?',[br.entries[0]]);
@@ -133,6 +133,26 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal((await http(path,{cookie:a.member.cookie})).status,404);
       assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).body.canManage,false);
       assert.equal((await vote(br,a.member)).status,200);
+    });
+
+    await t.test('participant saves require a commissioner and concurrent changes cannot remove the last one',async()=>{
+      const br=await bracket(a),path=`/api/admin/brackets/${br.id}/participants`;
+      const save=body=>http(path,{cookie:a.owner.cookie,method:'PUT',body});
+      assert.equal((await save({participantIds:[]})).status,400);
+      assert.equal((await save({participantIds:[a.member.id]})).status,400,'omitting roles must not bypass commissioner requirement');
+      assert.equal((await save({participantIds:[a.owner.id,a.member.id],participantRoles:{[a.owner.id]:'member'}})).status,400);
+      let [[roster]]=await db.pool.execute("SELECT COUNT(*) AS total FROM bracket_members WHERE bracket_id=? AND bracket_role='commissioner'",[br.id]);
+      assert.equal(Number(roster.total),1,'failed updates roll back membership removal');
+      assert.equal((await save({participantIds:[a.owner.id,a.member.id],participantRoles:{[a.member.id]:'commissioner'}})).status,200);
+      const results=await Promise.all([
+        save({participantIds:[a.owner.id,a.member.id],participantRoles:{[a.owner.id]:'member'}}),
+        save({participantIds:[a.owner.id,a.member.id],participantRoles:{[a.member.id]:'member'}})
+      ]);
+      assert.deepEqual(results.map(r=>r.status).sort(),[200,400]);
+      [[roster]]=await db.pool.execute("SELECT COUNT(*) AS total FROM bracket_members WHERE bracket_id=? AND bracket_role='commissioner'",[br.id]);
+      assert.equal(Number(roster.total),1);
+      const invalidDraft=await http('/api/admin/brackets/draft',{cookie:a.owner.cookie,method:'POST',body:{title:'No commissioner',artist:'Test',participantIds:[a.owner.id],participantRoles:{[a.owner.id]:'member'}}});
+      assert.equal(invalidDraft.status,400);
     });
 
     await t.test('accepting a commissioner invitation never opens voting before the scheduled start',async()=>{
@@ -206,12 +226,12 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie,method:'POST',body:{response:'accepted'}})).status,409);
       assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,404);
       assert.ok(!(await http('/api/my/brackets',{cookie:a.member.cookie})).body.brackets.some(row=>row.bracketId===br.id));
-      assert.equal((await http(`/api/admin/brackets/${br.id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[]}})).status,200);
-      const [[count]]=await db.pool.execute('SELECT COUNT(*) AS total FROM bracket_members WHERE bracket_id=?',[br.id]);assert.equal(Number(count.total),0);
+      assert.equal((await http(`/api/admin/brackets/${br.id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[]}})).status,400);
+      const [[count]]=await db.pool.execute('SELECT COUNT(*) AS total FROM bracket_members WHERE bracket_id=?',[br.id]);assert.equal(Number(count.total),2);
     });
 
     await t.test('publishing creates pending invitations; email retry and concurrent response preserve consent',async()=>{
-      const created=await http('/api/admin/brackets',{cookie:a.owner.cookie,method:'POST',body:{title:'Invitation test',artist:'Hidden songs',songCount:4,songList:'Secret A\nSecret B\nSecret C\nSecret D',participantIds:[a.owner.id,a.member.id],startAt:'2027-06-01T18:00:00Z',songsPerSession:2,sessionDurationMinutes:null,tiebreakerOption:'random'}});
+      const created=await http('/api/admin/brackets',{cookie:a.owner.cookie,method:'POST',body:{title:'Invitation test',artist:'Hidden songs',songCount:4,songList:'Secret A\nSecret B\nSecret C\nSecret D',participantIds:[a.owner.id,a.member.id],participantRoles:{[a.owner.id]:'commissioner'},startAt:'2027-06-01T18:00:00Z',songsPerSession:2,sessionDurationMinutes:null,tiebreakerOption:'random'}});
       assert.equal(created.status,201,JSON.stringify(created.body));
       const id=created.body.bracketId;
       const [members]=await db.pool.execute('SELECT invitation_status FROM bracket_members WHERE bracket_id=?',[id]);
@@ -339,7 +359,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const id=copied.body.bracketId;
       const [[counts]]=await db.pool.execute('SELECT (SELECT COUNT(*) FROM votes WHERE bracket_id=?) AS votes,(SELECT COUNT(*) FROM bracket_members WHERE bracket_id=?) AS members,(SELECT COUNT(*) FROM matchups WHERE bracket_id=?) AS matchups',[id,id,id]);
       assert.deepEqual([Number(counts.votes),Number(counts.members),Number(counts.matchups)],[0,0,0]);
-      assert.equal((await http(`/api/admin/brackets/${id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[a.member.id]}})).status,200);
+      assert.equal((await http(`/api/admin/brackets/${id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[a.member.id],participantRoles:{[a.member.id]:'commissioner'}}})).status,200);
       const delivered=[];
       const sent=await sendBracketInvitations(db.pool,id,{deliver:async message=>delivered.push(message),env:{APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'}});
       assert.deepEqual(sent,{sent:0,failed:0});assert.equal(delivered.length,0);
@@ -488,7 +508,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal(draft.status,201);
       const id=draft.body.bracketId,path=`/api/admin/brackets/${id}`;
       assert.equal((await http(path,{cookie:a.owner.cookie})).body.bracket.automaticEmailsDisabled,true);
-      const published=await http(path,{cookie:a.owner.cookie,method:'PUT',body:{title:'Email preference',artist:'Test',songCount:4,songList:'Mail A\nMail B\nMail C\nMail D',participantIds:[a.owner.id,a.member.id],startAt:new Date(Date.now()-3600000).toISOString(),songsPerSession:2,sessionDurationMinutes:null,tiebreakerOption:'random',automaticEmailsDisabled:true}});
+      const published=await http(path,{cookie:a.owner.cookie,method:'PUT',body:{title:'Email preference',artist:'Test',songCount:4,songList:'Mail A\nMail B\nMail C\nMail D',participantIds:[a.owner.id,a.member.id],participantRoles:{[a.owner.id]:'commissioner'},startAt:new Date(Date.now()-3600000).toISOString(),songsPerSession:2,sessionDurationMinutes:null,tiebreakerOption:'random',automaticEmailsDisabled:true}});
       assert.equal(published.status,200);
       const stored=(await http(path,{cookie:a.owner.cookie})).body.bracket;
       assert.equal(stored.automaticEmailsDisabled,true);

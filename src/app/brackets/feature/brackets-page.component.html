@@ -237,7 +237,7 @@
       </div>
       <p class="hint" *ngIf="!members.length">No family members are available.</p>
       <p class="field-error" *ngIf="participantEditor.error" role="alert">{{ participantEditor.error }}</p>
-      <p class="hint">Save Changes saves participant selections immediately. Super users can also update emails and assign bracket roles. Commissioners can edit this bracket after accepting their invitation. Super users and this bracket’s commissioners can change existing invitations to Accepted or Declined. Accepted restores access; Declined removes access while preserving recorded votes. Voting still follows the scheduled start time.</p>
+      <p class="hint">Save Changes saves participant selections immediately. Keep at least one selected participant with the Commissioner role. Super users can also update emails and assign bracket roles. Commissioners can edit this bracket after accepting their invitation. Super users and this bracket’s commissioners can change existing invitations to Accepted or Declined. Accepted restores access; Declined removes access while preserving recorded votes. Voting still follows the scheduled start time.</p>
       <div class="song-modal-actions"><button class="add-song" type="button" [disabled]="participantEditor.saving" (click)="saveParticipants()">{{ participantEditor.saving ? 'SAVING…' : 'SAVE CHANGES' }}</button><button class="cancel" type="button" [disabled]="participantEditor.saving" (click)="closeParticipantsModal()">Cancel</button></div>
     </dialog>
     <dialog #songDialog class="song-dialog" aria-labelledby="song-dialog-title" (close)="onSongModalClosed()" (cancel)="songSaving && $event.preventDefault()">
