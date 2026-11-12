@@ -66,7 +66,7 @@ CREATE TABLE brackets (
   tiebreaker_option ENUM('random', 'seed', 'seed_low', 'admin_pick') NOT NULL DEFAULT 'admin_pick',
   status ENUM('draft', 'active', 'complete') NOT NULL DEFAULT 'draft',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  completed_at DATETIME NULL,
+  completed_at DATETIME(6) NULL,
   PRIMARY KEY (bracket_id),
   KEY ix_brackets_family_status (family_id, status),
   UNIQUE KEY uq_brackets_id_family (bracket_id, family_id),
@@ -328,7 +328,8 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 
 CREATE TABLE IF NOT EXISTS session_email_settings (
   settings_id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
-  enabled_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+  enabled_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  winner_enabled_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
 ) ENGINE=InnoDB;
 INSERT IGNORE INTO session_email_settings (settings_id) VALUES (1);
 
@@ -337,7 +338,7 @@ CREATE TABLE IF NOT EXISTS session_email_deliveries (
   bracket_id BIGINT UNSIGNED NOT NULL,
   week_id BIGINT UNSIGNED NOT NULL,
   user_id BIGINT UNSIGNED NOT NULL,
-  event_type ENUM('start','end') NOT NULL,
+  event_type ENUM('start','end','winner') NOT NULL,
   delivery_status ENUM('pending','sending','sent','skipped') NOT NULL DEFAULT 'pending',
   attempt_at DATETIME(6) NULL,
   attempts SMALLINT UNSIGNED NOT NULL DEFAULT 0,

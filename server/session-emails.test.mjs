@@ -28,3 +28,12 @@ test('only the last online closing email announces the finale on its exact calen
   assert.doesNotMatch(sessionEmail({...planned,eventType:'end',isLastOnlineSession:0},'https://thesongshowdown.com').text,/We hope to see you there/);
   assert.match(sessionEmail({...planned,eventType:'end',finaleDate:null},'https://thesongshowdown.com').text,/date has not been set/);
 });
+
+test('winner email names the champion, thanks participants, and links directly to history',()=>{
+  const message=sessionEmail({...row,eventType:'winner',winnerTitle:'No Surprises',winnerArtist:'Radiohead'},'https://thesongshowdown.com');
+  assert.equal(message.subject,'Radiohead: We have a winner!');
+  assert.match(message.text,/“No Surprises” by Radiohead/);
+  assert.match(message.text,/Thank you for participating/);
+  assert.match(message.text,/https:\/\/thesongshowdown.com\/history\/8/);
+  assert.doesNotMatch(message.text,/\/brackets\/8/);
+});

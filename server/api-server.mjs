@@ -1086,8 +1086,8 @@ const server = createServer(async (request, response) => {
       } else if (matchup.nextMatchupId && matchup.nextSlot === 'B') {
         await connection.execute('UPDATE matchups SET song_b_entry_id=? WHERE bracket_id=? AND matchup_id=?', [winnerEntryId, bracketId, matchup.nextMatchupId]);
       } else if (Number(matchup.roundNumber) === Number(matchup.finalRoundNumber)) {
-        await connection.execute("UPDATE brackets SET status='complete',completed_at=NOW() WHERE bracket_id=?", [bracketId]);
-        await connection.execute("UPDATE bracket_finale_sessions SET status='complete',completed_at=NOW() WHERE bracket_id=?", [bracketId]);
+        await connection.execute("UPDATE brackets SET status='complete',completed_at=NOW(6) WHERE bracket_id=?", [bracketId]);
+        await connection.execute("UPDATE bracket_finale_sessions SET status='complete',completed_at=NOW(6) WHERE bracket_id=?", [bracketId]);
       }
       await randomizeReadyRounds(connection,bracketId);
       await connection.commit();

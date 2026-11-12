@@ -435,7 +435,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const env={NODE_ENV:'production',APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'};
       const messages=[];
       const deliver=async(message,options)=>{messages.push({message,key:options.idempotencyKey});};
-      await db.pool.execute('UPDATE session_email_settings SET enabled_at=NOW(6) WHERE settings_id=1');
+      await db.pool.execute('UPDATE session_email_settings SET enabled_at=NOW(6),winner_enabled_at=NOW(6) WHERE settings_id=1');
       await db.pool.execute("UPDATE brackets SET start_at=DATE_ADD(NOW(6),INTERVAL 1 HOUR) WHERE bracket_id=?",[br.id]);
       await db.pool.execute('UPDATE bracket_weeks SET opens_at=NOW(6),closes_at=DATE_ADD(NOW(6),INTERVAL 2 HOUR) WHERE week_id=?',[br.weeks[0]]);
       assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0);
@@ -493,7 +493,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal(page.body.isCommissioner,true);assert.equal(Number(page.body.bracket.automaticEmailsDisabled),1);
       const env={NODE_ENV:'production',APP_URL:'https://example.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'};
       const messages=[];const deliver=async m=>{if(m.text.includes(`/brackets/${br.id}`))messages.push(m);};
-      await db.pool.execute('UPDATE session_email_settings SET enabled_at=NOW(6) WHERE settings_id=1');
+      await db.pool.execute('UPDATE session_email_settings SET enabled_at=NOW(6),winner_enabled_at=NOW(6) WHERE settings_id=1');
       await db.pool.execute('UPDATE bracket_weeks SET opens_at=NOW(6),closes_at=DATE_ADD(NOW(6),INTERVAL 1 HOUR) WHERE week_id=?',[br.weeks[0]]);
       await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,0);
       await db.pool.execute('UPDATE bracket_weeks SET closes_at=NOW(6) WHERE week_id=?',[br.weeks[0]]);
@@ -515,7 +515,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const br=await bracket(a);
       const env={NODE_ENV:'production',APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'};
       const messages=[];const deliver=async message=>{if(message.text.includes(`/brackets/${br.id}`))messages.push(message);};
-      await db.pool.execute('UPDATE session_email_settings SET enabled_at=NOW(6) WHERE settings_id=1');
+      await db.pool.execute('UPDATE session_email_settings SET enabled_at=NOW(6),winner_enabled_at=NOW(6) WHERE settings_id=1');
       await db.pool.execute("UPDATE brackets SET finale_start_round=2,finale_at='2026-11-20' WHERE bracket_id=?",[br.id]);
       await db.pool.execute('UPDATE bracket_weeks SET week_number=3 WHERE week_id=?',[br.weeks[1]]);
       const [[first]]=await db.pool.execute('SELECT round_id FROM bracket_weeks WHERE week_id=?',[br.weeks[0]]);
@@ -528,6 +528,38 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,4);
       assert.ok(messages.slice(-2).every(m=>m.text.includes('last session held online') && m.text.includes('Friday, November 20, 2026') && m.text.includes('We hope to see you there!')));
       await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,4,'no repeated finale announcement');
+    });
+
+    await t.test('winner announcements include finale members and retry once without announcing historical brackets',async()=>{
+      const env={NODE_ENV:'production',APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'};
+      const old=await bracket(a,{complete:true,finale:true});
+      await db.pool.execute('UPDATE session_email_settings SET winner_enabled_at=NOW(6) WHERE settings_id=1');
+      const br=await bracket(a,{finale:true});
+      await db.pool.execute('UPDATE bracket_members SET non_finale_participant=FALSE WHERE bracket_id=?',[br.id]);
+      const messages=[];
+      const deliver=async(message,options)=>{if(message.subject.endsWith('We have a winner!'))messages.push({message,key:options.idempotencyKey});};
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,0,'unfinished and historical brackets excluded');
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE bracket_id=?',[br.id]);
+      await db.pool.execute("UPDATE brackets SET status='complete',completed_at=NOW(6) WHERE bracket_id=?",[br.id]);
+      const keys=[];
+      await processSessionEmails(db.pool,{env,deliver:async(message,options)=>{if(message.text.includes(`/history/${br.id}`)){keys.push(options.idempotencyKey);throw Error('Test provider failure');}}});
+      assert.equal(keys.length,2);
+      await db.pool.execute("UPDATE session_email_deliveries SET attempt_at=DATE_SUB(NOW(6),INTERVAL 2 MINUTE) WHERE bracket_id=?",[br.id]);
+      await Promise.all([processSessionEmails(db.pool,{env,deliver}),processSessionEmails(db.pool,{env,deliver})]);
+      assert.equal(messages.length,2);
+      assert.deepEqual(messages.map(m=>m.message.to).sort(),[a.owner.email,a.member.email].sort());
+      assert.deepEqual(messages.map(m=>m.key).sort(),keys.sort());
+      assert.ok(messages.every(m=>m.message.text.includes(`/history/${br.id}`)));
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,2);
+      const disabled=await bracket(a,{finale:true});
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE bracket_id=?',[disabled.id]);
+      await db.pool.execute("UPDATE brackets SET status='complete',completed_at=NOW(6),automatic_emails_disabled=TRUE WHERE bracket_id=?",[disabled.id]);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,2,'automatic email opt-out honored');
+      const optedOut=await bracket(a,{finale:true});
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='declined' WHERE bracket_id=? AND user_id=?",[optedOut.id,a.member.id]);
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE bracket_id=?',[optedOut.id]);
+      await db.pool.execute("UPDATE brackets SET status='complete',completed_at=NOW(6) WHERE bracket_id=?",[optedOut.id]);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,3);assert.equal(messages.at(-1).message.to,a.owner.email);
     });
 
     await t.test('legacy role migration preserves accounts and assigns bracket role defaults',async()=>{

@@ -61,7 +61,7 @@ export async function finalizeClosedMatchups(connection,bracketId=null,weekId=nu
           );
         } else if (Number(matchup.roundNumber) === Number(matchup.finalRoundNumber)) {
           await connection.execute(
-            `UPDATE brackets SET status='complete',completed_at=NOW()
+            `UPDATE brackets SET status='complete',completed_at=NOW(6)
              WHERE bracket_id=? AND completed_at IS NULL`,
             [matchup.bracketId]
           );

@@ -227,3 +227,7 @@ Delivery records survive restarts. Failed attempts retry after one minute; aband
 Before deploying this version, run `database/migrate_bracket_automatic_emails.sql` once on each existing `music_bracket` database. New databases include these columns in `database/schema.sql`.
 
 The bracket form saves **Disable Automatic Emails** with the bracket. Accepted commissioners also have an immediately saved checkbox on the active bracket page. This disables session start/end notifications (including the last online session announcement), not invitations, invitation-status messages, or Write email. Re-enabling applies to future session events without sending missed notifications. An email already submitted to the delivery provider cannot be recalled.
+
+### Winner announcement emails
+
+Before deploying winner announcements, run each statement in `database/migrate_winner_emails.sql` once on existing databases. The existing production email worker sends a champion announcement after a bracket completes, including finale mode. It names the winning song/artist, thanks accepted participants (including finale-only members), and links to `/history/:bracketId`. Delivery uses the persisted queue, retries, and provider idempotency. Disable Automatic Emails also suppresses winner announcements. Brackets completed before this migration are excluded to avoid unexpectedly emailing historical participants.
