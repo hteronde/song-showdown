@@ -28,7 +28,7 @@ import { getBracketAlbums, resolveSongAlbums, saveBracketAlbum, removeBracketAlb
 import { canPreserveBracketStructure, applyLiveBracketEdit } from './live-bracket-edit.mjs';
 import { memberMatchupView } from './member-bracket-view.mjs';
 import { loadAdminBallots, saveAdminBallots, getBallotEditingRound, roundAllowsBallotEditing, correctedWinner } from './admin-ballots.mjs';
-import { setBracketPaused } from './bracket-pause.mjs';
+import { setBracketPaused, getResumeSchedule, resumeWithSchedule } from './bracket-pause.mjs';
 import { tiebreakerOptions, validateSeedTiebreaker } from './tiebreaker.mjs';
 import { saveBracketSongs } from './bracket-song-save.mjs';
 import { createServer } from 'node:http';
@@ -399,11 +399,19 @@ const server = createServer(async (request, response) => {
         return;
       }
       const pauseRoute = url.pathname.match(/^\/api\/admin\/brackets\/(\d+)\/(pause|resume)$/);
+      if(request.method==='GET' && pauseRoute?.[2]==='resume') {
+        try { send(200,await getResumeSchedule(pool,Number(pauseRoute[1]),familyId)); }
+        catch(error) { send(error.status||500,{error:error.message}); }
+        return;
+      }
       if (request.method === 'POST' && pauseRoute) {
+        const input=await readJson(request);
         const connection = await pool.getConnection();
         try {
           await connection.beginTransaction();
-          const result = await setBracketPaused(connection,Number(pauseRoute[1]),familyId,pauseRoute[2] === 'pause');
+          const result = pauseRoute[2]==='resume' && input.sessions !== undefined
+            ? await resumeWithSchedule(connection,Number(pauseRoute[1]),familyId,input)
+            : await setBracketPaused(connection,Number(pauseRoute[1]),familyId,pauseRoute[2] === 'pause');
           await connection.commit(); send(200,result);
         } catch (error) { await connection.rollback(); send(error.status || 500,{error:error.message}); }
         finally { connection.release(); }

@@ -654,6 +654,54 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,3);assert.equal(messages.at(-1).message.to,a.owner.email);
     });
 
+    await t.test('resume schedule previews the hold delay and saves commissioner dates atomically',async()=>{
+      const br=await bracket(a),path=`/api/admin/brackets/${br.id}/resume`;
+      await db.pool.execute("UPDATE bracket_members SET bracket_role='commissioner' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      await db.pool.execute('UPDATE brackets SET session_duration_minutes=60,paused_at=DATE_SUB(NOW(6),INTERVAL 30 SECOND) WHERE bracket_id=?',[br.id]);
+      await db.pool.execute('UPDATE bracket_weeks SET closes_at=DATE_ADD(NOW(6),INTERVAL 1 HOUR) WHERE week_id=?',[br.weeks[0]]);
+      await db.pool.execute('UPDATE bracket_weeks SET opens_at=DATE_ADD(NOW(6),INTERVAL 1 HOUR),closes_at=DATE_ADD(NOW(6),INTERVAL 2 HOUR) WHERE week_id=?',[br.weeks[1]]);
+      const snapshot=async()=>({bracket:(await db.pool.execute('SELECT start_at,paused_at,status FROM brackets WHERE bracket_id=?',[br.id]))[0],weeks:(await db.pool.execute('SELECT * FROM bracket_weeks WHERE bracket_id=? ORDER BY week_number',[br.id]))[0],matches:(await db.pool.execute('SELECT * FROM matchups WHERE bracket_id=?',[br.id]))[0]});
+      const before=await snapshot();
+      assert.equal((await http(path,{cookie:b.owner.cookie})).status,404);
+      const loaded=await http(path,{cookie:a.member.cookie});assert.equal(loaded.status,200,JSON.stringify(loaded.body));
+      const plan=loaded.body;
+      assert.equal(plan.sessions[0].startLocked,true);assert.equal(plan.sessions[1].startLocked,false);
+      assert.ok(new Date(plan.sessions[0].closesAt)-new Date(before.weeks[0].closes_at)>=29000);
+      assert.deepEqual(await snapshot(),before,'opening or cancelling a preview never changes the bracket');
+      const sessions=plan.sessions.map(({weekId,opensAt,closesAt})=>({weekId,opensAt,closesAt}));
+      sessions[1].opensAt=new Date(Date.now()+3*3600000).toISOString();sessions[1].closesAt=new Date(Date.now()+4*3600000).toISOString();
+      const body={revision:plan.revision,pausedAt:plan.effectiveAt,sessions};
+      const invalid=await http(path,{method:'POST',cookie:a.member.cookie,body:{...body,sessions:sessions.map((row,i)=>i?{...row,opensAt:sessions[0].opensAt}:row)}});
+      assert.equal(invalid.status,400);assert.deepEqual(await snapshot(),before);
+      assert.equal((await http(path,{method:'POST',cookie:a.member.cookie,body:{...body,revision:'stale'}})).status,409);
+      const results=await Promise.all([http(path,{method:'POST',cookie:a.member.cookie,body}),http(path,{method:'POST',cookie:a.member.cookie,body})]);
+      assert.deepEqual(results.map(result=>result.status).sort(),[200,409]);
+      const after=await snapshot();assert.equal(after.bracket[0].paused_at,null);
+      assert.deepEqual(after.matches,before.matches);
+      for(let i=0;i<sessions.length;i++) {
+        assert.equal(new Date(after.weeks[i].opens_at).getTime(),new Date(sessions[i].opensAt).getTime());
+        assert.equal(new Date(after.weeks[i].closes_at).getTime(),new Date(sessions[i].closesAt).getTime());
+      }
+      assert.equal((await http(path,{cookie:a.member.cookie})).status,409);
+    });
+    await t.test('resume supports untimed sessions and protects completed sessions and member access',async()=>{
+      const br=await bracket(a),path=`/api/admin/brackets/${br.id}/resume`;
+      await db.pool.execute('UPDATE brackets SET paused_at=NOW(6) WHERE bracket_id=?',[br.id]);
+      assert.equal((await http(path,{cookie:a.member.cookie})).status,404);
+      const plan=(await http(path,{cookie:a.owner.cookie})).body;
+      const body={revision:plan.revision,pausedAt:plan.effectiveAt,sessions:plan.sessions.map(({weekId,opensAt,closesAt})=>({weekId,opensAt,closesAt}))};
+      assert.equal((await http(path,{method:'POST',cookie:a.member.cookie,body})).status,404);
+      assert.equal((await http(path,{method:'POST',cookie:a.owner.cookie,body})).status,200);
+      const [[next]]=await db.pool.execute('SELECT opens_at,closes_at FROM bracket_weeks WHERE week_id=?',[br.weeks[1]]);assert.equal(next.opens_at,null);assert.equal(next.closes_at,null);
+      await db.pool.execute('UPDATE bracket_weeks SET closes_at=DATE_SUB(NOW(6),INTERVAL 1 SECOND) WHERE week_id=?',[br.weeks[0]]);
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE week_id=?',[br.weeks[0]]);
+      await db.pool.execute('UPDATE brackets SET paused_at=NOW(6) WHERE bracket_id=?',[br.id]);
+      const completedPlan=(await http(path,{cookie:a.owner.cookie})).body;
+      assert.equal(completedPlan.sessions[0].endLocked,true);
+      const changed=completedPlan.sessions.map(({weekId,opensAt,closesAt},i)=>({weekId,opensAt:i?opensAt:new Date(Date.now()-7200000).toISOString(),closesAt}));
+      assert.equal((await http(path,{method:'POST',cookie:a.owner.cookie,body:{revision:completedPlan.revision,pausedAt:completedPlan.effectiveAt,sessions:changed}})).status,409);
+      const [[state]]=await db.pool.execute('SELECT paused_at FROM brackets WHERE bracket_id=?',[br.id]);assert.ok(state.paused_at);
+    });
     await t.test('legacy role migration preserves accounts and assigns bracket role defaults',async()=>{
       await db.pool.query("ALTER TABLE users MODIFY user_role ENUM('super','viewer','owner','member') NULL");
       await db.pool.query("UPDATE users SET user_role=CASE user_role WHEN 'super' THEN 'owner' WHEN 'viewer' THEN 'member' ELSE user_role END");

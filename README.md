@@ -241,3 +241,7 @@ For the one-time Radiohead testing cleanup, `node --env-file=.env scripts/cleanu
 ### Combined session notifications
 
 Participants receive one email when a session opens. The first session announces only its start; subsequent sessions also say the previous session ended and include the new deadline and bracket link. Ordinary session-end emails are no longer sent, including queued old end notifications. If there is a gap between sessions, the combined email waits until the next session actually opens. The final online-session finale reminder and completed-bracket winner announcement remain separate events. Existing notification records prevent repeat start emails after deployment; no schema migration is required.
+
+### Reviewing session dates on resume
+
+Resume opens the same individual-session date fields used by Edit bracket, on both the active page and management list. The preview includes the elapsed hold duration; commissioners can adjust upcoming dates and the current session’s closing time. Save dates and resume commits the reviewed schedule and clears the pause together, without shifting dates again. Cancel leaves everything paused. Past sessions and existing opening times stay locked, and stale edits must be reopened. This change requires no database migration.

@@ -312,11 +312,7 @@
         <p class="hint">You can edit the previewed start and end of each session. Sessions cannot overlap. Moving an undecided session’s end into the past closes its voting when saved.</p>
         <p class="hint" *ngIf="sessionsNoTimer">Untimed sessions can have no end date. Leave a future start blank to open it automatically after the preceding session is decided.</p>
         <p class="hint" *ngIf="sessionsPaused">This bracket is on hold. Scheduled dates will shift forward by the hold duration when it resumes.</p>
-        <div class="session-list"><div class="session-row" *ngFor="let session of onlineSessions">
-          <div><strong>Week {{ session.weekNumber }}</strong><small>{{ session.roundName }} · {{ session.matchupCount }} {{ session.matchupCount === 1 ? 'matchup' : 'matchups' }}</small><small>{{ session.state }}</small></div>
-          <label>Starts<input type="datetime-local" step="1" [name]="'session-start-' + session.weekId" [(ngModel)]="session.startInput" [disabled]="sessionsSaving" [attr.aria-label]="'Week ' + session.weekNumber + ' start'"><small *ngIf="!session.startInput && sessionsNoTimer">After the previous session</small></label>
-          <label>Ends<input type="datetime-local" step="1" [name]="'session-end-' + session.weekId" [(ngModel)]="session.endInput" [disabled]="sessionsSaving" [attr.aria-label]="'Week ' + session.weekNumber + ' end'"><small *ngIf="!session.endInput && sessionsNoTimer">No timer</small></label>
-        </div></div>
+        <app-session-date-fields [sessions]="onlineSessions" [saving]="sessionsSaving" [noTimer]="sessionsNoTimer"></app-session-date-fields>
         <section class="finale-session-summary" *ngIf="finaleSessionSummary as finale" aria-label="Finale Week">
           <div><strong>Finale Week</strong><small>{{ finale.roundRange }}</small><small>{{ finale.matchupCount }} {{ finale.matchupCount === 1 ? 'matchup' : 'matchups' }}</small></div>
           <div class="finale-session-date"><span>Finale Date</span><strong>{{ finaleDate ? (finaleDate | date:'mediumDate') : 'Choose a Finale Date above' }}</strong></div>
@@ -369,3 +365,5 @@
 </dialog>
 
 <app-bracket-email-composer #emailComposer (sent)="success = $event"></app-bracket-email-composer>
+
+<app-resume-bracket-dialog (resumed)="bracketResumed()"></app-resume-bracket-dialog>

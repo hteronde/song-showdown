@@ -1,3 +1,5 @@
+import { SessionDateFieldsComponent } from '../ui/session-date-fields.component';
+import { ResumeBracketDialogComponent } from '../ui/resume-bracket-dialog.component';
 import { BracketEmailComposerComponent } from '../ui/bracket-email-composer.component';
 import { AuthApiService } from '../../auth/data-access/auth-api.service';
 import { apiErrorMessage } from '../../shared/data-access/api-client';
@@ -14,7 +16,7 @@ import { FormsModule } from '@angular/forms';
 import { BracketsApiService, InvitationParticipant } from '../data-access/brackets-api.service';
 import { SessionPlaylist, BracketSession, BracketSessionsData, BracketInput, BracketParticipant, BracketRecord, BracketSong, BracketAlbum, TiebreakerOption, RandomizationMode } from '../data-access/bracket.model';
 @Component({
-    selector: 'app-brackets-page', standalone: true, imports: [CommonModule, FormsModule, BracketEmailComposerComponent],
+    selector: 'app-brackets-page', standalone: true, imports: [SessionDateFieldsComponent, ResumeBracketDialogComponent, CommonModule, FormsModule, BracketEmailComposerComponent],
     templateUrl: './brackets-page.component.html', styleUrls: ['./brackets-page.component.css']
 })
 export class BracketsPageComponent implements OnInit, OnDestroy {
@@ -1118,7 +1120,10 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             await retry();
     }
     pauseSavingId: number | null = null;
+    @ViewChild(ResumeBracketDialogComponent) resumeDialog?: ResumeBracketDialogComponent;
+    async bracketResumed(): Promise<void> { this.success='Session dates saved. Bracket resumed.'; await this.load(); }
     async togglePaused(bracket: BracketRecord): Promise<void> {
+        if(bracket.pausedAt) { void this.resumeDialog?.open(bracket.bracketId); return; }
         this.pauseSavingId = bracket.bracketId;
         this.error = '';
         try {

@@ -1,3 +1,4 @@
+import { ResumeBracketDialogComponent } from '../ui/resume-bracket-dialog.component';
 import { BracketEmailComposerComponent } from '../ui/bracket-email-composer.component';
 import { ApiError } from '../../shared/data-access/api-client';
 import { BracketRequests, VoteDrafts } from '../state/voting-state';
@@ -21,7 +22,7 @@ interface RevealedRound {
     }>;
 }
 @Component({
-    selector: 'app-active-bracket-page', standalone: true, imports: [BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent],
+    selector: 'app-active-bracket-page', standalone: true, imports: [ResumeBracketDialogComponent, BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent],
     templateUrl: './active-bracket-page.component.html',
     styleUrls: ['./active-bracket-page.component.css', '../ui/bracket-connectors.css']
 })
@@ -197,9 +198,12 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         const seconds = Math.max(0, Math.ceil((new Date(closes).getTime() - new Date(pause).getTime()) / 1000));
         return `${Math.floor(seconds / 60)}m ${seconds % 60}s remaining`;
     }
+    @ViewChild(ResumeBracketDialogComponent) resumeDialog?: ResumeBracketDialogComponent;
+    async bracketResumed(): Promise<void> { this.notice='Session dates saved. Bracket resumed.'; await this.refresh(); }
     async togglePaused(): Promise<void> {
         if (!this.isAdmin || !this.data || this.pauseSaving)
             return;
+        if(this.paused) { void this.resumeDialog?.open(this.data.bracket.bracketId); return; }
         this.pauseSaving = true;
         this.error = '';
         try {
