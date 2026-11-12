@@ -45,7 +45,7 @@
     <div class="finale-notice" *ngIf="finaleNotice">{{ finaleNotice }}</div>
     <app-bracket-champion [bracketId]="selectedBracket?.bracketId || 0" [champion]="bracketChampion" [celebrate]="celebrateChampion"></app-bracket-champion>
     <div class="notice-bar" *ngIf="!bracketChampion && selectedBracket"><span class="notice-icon">◉</span><span>The database does not have a championship winner recorded yet.</span></div>
-    <section class="playlist-section" *ngIf="bracketPlaylists.length && !finaleSessionActive && !finaleSessionPaused" aria-label="Bracket playlists">
+    <section class="playlist-section" *ngIf="bracketPlaylists.length && !finaleSetupOpen && !finaleSessionActive && !finaleSessionPaused" aria-label="Bracket playlists">
       <div class="history-subhead"><div><span class="stat-label">LISTEN ALONG</span><h3>Bracket playlists</h3></div></div>
       <div class="playlist-links">
         <a class="playlist-link" *ngFor="let playlist of bracketPlaylists" [href]="playlist.playlistUrl" target="_blank" rel="noopener noreferrer">
