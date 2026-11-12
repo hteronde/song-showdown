@@ -82,3 +82,25 @@ test('request state rejects old same-bracket responses and invalidates on dispos
   assert.equal(requests.isCurrent(a,1),false);assert.equal(requests.isCurrent(latest,1),true);
   requests.invalidate();assert.equal(requests.isCurrent(latest,1),false);
 });
+
+test('session end edits link following starts and preserve durations in both directions',()=>{
+  const rows=[{startInput:'2026-11-12T10:00:00',endInput:'2026-11-12T11:00:00'},
+    {startInput:'2026-11-12T11:00:00',endInput:'2026-11-12T12:00:00'},
+    {startInput:'2026-11-12T13:00:00',endInput:'2026-11-12T15:00:00'}];
+  schedule.updateSessionEnd(rows,0,'2026-11-12T14:00:00');
+  assert.equal(rows[1].startInput,rows[0].endInput);
+  assert.equal(rows[1].endInput,'2026-11-12T15:00:00');
+  assert.equal(rows[2].startInput,rows[1].endInput);
+  assert.equal(rows[2].endInput,'2026-11-12T17:00:00');
+  schedule.updateSessionEnd(rows,0,'2026-11-12T11:00:00');
+  assert.equal(rows[1].endInput,'2026-11-12T12:00:00');
+  assert.equal(rows[2].endInput,'2026-11-12T14:00:00');
+});
+test('linked session edits preserve locked history and finale and handle untimed windows',()=>{
+  const past={startInput:'2026-11-12T08:00:00',endInput:'2026-11-12T09:00:00',endLocked:true};
+  const finale={startInput:'2026-11-13T18:00:00',endInput:'',isFinale:true};
+  const rows=[past,{startInput:'2026-11-12T09:00:00',endInput:'2026-11-12T10:00:00'},{startInput:'',endInput:''},finale];
+  schedule.updateSessionEnd(rows,0,'2026-11-12T12:00:00');assert.equal(past.endInput,'2026-11-12T09:00:00');
+  schedule.updateSessionEnd(rows,1,'2026-11-12T12:00:00');assert.equal(rows[2].startInput,rows[1].endInput);assert.equal(rows[2].endInput,'');assert.equal(finale.startInput,'2026-11-13T18:00:00');
+  schedule.updateSessionEnd(rows,1,'');assert.equal(rows[2].startInput,'');
+});

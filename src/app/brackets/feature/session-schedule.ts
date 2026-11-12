@@ -89,3 +89,25 @@ export function summarizeFinaleSessions(sessions: BracketSession[]): {
     const first = finale[0].roundName, last = finale[finale.length - 1].roundName;
     return { roundRange: first === last ? first : `${first} - ${last}`, matchupCount: finale.reduce((total, session) => total + Number(session.matchupCount), 0) };
 }
+
+// Keep subsequent voting windows contiguous while preserving their durations.
+export function updateSessionEnd(rows: Array<SessionEditorRow & {startLocked?:boolean;endLocked?:boolean}>, index: number, value: string): void {
+    const row = rows[index];
+    if (!row || row.endLocked) return;
+    row.endInput = value;
+    if (value && !Number.isFinite(new Date(value).getTime())) return;
+    for (let i = index + 1; i < rows.length; i++) {
+        const previous = rows[i - 1], next = rows[i];
+        if (next.startLocked || next.endLocked || next.isFinale || next.state === 'Decided' || next.state === 'Awaiting results') break;
+        const duration = new Date(next.endInput).getTime() - new Date(next.startInput).getTime();
+        next.startInput = previous.endInput;
+        if (!next.startInput) break; // Untimed sessions open after the preceding session.
+        if (Number.isFinite(duration) && duration > 0) {
+            next.endInput = sessionDateInput(new Date(new Date(next.startInput).getTime() + duration).toISOString());
+        } else if (!next.endInput) {
+            // A session without a timer has no scheduled boundary to propagate.
+            if (rows[i + 1] && !rows[i + 1].startLocked && !rows[i + 1].isFinale) rows[i + 1].startInput = '';
+            break;
+        } else break; // Keep invalid values visible for correction; server validation rejects them.
+    }
+}

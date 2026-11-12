@@ -1,5 +1,6 @@
-        <div class="session-list"><div class="session-row" *ngFor="let session of sessions">
+<p class="schedule-hint">Changing an end date moves the next session’s start to the same time. Later sessions shift together, keeping their durations.</p>
+        <div class="session-list"><div class="session-row" *ngFor="let session of sessions; let i = index">
           <div><strong>Week {{ session.weekNumber }}</strong><small>{{ session.roundName }} · {{ session.matchupCount }} {{ session.matchupCount === 1 ? 'matchup' : 'matchups' }}</small><small>{{ session.state }}</small></div>
-          <label>Starts<input type="datetime-local" step="1" [name]="'session-start-' + session.weekId" [(ngModel)]="session.startInput" [disabled]="saving || !!session.startLocked" [attr.aria-label]="'Week ' + session.weekNumber + ' start'"><small *ngIf="!session.startInput && noTimer">After the previous session</small></label>
-          <label>Ends<input type="datetime-local" step="1" [name]="'session-end-' + session.weekId" [(ngModel)]="session.endInput" [disabled]="saving || !!session.endLocked" [attr.aria-label]="'Week ' + session.weekNumber + ' end'"><small *ngIf="!session.endInput && noTimer">No timer</small></label>
+          <label>Starts<input type="datetime-local" step="1" [name]="'session-start-' + session.weekId" [(ngModel)]="session.startInput" [disabled]="saving || !!session.startLocked" [readOnly]="i > 0 && !!sessions[i - 1].endInput" [attr.aria-label]="'Week ' + session.weekNumber + ' start'"><small *ngIf="!session.startInput && noTimer">After the previous session</small></label>
+          <label>Ends<input type="datetime-local" step="1" [name]="'session-end-' + session.weekId" [ngModel]="session.endInput" (ngModelChange)="updateEnd(i,$event)" [disabled]="saving || !!session.endLocked" [attr.aria-label]="'Week ' + session.weekNumber + ' end'"><small *ngIf="!session.endInput && noTimer">No timer</small></label>
         </div></div>
