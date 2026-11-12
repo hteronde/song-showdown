@@ -243,6 +243,31 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
 
     });
 
+    await t.test('declined invitations stay in upcoming navigation after login until the start time',async()=>{
+      const br=await bracket(a);
+      await db.pool.execute("UPDATE brackets SET start_at=DATE_ADD(NOW(),INTERVAL 1 HOUR) WHERE bracket_id=?",[br.id]);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='declined' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      const login=await http('/api/auth/login',{method:'POST',body:{username:a.member.email,password}});
+      assert.equal(login.status,200);
+      const links=()=>http('/api/my/brackets',{cookie:login.cookie});
+      const upcoming=(await links()).body.brackets.find(row=>row.bracketId===br.id);
+      assert.equal(upcoming.navigationStatus,'upcoming');assert.equal(upcoming.invitationStatus,'declined');assert.equal(upcoming.logoUrl,null);
+      const invitation=await http(`/api/brackets/${br.id}/invitation`,{cookie:login.cookie});
+      assert.equal(invitation.status,200);assert.equal(invitation.body.canAccess,false);
+      assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:login.cookie})).status,404);
+      assert.equal((await vote(br,a.member)).status,404);
+      await db.pool.execute('UPDATE brackets SET start_at=DATE_SUB(NOW(),INTERVAL 1 SECOND) WHERE bracket_id=?',[br.id]);
+      assert.ok(!(await links()).body.brackets.some(row=>row.bracketId===br.id));
+      await db.pool.execute('UPDATE brackets SET start_at=DATE_ADD(NOW(),INTERVAL 1 HOUR) WHERE bracket_id=?',[br.id]);
+      await db.pool.execute("UPDATE brackets SET status='draft' WHERE bracket_id=?",[br.id]);
+      assert.ok(!(await links()).body.brackets.some(row=>row.bracketId===br.id));
+      await db.pool.execute("UPDATE brackets SET status='complete',completed_at=NOW() WHERE bracket_id=?",[br.id]);
+      assert.ok(!(await links()).body.brackets.some(row=>row.bracketId===br.id));
+      await db.pool.execute("UPDATE brackets SET status='active',completed_at=NULL WHERE bracket_id=?",[br.id]);
+      await db.pool.execute('DELETE FROM bracket_members WHERE bracket_id=? AND user_id=?',[br.id,a.member.id]);
+      assert.ok(!(await links()).body.brackets.some(row=>row.bracketId===br.id));
+    });
+
     await t.test('publishing creates pending invitations; email retry and concurrent response preserve consent',async()=>{
       const created=await http('/api/admin/brackets',{cookie:a.owner.cookie,method:'POST',body:{title:'Invitation test',artist:'Hidden songs',songCount:4,songList:'Secret A\nSecret B\nSecret C\nSecret D',participantIds:[a.owner.id,a.member.id],participantRoles:{[a.owner.id]:'commissioner'},startAt:'2027-06-01T18:00:00Z',songsPerSession:2,sessionDurationMinutes:null,tiebreakerOption:'random'}});
       assert.equal(created.status,201,JSON.stringify(created.body));
@@ -449,7 +474,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const commissionerBody={participantIds:[a.owner.id,a.member.id,Number(actor.insertId)],invitationChanges:[{userId:a.member.id,previousStatus:'accepted',status:'declined'}]};
       assert.equal((await http(path,{cookie:login.cookie,method:'PUT',body:commissionerBody})).status,200);
       assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,404);
-      assert.ok(!(await http('/api/my/brackets',{cookie:a.member.cookie})).body.brackets.some(row=>row.bracketId===br.id));
+      assert.equal((await http('/api/my/brackets',{cookie:a.member.cookie})).body.brackets.find(row=>row.bracketId===br.id)?.navigationStatus,'upcoming');
       assert.equal((await http(path,{cookie:login.cookie,method:'PUT',body:{...commissionerBody,invitationChanges:body.invitationChanges}})).status,200);
       assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie})).body.invitationStatus,'accepted');
       assert.equal((await http(path,{cookie:login.cookie,method:'PUT',body:{...commissionerBody,invitationChanges:[{userId:a.member.id,previousStatus:'accepted',status:'invalid'}]}})).status,400);

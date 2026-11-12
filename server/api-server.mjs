@@ -693,7 +693,8 @@ const server = createServer(async (request, response) => {
          JOIN bracket_members bm ON bm.bracket_id=b.bracket_id
          WHERE bm.user_id=?
            AND (bm.non_finale_participant=TRUE OR bm.finale_participant=TRUE)
-           AND b.status<>'draft' AND bm.invitation_status<>'declined'
+           AND b.status<>'draft'
+           AND (bm.invitation_status<>'declined' OR (b.start_at>NOW() AND b.status<>'complete' AND b.completed_at IS NULL))
            AND (${effectiveBracketStatus}='active' OR (b.start_at>NOW() AND b.status<>'complete' AND b.completed_at IS NULL) OR bm.invitation_status='pending')
          ORDER BY b.start_at DESC,b.created_at DESC`,[authenticatedUser.userId]);
       send(200,{brackets});
