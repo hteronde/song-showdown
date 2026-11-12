@@ -589,3 +589,5 @@
 
 
 .automatic-email-setting { display: flex; align-items: center; gap: 8px; margin: 0 0 28px; }
+
+.advance-schedule-dialog{width:min(960px,calc(100vw - 32px))}

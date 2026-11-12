@@ -1,3 +1,5 @@
+import {SessionDateFieldsComponent,EditableSessionRow} from '../ui/session-date-fields.component';
+import {sessionEditorRows,sessionSchedulePayload,sessionDateInput} from './session-schedule';
 import { ResumeBracketDialogComponent } from '../ui/resume-bracket-dialog.component';
 import { BracketEmailComposerComponent } from '../ui/bracket-email-composer.component';
 import { ApiError } from '../../shared/data-access/api-client';
@@ -22,7 +24,7 @@ interface RevealedRound {
     }>;
 }
 @Component({
-    selector: 'app-active-bracket-page', standalone: true, imports: [ResumeBracketDialogComponent, BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent],
+    selector: 'app-active-bracket-page', standalone: true, imports: [SessionDateFieldsComponent, ResumeBracketDialogComponent, BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent],
     templateUrl: './active-bracket-page.component.html',
     styleUrls: ['./active-bracket-page.component.css', '../ui/bracket-connectors.css']
 })
@@ -124,8 +126,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     @ViewChild('advanceWeekDialog')
     advanceWeekDialog?: ElementRef<HTMLDialogElement>;
     advancePlan: AdvanceWeekPlan | null = null;
-    nextSessionEnd = '';
-    nextSessionUntimed = false;
+    advanceSessions:EditableSessionRow[]=[];
     advancing = false;
     advanceLoading = false;
     advanceError = '';
@@ -141,9 +142,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         this.advanceWeekDialog?.nativeElement.showModal();
         try {
             this.advancePlan = await this.api.getAdvanceWeekPlan(this.data.bracket.bracketId);
-            this.nextSessionUntimed = this.advancePlan.noTimer && !this.advancePlan.nextClosesAt;
-            const end = this.advancePlan.nextClosesAt ? new Date(this.advancePlan.nextClosesAt) : new Date(Date.now() + 86400000);
-            this.nextSessionEnd = new Date(end.getTime() - end.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+            this.advanceSessions = sessionEditorRows(this.advancePlan.sessions);
         }
         catch (error) {
             this.advanceError = error instanceof Error ? error.message : 'Could not load the next session.';
@@ -160,15 +159,16 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     async confirmAdvanceWeek(): Promise<void> {
         if (!this.advancePlan || !this.data || this.advancing)
             return;
-        const end = this.advancePlan.nextWeekId != null && !this.nextSessionUntimed ? new Date(this.nextSessionEnd) : null;
-        if (end && (!Number.isFinite(end.getTime()) || end <= new Date())) {
-            this.advanceError = 'The next session must end in the future.';
-            return;
-        }
         this.advancing = true;
         this.advanceError = '';
         try {
-            await this.api.advanceWeek(this.data.bracket.bracketId, this.advancePlan.weekId, end?.toISOString() ?? null);
+            const dates=sessionSchedulePayload(this.advanceSessions);
+            const first=this.advanceSessions[0];
+            await this.api.advanceWeek(this.data.bracket.bracketId, this.advancePlan.weekId, null, {
+                revision:this.advancePlan.revision,
+                nextStartsNow:!!first && first.startInput===sessionDateInput(first.opensAt),
+                sessions:this.advanceSessions.map((row,i)=>({weekId:row.weekId,opensAt:dates[i].opensAt,closesAt:dates[i].closesAt}))
+            });
             this.advanceWeekDialog?.nativeElement.close();
             await this.refresh();
             this.notice = 'Voting week advanced.';

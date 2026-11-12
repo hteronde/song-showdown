@@ -1,3 +1,4 @@
+import {BracketSession} from './bracket.model';
 import { apiRequest } from '../../shared/data-access/api-client';
 import { Injectable } from '@angular/core';
 
@@ -62,7 +63,7 @@ export interface ActiveBracketVotingData {
   weeks: VotingWeek[];
 }
 
-export interface AdvanceWeekPlan {weekId:number;weekNumber:number;nextWeekId:number|null;nextWeekNumber:number|null;nextClosesAt:string|null;noTimer:boolean;}
+export interface AdvanceWeekPlan {revision:string;sessions:BracketSession[];weekId:number;weekNumber:number;nextWeekId:number|null;nextWeekNumber:number|null;nextClosesAt:string|null;noTimer:boolean;}
 
 @Injectable({ providedIn: 'root' })
 export class ActiveBracketApiService {
@@ -75,8 +76,8 @@ export class ActiveBracketApiService {
   getAdvanceWeekPlan(bracketId: number, signal?: AbortSignal): Promise<AdvanceWeekPlan> {
     return apiRequest(`/api/admin/brackets/${bracketId}/advance-week`, {signal});
   }
-  async advanceWeek(bracketId: number, weekId: number, nextClosesAt: string | null): Promise<void> {
-    await apiRequest(`/api/admin/brackets/${bracketId}/advance-week`, {method: 'POST', json: {weekId, nextClosesAt}});
+  async advanceWeek(bracketId: number, weekId: number, nextClosesAt: string | null, schedule?:{revision:string;nextStartsNow:boolean;sessions:Array<{weekId:number;opensAt:string|null;closesAt:string|null}>}): Promise<void> {
+    await apiRequest(`/api/admin/brackets/${bracketId}/advance-week`, {method: 'POST', json: {weekId, nextClosesAt, ...schedule}});
   }
   async setPaused(bracketId: number, paused: boolean): Promise<void> {
     await apiRequest(`/api/admin/brackets/${bracketId}/${paused ? 'pause' : 'resume'}`, {method: 'POST'});

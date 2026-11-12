@@ -405,6 +405,50 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const [writes]=await db.pool.execute('SELECT matchup_id,COUNT(*) AS total FROM integration_winner_writes WHERE matchup_id IN (?,?) GROUP BY matchup_id ORDER BY matchup_id',[br.matches[0],br.matches[1]]);
       assert.equal(writes.length,2);assert.ok(writes.every(row=>Number(row.total)===1));
     });
+    await t.test('advance week saves every upcoming session atomically without shifting custom durations',async()=>{
+      const br=await bracket(a),path=`/api/admin/brackets/${br.id}/advance-week`;
+      await db.pool.execute("UPDATE bracket_members SET bracket_role='commissioner' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      await db.pool.execute('UPDATE brackets SET session_duration_minutes=60 WHERE bracket_id=?',[br.id]);
+      await db.pool.execute('UPDATE bracket_weeks SET closes_at=DATE_ADD(NOW(6),INTERVAL 1 HOUR) WHERE week_id=?',[br.weeks[0]]);
+      await db.pool.execute('UPDATE bracket_weeks SET week_number=3,opens_at=DATE_ADD(NOW(6),INTERVAL 2 HOUR),closes_at=DATE_ADD(NOW(6),INTERVAL 3 HOUR) WHERE week_id=?',[br.weeks[1]]);
+      const [[round]]=await db.pool.execute('SELECT round_id FROM bracket_weeks WHERE week_id=?',[br.weeks[0]]);
+      const [middle]=await db.pool.execute('INSERT INTO bracket_weeks (bracket_id,round_id,week_number,opens_at,closes_at) VALUES (?,?,2,DATE_ADD(NOW(6),INTERVAL 1 HOUR),DATE_ADD(NOW(6),INTERVAL 2 HOUR))',[br.id,round.round_id]);
+      await db.pool.execute('UPDATE matchups SET week_id=? WHERE matchup_id=?',[middle.insertId,br.matches[1]]);
+      const snapshot=async()=>(await db.pool.execute('SELECT * FROM bracket_weeks WHERE bracket_id=? ORDER BY week_number',[br.id]))[0];
+      const before=await snapshot();
+      assert.equal((await http(path,{cookie:b.owner.cookie})).status,404);
+      const loaded=await http(path,{cookie:a.member.cookie});assert.equal(loaded.status,200);
+      const plan=loaded.body;assert.equal(plan.sessions.length,2);assert.ok(plan.sessions.every(row=>row.weekNumber>plan.weekNumber));
+      assert.deepEqual(await snapshot(),before);
+      const date=hours=>new Date(Date.now()+hours*3600000).toISOString();
+      const boundary=date(2),sessions=plan.sessions.map((row,i)=>({weekId:row.weekId,opensAt:i?boundary:date(1),closesAt:i?date(5):boundary}));
+      const body={weekId:plan.weekId,revision:plan.revision,nextStartsNow:false,sessions};
+      assert.equal((await http(path,{cookie:a.member.cookie,method:'POST',body:{...body,revision:'stale'}})).status,409);
+      assert.equal((await http(path,{cookie:a.member.cookie,method:'POST',body:{...body,sessions:sessions.map((row,i)=>i?{...row,opensAt:sessions[0].opensAt}:row)}})).status,400);
+      assert.deepEqual(await snapshot(),before,'invalid dates do not close the current session');
+      const saved=await http(path,{cookie:a.member.cookie,method:'POST',body});assert.equal(saved.status,200,JSON.stringify(saved.body));
+      const after=await snapshot();
+      for(let i=0;i<sessions.length;i++) {
+        assert.equal(new Date(after[i+1].opens_at).getTime(),new Date(sessions[i].opensAt).getTime());
+        assert.equal(new Date(after[i+1].closes_at).getTime(),new Date(sessions[i].closesAt).getTime());
+      }
+      const [[winner]]=await db.pool.execute('SELECT winner_entry_id FROM matchups WHERE matchup_id=?',[br.matches[0]]);assert.ok(winner.winner_entry_id);
+      assert.equal((await http(path,{cookie:a.member.cookie,method:'POST',body})).status,409);
+    });
+    await t.test('advance schedule opens next untimed session now and rolls back unresolved ties',async()=>{
+      const br=await bracket(a),path=`/api/admin/brackets/${br.id}/advance-week`;
+      const plan=(await http(path,{cookie:a.owner.cookie})).body;
+      const body={weekId:plan.weekId,revision:plan.revision,nextStartsNow:true,sessions:plan.sessions.map(({weekId,opensAt,closesAt})=>({weekId,opensAt,closesAt}))};
+      assert.equal((await http(path,{cookie:a.member.cookie,method:'POST',body})).status,404);
+      await db.pool.execute("UPDATE brackets SET tiebreaker_option='admin_pick' WHERE bracket_id=?",[br.id]);
+      const before=(await db.pool.execute('SELECT * FROM bracket_weeks WHERE bracket_id=? ORDER BY week_number',[br.id]))[0];
+      assert.equal((await http(path,{cookie:a.owner.cookie,method:'POST',body})).status,409);
+      assert.deepEqual((await db.pool.execute('SELECT * FROM bracket_weeks WHERE bracket_id=? ORDER BY week_number',[br.id]))[0],before);
+      await db.pool.execute("UPDATE brackets SET tiebreaker_option='random' WHERE bracket_id=?",[br.id]);
+      assert.equal((await http(path,{cookie:a.owner.cookie,method:'POST',body})).status,200);
+      const [after]=await db.pool.execute('SELECT opens_at,closes_at FROM bracket_weeks WHERE bracket_id=? ORDER BY week_number',[br.id]);
+      assert.equal(new Date(after[0].closes_at).getTime(),new Date(after[1].opens_at).getTime());assert.equal(after[1].closes_at,null);
+    });
     await t.test('duplicating excludes votes and invitations, including after selecting draft participants',async()=>{
       const source=await bracket(a);
       assert.equal((await vote(source,a.member)).status,200);

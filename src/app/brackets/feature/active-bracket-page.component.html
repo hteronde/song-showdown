@@ -138,15 +138,15 @@
   </ng-container>
 </dialog>
 
-<dialog #advanceWeekDialog class="matchup-details-dialog" aria-labelledby="advance-week-title" (cancel)="advancing && $event.preventDefault()">
+<dialog #advanceWeekDialog class="matchup-details-dialog advance-schedule-dialog" aria-labelledby="advance-week-title" (cancel)="advancing && $event.preventDefault()">
   <h2 id="advance-week-title">Advance voting week</h2>
   <p *ngIf="advanceLoading" role="status">Loading session details…</p>
   <ng-container *ngIf="advancePlan as plan">
     <p class="details-note">Close Week {{ plan.weekNumber }} now and decide its matchups using the votes received and the bracket’s tiebreaker. Missing votes will not be added.</p>
     <ng-container *ngIf="plan.nextWeekId != null; else noNextSession">
-      <p class="details-note">Week {{ plan.nextWeekNumber }} will open immediately. Choose when its voting should end.</p>
-      <label *ngIf="plan.noTimer"><input type="checkbox" [(ngModel)]="nextSessionUntimed" [disabled]="advancing"> No timer — wait for everyone’s votes</label>
-      <label class="next-session-end" *ngIf="!nextSessionUntimed">Next session ends<input type="datetime-local" step="1" [(ngModel)]="nextSessionEnd" [disabled]="advancing"></label>
+      <p class="details-note">Review all upcoming online sessions. Week {{ plan.nextWeekNumber }} starts immediately unless you change its start date. Dates use your local time zone.</p>
+      <p class="details-note" *ngIf="plan.noTimer">Leave an end blank for no timer. Later sessions with a blank start open after the preceding session is decided.</p>
+      <app-session-date-fields [sessions]="advanceSessions" [saving]="advancing" [noTimer]="plan.noTimer"></app-session-date-fields>
     </ng-container>
     <ng-template #noNextSession><p class="details-note">This is the last online session. The bracket will proceed to the finale or declare its champion.</p></ng-template>
   </ng-container>

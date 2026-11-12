@@ -1,3 +1,4 @@
+import {getManagedSessions,validateSessionDates} from './session-management.mjs';
 import {resolveWinner,randomTiebreakerVote} from './tiebreaker.mjs';
 import {randomizeReadyRounds,readyRoundSql} from './round-randomization.mjs';
 
@@ -115,7 +116,10 @@ export async function getAdvanceWeekPlan(c,bracketId,familyId,lock=false) {
   if(!week||!week.opensAt||new Date(week.opensAt)>new Date()||!week.roundReady||(b.finale_start_round!=null&&week.roundNumber>=b.finale_start_round))throw fail(409,'There is no open online voting week ready to advance.');
   const next=weeks.find(w=>w.weekNumber>week.weekNumber);
   const nextOnline=next && (b.finale_start_round==null||next.roundNumber<b.finale_start_round)?next:null;
-  return {weekId:Number(week.weekId),weekNumber:Number(week.weekNumber),nextWeekId:nextOnline?Number(nextOnline.weekId):null,nextWeekNumber:nextOnline?Number(nextOnline.weekNumber):null,nextClosesAt:nextOnline?.closesAt??null,noTimer:b.session_duration_minutes==null};
+  const schedule=await getManagedSessions(c,bracketId,familyId,lock);
+  const sessions=schedule.sessions.filter(row=>row.weekNumber>week.weekNumber && !row.isFinale)
+    .map(row=>({...row,opensAt:Number(row.weekId)===Number(nextOnline?.weekId)?new Date().toISOString():row.opensAt}));
+  return {revision:schedule.revision,sessions,weekId:Number(week.weekId),weekNumber:Number(week.weekNumber),nextWeekId:nextOnline?Number(nextOnline.weekId):null,nextWeekNumber:nextOnline?Number(nextOnline.weekNumber):null,nextClosesAt:nextOnline?.closesAt??null,noTimer:b.session_duration_minutes==null};
 }
 export function parseNextSessionEnd(input,plan,now=new Date()) {
   if(plan.nextWeekId==null)return null;
@@ -130,6 +134,34 @@ export function parseNextSessionEnd(input,plan,now=new Date()) {
 export async function advanceWeek(c,bracketId,familyId,input) {
   const plan=await getAdvanceWeekPlan(c,bracketId,familyId,true);
   if(input.weekId!==plan.weekId)throw fail(409,'The voting week has changed. Close and reopen this modal.');
+  if(input.sessions!==undefined) {
+    const current=await getManagedSessions(c,bracketId,familyId,true);
+    if(input.revision!==current.revision)throw fail(409,'Session dates or results changed. Close and reopen Advance week.');
+    if(!Array.isArray(input.sessions)||input.sessions.length!==plan.sessions.length || new Set(input.sessions.map(row=>row?.weekId)).size!==plan.sessions.length)
+      throw fail(400,'Provide each upcoming online session once.');
+    if(input.sessions.some(row=>!plan.sessions.some(session=>Number(session.weekId)===row?.weekId)))throw fail(400,'Only upcoming online sessions can be edited here.');
+    const [[clock]]=await c.execute('SELECT NOW(6) AS now');
+    const now=new Date(clock.now);
+    const dates=current.sessions.map(row=>{
+      const edited=input.sessions.find(change=>change.weekId===Number(row.weekId));
+      if(Number(row.weekId)===plan.weekId)return {weekId:Number(row.weekId),opensAt:row.opensAt?new Date(row.opensAt).toISOString():null,closesAt:now.toISOString()};
+      if(edited)return {...edited,opensAt:Number(row.weekId)===plan.nextWeekId && input.nextStartsNow===true?now.toISOString():edited.opensAt};
+      return {weekId:Number(row.weekId),opensAt:row.opensAt?new Date(row.opensAt).toISOString():null,closesAt:row.closesAt?new Date(row.closesAt).toISOString():null};
+    });
+    const changes=validateSessionDates(dates,current.sessions,current.noTimer,now);
+    const next=changes.find(row=>row.weekId===plan.nextWeekId);
+    if(next && (!next.opensAt || next.opensAt<now))throw fail(400,'The next session must start now or in the future.');
+    for(const change of changes.filter(row=>plan.sessions.some(session=>Number(session.weekId)===row.weekId))) {
+      if(change.closesAt && change.closesAt<=now)throw fail(400,'Upcoming sessions must end in the future.');
+      await c.execute('UPDATE bracket_weeks SET opens_at=?,closes_at=? WHERE bracket_id=? AND week_id=?',[change.opensAt,change.closesAt,bracketId,change.weekId]);
+    }
+    await c.execute('UPDATE bracket_weeks SET closes_at=? WHERE bracket_id=? AND week_id=?',[now,bracketId,plan.weekId]);
+    await finalizeClosedMatchups(c,bracketId,plan.weekId);
+    const [[pending]]=await c.execute('SELECT COUNT(*) AS total FROM matchups WHERE bracket_id=? AND week_id=? AND winner_entry_id IS NULL',[bracketId,plan.weekId]);
+    if(Number(pending.total))throw fail(409,'This week has an unresolved tie. Record an admin vote or resolve the tied matchup before advancing.');
+    await openNextUntimedWeeks(c);
+    return {advanced:true,weekNumber:plan.weekNumber,nextWeekNumber:plan.nextWeekNumber};
+  }
   const end=parseNextSessionEnd(input,plan);
   await c.execute('UPDATE bracket_weeks SET closes_at=NOW(6) WHERE bracket_id=? AND week_id=?',[bracketId,plan.weekId]);
   await finalizeClosedMatchups(c,bracketId,plan.weekId);

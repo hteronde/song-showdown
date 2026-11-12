@@ -245,3 +245,7 @@ Participants receive one email when a session opens. The first session announces
 ### Reviewing session dates on resume
 
 Resume opens the same individual-session date fields used by Edit bracket, on both the active page and management list. The preview includes the elapsed hold duration; commissioners can adjust upcoming dates and the current session’s closing time. Save dates and resume commits the reviewed schedule and clears the pause together, without shifting dates again. Cancel leaves everything paused. Past sessions and existing opening times stay locked, and stale edits must be reopened. This change requires no database migration.
+
+### Scheduling when advancing a week
+
+Advance week shows all upcoming online sessions with the shared date editor. Changing a start or end updates only the neighboring boundary; session durations may differ. The next session opens immediately unless its start is changed. The reviewed future schedule and closing/resolving the current week commit together; stale dates, overlapping windows, or unresolved ties reject the action without partial changes. Past sessions and finale dates remain untouched. No database migration is required.
