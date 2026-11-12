@@ -37,3 +37,11 @@ test('winner email names the champion, thanks participants, and links directly t
   assert.match(message.text,/https:\/\/thesongshowdown.com\/history\/8/);
   assert.doesNotMatch(message.text,/\/brackets\/8/);
 });
+
+ test('session transition email combines the previous end and new start, but the first has no end',()=>{
+  const first=sessionEmail({...row,weekNumber:1,previousWeekNumber:null},'https://thesongshowdown.com');
+  assert.match(first.text,/Session 1 .* begins now!/);assert.doesNotMatch(first.text,/has ended/);
+  const next=sessionEmail({...row,previousWeekNumber:1},'https://thesongshowdown.com');
+  assert.match(next.text,/Session 1 has ended/);assert.match(next.text,/Session 2 .* begins now!/);
+  assert.match(next.text,/You have until/);assert.match(next.text,/\/brackets\/8/);
+ });

@@ -18,14 +18,21 @@ export function sessionEmail(row,appUrl) {
   const closing=lastOnlineEnd
     ? `${session} has ended. Voting for this session is now closed. This was the last session held online; the remaining matchups will take place at the finale.\n\n${finaleDate ? `The finale is scheduled for ${finaleDate}.` : 'The finale date has not been set yet. Please check the bracket page for updates.'} We hope to see you there!`
     : `${session} has ended. Voting for this session is now closed. Open the bracket to follow the results and see the next session.`;
+  const previous=row.previousWeekNumber == null ? '' : `Session ${row.previousWeekNumber} has ended.\n\n`;
   const text=row.eventType==='start'
-    ? `${session} begins now!\n\n${deadline ? `You have until ${deadline} (Central time / America/Chicago) to vote.` : 'This session has no fixed deadline. It closes once every participating member has voted on every matchup. Please cast your votes.'}`
+    ? `${previous}${session} begins now!\n\n${deadline ? `You have until ${deadline} (Central time / America/Chicago) to vote.` : 'This session has no fixed deadline. It closes once every participating member has voted on every matchup. Please cast your votes.'}`
     : closing;
   return {to:row.email,subject:lastOnlineEnd ? 'Our final online week has come to an end!' : `${row.title}: ${session} ${row.eventType==='start'?'begins now':'has ended'}`,
     text:`${row.title}\nTheme: ${row.artist}\n\n${text}\n\nOpen the bracket:\n${link}`};
 }
 
 const finaleRound="COALESCE(b.finale_start_round,(SELECT f.start_round_number FROM bracket_finale_sessions f WHERE f.bracket_id=b.bracket_id))";
+
+const lastOnlineSession=`(${finaleRound} IS NOT NULL AND w.week_number=(
+  SELECT MAX(lastWeek.week_number) FROM bracket_weeks lastWeek
+  JOIN bracket_rounds lastRound ON lastRound.bracket_id=lastWeek.bracket_id AND lastRound.round_id=lastWeek.round_id
+  WHERE lastWeek.bracket_id=b.bracket_id AND lastRound.round_number<${finaleRound}
+))`;
 
 const joins=`FROM bracket_weeks w JOIN brackets b ON b.bracket_id=w.bracket_id
   JOIN bracket_rounds r ON r.bracket_id=w.bracket_id AND r.round_id=w.round_id
@@ -57,20 +64,33 @@ const due=type=>type==='winner'
   ? `b.status='active' AND b.completed_at IS NULL AND w.opens_at>=GREATEST(settings.enabled_at,COALESCE(b.automatic_emails_enabled_at,settings.enabled_at)) AND (w.closes_at IS NULL OR w.closes_at>NOW(6))
      AND NOT EXISTS (SELECT 1 FROM bracket_finale_sessions f WHERE f.bracket_id=b.bracket_id)
      AND EXISTS (SELECT 1 FROM matchups m WHERE m.week_id=w.week_id AND m.winner_entry_id IS NULL)`
-  : 'w.closes_at>=GREATEST(settings.enabled_at,COALESCE(b.automatic_emails_enabled_at,settings.enabled_at)) AND w.closes_at<=NOW(6)';
+  : `${lastOnlineSession} AND w.closes_at>=GREATEST(settings.enabled_at,COALESCE(b.automatic_emails_enabled_at,settings.enabled_at)) AND w.closes_at<=NOW(6)`;
+
+// These autocommit queue statements can deadlock when workers overlap.
+// Retrying is safe: the unique event key and conditional status updates are idempotent.
+async function updateQueue(pool,sql,params=[]) {
+  for(let attempt=0;;attempt++) {
+    try { return await pool.execute(sql,params); }
+    catch(error) {
+      if(error.code!=='ER_LOCK_DEADLOCK' || attempt>=3)throw error;
+      await new Promise(resolve=>setTimeout(resolve,25*(attempt+1)));
+    }
+  }
+}
 
 export async function processSessionEmails(pool,{env=process.env,deliver=deliverEmail}={}) {
   const summary={sent:0,failed:0};
   if(env.SESSION_EMAILS_ENABLED==='false' || (env.SESSION_EMAILS_ENABLED!=='true' && env.NODE_ENV!=='production') || !passwordEmailConfigured(env))return summary;
   // INSERT IGNORE plus a conditional lease makes overlapping workers safe.
-  for(const type of ['end','start','winner']) await pool.execute(`INSERT IGNORE INTO session_email_deliveries (delivery_id,bracket_id,week_id,user_id,event_type)
+  for(const type of ['end','start','winner']) await updateQueue(pool,`INSERT IGNORE INTO session_email_deliveries (delivery_id,bracket_id,week_id,user_id,event_type)
     SELECT UUID(),b.bracket_id,w.week_id,u.user_id,? ${joins} WHERE ${eligibleFor(type)} AND ${due(type)}`,[type]);
-  await pool.execute(`UPDATE session_email_deliveries d
+  await updateQueue(pool,`UPDATE session_email_deliveries d
     JOIN bracket_weeks w ON w.week_id=d.week_id AND w.bracket_id=d.bracket_id
     JOIN brackets b ON b.bracket_id=d.bracket_id
     LEFT JOIN bracket_members bm ON bm.bracket_id=d.bracket_id AND bm.user_id=d.user_id
     SET d.delivery_status='skipped'
     WHERE d.delivery_status='pending' AND (b.automatic_emails_disabled=TRUE
+      OR (d.event_type='end' AND NOT COALESCE(${lastOnlineSession},FALSE))
       OR (d.event_type='start' AND w.opens_at<b.automatic_emails_enabled_at)
       OR (d.event_type='end' AND w.closes_at<b.automatic_emails_enabled_at) OR bm.user_id IS NULL OR bm.invitation_status<>'accepted' OR (d.event_type<>'winner' AND bm.non_finale_participant=FALSE)
       OR (d.event_type='winner' AND b.completed_at<b.automatic_emails_enabled_at)
@@ -90,14 +110,22 @@ export async function processSessionEmails(pool,{env=process.env,deliver=deliver
         DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleDate,
         (SELECT s.title FROM bracket_songs bs JOIN songs s ON s.song_id=bs.song_id WHERE bs.bracket_id=b.bracket_id AND bs.bracket_song_id=(${championship})) AS winnerTitle,
         (SELECT s.artist FROM bracket_songs bs JOIN songs s ON s.song_id=bs.song_id WHERE bs.bracket_id=b.bracket_id AND bs.bracket_song_id=(${championship})) AS winnerArtist,
-        (${finaleRound} IS NOT NULL AND w.week_number=(
-          SELECT MAX(lastWeek.week_number) FROM bracket_weeks lastWeek
-          JOIN bracket_rounds lastRound ON lastRound.bracket_id=lastWeek.bracket_id AND lastRound.round_id=lastWeek.round_id
-          WHERE lastWeek.bracket_id=b.bracket_id AND lastRound.round_number<${finaleRound}
-        )) AS isLastOnlineSession
+        (SELECT MAX(previousWeek.week_number) FROM bracket_weeks previousWeek
+          WHERE previousWeek.bracket_id=b.bracket_id AND previousWeek.week_number<w.week_number
+            AND EXISTS(SELECT 1 FROM matchups pm WHERE pm.week_id=previousWeek.week_id AND pm.bracket_id=b.bracket_id)) AS previousWeekNumber,
+        ${lastOnlineSession} AS isLastOnlineSession
         ${joins} JOIN session_email_deliveries d ON d.bracket_id=b.bracket_id AND d.week_id=w.week_id AND d.user_id=u.user_id
         WHERE d.delivery_id=? AND ${eligibleFor(job.eventType)} AND ${due(job.eventType)}`,[job.id]);
       if(!rows.length) {
+        if(job.eventType==='end') {
+          const [obsolete]=await pool.execute(`SELECT 1 FROM session_email_deliveries d
+            JOIN bracket_weeks w ON w.week_id=d.week_id JOIN brackets b ON b.bracket_id=d.bracket_id
+            WHERE d.delivery_id=? AND NOT COALESCE(${lastOnlineSession},FALSE)`,[job.id]);
+          if(obsolete.length) {
+            await pool.execute("UPDATE session_email_deliveries SET delivery_status='skipped',lease_token=NULL WHERE delivery_id=? AND lease_token=?",[job.id,token]);
+            continue;
+          }
+        }
         // Pause/reschedule/withdrawal must not produce an obsolete email. Keep
         // undelivered work pending so a resumed or rescheduled session can qualify.
         await pool.execute("UPDATE session_email_deliveries SET delivery_status='pending',lease_token=NULL WHERE delivery_id=? AND lease_token=?",[job.id,token]);

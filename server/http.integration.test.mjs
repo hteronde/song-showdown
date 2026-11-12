@@ -518,7 +518,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       await db.pool.execute("UPDATE bracket_members SET invitation_status='declined' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
       await db.pool.execute('UPDATE brackets SET paused_at=NULL WHERE bracket_id=?',[br.id]);
       await Promise.all([processSessionEmails(db.pool,{env,deliver}),processSessionEmails(db.pool,{env,deliver})]);
-      assert.equal(messages.length,1);assert.equal(messages[0].message.to,a.owner.email);assert.match(messages[0].message.text,/You have until/);
+      assert.equal(messages.length,1);assert.doesNotMatch(messages[0].message.text,/has ended/);assert.equal(messages[0].message.to,a.owner.email);assert.match(messages[0].message.text,/You have until/);
       assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0);
       await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
       assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0);
@@ -530,12 +530,17 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       await db.pool.execute("UPDATE session_email_deliveries SET attempt_at=DATE_SUB(NOW(6),INTERVAL 2 MINUTE) WHERE bracket_id=? AND delivery_status='pending'",[br.id]);
       assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,1);assert.equal(messages.at(-1).key,keys[0]);
       await db.pool.execute('UPDATE bracket_weeks SET closes_at=NOW(6) WHERE week_id=?',[br.weeks[0]]);
-      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,2);assert.ok(messages.slice(-2).every(m=>m.message.subject.includes('has ended')));
+      assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0,'no separate session-end message');
       assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,0);
+      await db.pool.execute("INSERT INTO session_email_deliveries (delivery_id,bracket_id,week_id,user_id,event_type) VALUES (UUID(),?,?,?,'end')",[br.id,br.weeks[0],a.owner.id]);
+      await processSessionEmails(db.pool,{env,deliver});
+      const [[oldEnd]]=await db.pool.execute("SELECT delivery_status FROM session_email_deliveries WHERE bracket_id=? AND event_type='end'",[br.id]);
+      assert.equal(oldEnd.delivery_status,'skipped');
       // A new untimed session opens only after every feeder winner is known.
       await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE bracket_id=? AND week_id=?',[br.id,br.weeks[0]]);
       await db.pool.execute('UPDATE bracket_weeks SET opens_at=NOW(6),closes_at=NULL WHERE week_id=?',[br.weeks[1]]);
       assert.equal((await processSessionEmails(db.pool,{env,deliver})).sent,2);assert.ok(messages.slice(-2).every(m=>m.message.text.includes('no fixed deadline')));
+      assert.ok(messages.slice(-2).every(m=>m.message.text.includes('Session 1 has ended.') && m.message.text.includes('Session 2 (Championship) begins now!')));
       // Deleting the bracket removes its delivery records along with the sessions.
       assert.equal((await http(`/api/admin/brackets/${br.id}`,{cookie:a.owner.cookie,method:'DELETE'})).status,200);
       const [[count]]=await db.pool.execute('SELECT COUNT(*) AS total FROM session_email_deliveries WHERE bracket_id=?',[br.id]);assert.equal(Number(count.total),0);
@@ -557,6 +562,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
 
     await t.test('automatic email setting is scoped and suppresses starts, ends, retries, and catch-up mail',async()=>{
       const br=await bracket(a), path=`/api/admin/brackets/${br.id}/automatic-emails`;
+      await db.pool.execute('UPDATE brackets SET finale_start_round=2 WHERE bracket_id=?',[br.id]);
       const toggle=(cookie,disabled)=>http(path,{cookie,method:'PUT',body:{automaticEmailsDisabled:disabled}});
       assert.notEqual((await toggle(a.member.cookie,true)).status,200);
       assert.notEqual((await toggle(b.owner.cookie,true)).status,200);
@@ -596,12 +602,12 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const [lastOnline]=await db.pool.execute('INSERT INTO bracket_weeks (bracket_id,round_id,week_number,opens_at) VALUES (?,?,2,DATE_SUB(NOW(6),INTERVAL 2 MINUTE))',[br.id,first.round_id]);
       await db.pool.execute('UPDATE matchups SET week_id=? WHERE matchup_id=?',[lastOnline.insertId,br.matches[1]]);
       await db.pool.execute('UPDATE bracket_weeks SET opens_at=DATE_SUB(NOW(6),INTERVAL 2 MINUTE),closes_at=NOW(6) WHERE week_id=?',[br.weeks[0]]);
-      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,2);assert.ok(messages.every(m=>!m.text.includes('last session held online')));
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,0,'earlier session ends wait for the next start');
       await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE matchup_id=?',[br.matches[0]]);
       await db.pool.execute('UPDATE bracket_weeks SET closes_at=NOW(6) WHERE week_id=?',[lastOnline.insertId]);
-      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,4);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,2);
       assert.ok(messages.slice(-2).every(m=>m.text.includes('last session held online') && m.text.includes('Friday, November 20, 2026') && m.text.includes('We hope to see you there!')));
-      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,4,'no repeated finale announcement');
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,2,'no repeated finale announcement');
     });
 
     await t.test('winner announcements include finale members and retry once without announcing historical brackets',async()=>{
