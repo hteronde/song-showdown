@@ -82,7 +82,15 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal(allRoles.status,200);assert.deepEqual(allRoles.body,{sent:2,failed:0});
       assert.deepEqual(customEmails.map(message=>message.to).sort(),[family.owner.email,family.member.email].sort());
       customEmails.length=0;
+      const selected=await http(path,{method:'POST',cookie:family.owner.cookie,body:{...body,recipientIds:[family.member.id]}});
+      assert.equal(selected.status,200);assert.equal(selected.body.sent,1);
+      assert.deepEqual(customEmails.map(message=>message.to),[family.member.email]);
+      assert.equal((await http(path,{method:'POST',cookie:family.owner.cookie,body:{...body,recipientIds:[]}})).status,400);
+      assert.equal((await http(path,{method:'POST',cookie:family.owner.cookie,body:{...body,recipientIds:[other.member.id]}})).status,409);
+      assert.equal(customEmails.length,1);
+      customEmails.length=0;
       await db.pool.execute("UPDATE bracket_members SET invitation_status='declined' WHERE bracket_id=? AND user_id=?",[br.id,family.member.id]);
+      assert.equal((await http(path,{method:'POST',cookie:family.owner.cookie,body:{...body,recipientIds:[family.member.id]}})).status,409);
       const sent=await http(path,{method:'POST',cookie:family.owner.cookie,body});
       assert.equal(sent.status,200);assert.deepEqual(sent.body,{sent:1,failed:0});
       assert.equal(customEmails[0].to,family.owner.email);

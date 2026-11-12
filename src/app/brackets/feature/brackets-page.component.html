@@ -8,7 +8,7 @@
 
   <article class="form-card" *ngIf="formOpen">
     <p class="hint">Commissioner changes save while the bracket is active. Existing votes are kept unless you explicitly confirm a tournament rebuild.</p>
-    <div class="form-head"><h2>{{ editingId ? 'Edit bracket' : 'Create bracket' }}</h2><div class="actions"><button class="cancel" type="button" *ngIf="editingId && isSuper" (click)="duplicateCurrentBracket()" [disabled]="duplicatingId != null || saving || sessionsSaving">{{ duplicatingId === editingId ? 'Duplicating…' : 'Duplicate' }}</button><button class="cancel" type="button" *ngIf="canSaveDraft" (click)="saveAsDraft()" [disabled]="saving || sessionsSaving" title="Save your unfinished bracket">{{ savingDraft ? 'Saving draft…' : 'Save as draft' }}</button><button class="cancel" type="button" (click)="closeForm()" [disabled]="saving || sessionsSaving">Close</button></div></div>
+    <div class="form-head"><h2>{{ editingId ? 'Edit bracket' : 'Create bracket' }}</h2><div class="actions"><button class="cancel" type="button" *ngIf="editingId" (click)="emailComposer.open(editingId, title)" [disabled]="saving || sessionsSaving" aria-haspopup="dialog">Write Email</button><button class="cancel" type="button" *ngIf="editingId && isSuper" (click)="duplicateCurrentBracket()" [disabled]="duplicatingId != null || saving || sessionsSaving">{{ duplicatingId === editingId ? 'Duplicating…' : 'Duplicate' }}</button><button class="cancel" type="button" *ngIf="canSaveDraft" (click)="saveAsDraft()" [disabled]="saving || sessionsSaving" title="Save your unfinished bracket">{{ savingDraft ? 'Saving draft…' : 'Save as draft' }}</button><button class="cancel" type="button" (click)="closeForm()" [disabled]="saving || sessionsSaving">Close</button></div></div>
     <div class="form-grid">
       <div class="field">
         <label for="bracket-title">Title <span aria-hidden="true">*</span></label>
@@ -366,3 +366,5 @@
     <button class="delete-confirm" type="button" (click)="confirmBracketDeletion()" [disabled]="deletingBracket || !bracketToDelete">{{ deletingBracket ? 'Deleting…' : 'Delete bracket' }}</button>
   </div>
 </dialog>
+
+<app-bracket-email-composer #emailComposer (sent)="success = $event"></app-bracket-email-composer>

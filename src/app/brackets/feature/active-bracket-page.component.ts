@@ -1,3 +1,4 @@
+import { BracketEmailComposerComponent } from '../ui/bracket-email-composer.component';
 import { ApiError } from '../../shared/data-access/api-client';
 import { BracketRequests, VoteDrafts } from '../state/voting-state';
 import { BracketChampionComponent, BracketChampion } from '../ui/bracket-champion.component';
@@ -20,7 +21,7 @@ interface RevealedRound {
     }>;
 }
 @Component({
-    selector: 'app-active-bracket-page', standalone: true, imports: [RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent],
+    selector: 'app-active-bracket-page', standalone: true, imports: [BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent],
     templateUrl: './active-bracket-page.component.html',
     styleUrls: ['./active-bracket-page.component.css', '../ui/bracket-connectors.css']
 })
@@ -68,47 +69,11 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         } catch(error) { this.error=error instanceof Error ? error.message : 'Could not save email settings.'; }
         finally {checkbox.checked=!!this.data?.bracket.automaticEmailsDisabled;this.emailSettingSaving=false;this.changeDetector.markForCheck();}
     }
-    @ViewChild('writeEmailDialog') writeEmailDialog?: ElementRef<HTMLDialogElement>;
-    emailSubject = '';
-    emailBody = '';
-    emailSending = false;
-    emailAttempted = false;
-    emailSent = false;
-    emailFeedback = '';
-    private emailBracketId = 0;
-    private emailRequestId = '';
-    openWriteEmail(): void {
-        if (!this.isAdmin || !this.data || this.emailSending) return;
-        this.emailBracketId = this.data.bracket.bracketId;
-        this.emailSubject = ''; this.emailBody = ''; this.emailFeedback = '';
-        this.emailAttempted = false; this.emailSent = false;
-        this.emailRequestId = crypto.randomUUID();
-        this.writeEmailDialog?.nativeElement.showModal();
+    @ViewChild(BracketEmailComposerComponent) emailComposer?:BracketEmailComposerComponent;
+    openWriteEmail():void {
+        if(this.isAdmin && this.data)void this.emailComposer?.open(this.data.bracket.bracketId,this.data.bracket.title);
     }
-    closeWriteEmail(): void {
-        if (!this.emailSending) this.writeEmailDialog?.nativeElement.close();
-    }
-    async sendBracketEmail(): Promise<void> {
-        if (!this.isAdmin || this.emailSending || this.emailSent || !this.emailSubject.trim() || !this.emailBody.trim()) return;
-        this.emailSending = true; this.emailAttempted = true; this.emailFeedback = '';
-        try {
-            const result = await this.api.sendEmail(this.emailBracketId, this.emailSubject, this.emailBody, this.emailRequestId);
-            this.emailSent = result.failed === 0;
-            this.emailFeedback = result.failed
-                ? `${result.sent} emails accepted for delivery; ${result.failed} failed. You can retry this message.`
-                : `${result.sent} emails accepted for delivery.`;
-            if (this.emailSent) {
-                this.writeEmailDialog?.nativeElement.close();
-                this.notice = this.emailFeedback;
-                this.toastMessage.emit(this.emailFeedback);
-            }
-        } catch (error) {
-            this.emailFeedback = error instanceof Error ? error.message : 'Could not send the email.';
-        } finally {
-            this.emailSending = false;
-            this.changeDetector.markForCheck();
-        }
-    }
+    emailSent(message:string):void {this.notice=message;this.toastMessage.emit(message);}
     @ViewChild('matchupDetailsDialog')
     matchupDetailsDialog?: ElementRef<HTMLDialogElement>;
     detailsMatch: VotingMatchup | null = null;

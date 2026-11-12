@@ -1,3 +1,4 @@
+import { BracketEmailComposerComponent } from '../ui/bracket-email-composer.component';
 import { AuthApiService } from '../../auth/data-access/auth-api.service';
 import { apiErrorMessage } from '../../shared/data-access/api-client';
 import { BracketFieldErrors, enteredSongCount, validateBracketSettings } from '../state/bracket-settings';
@@ -13,7 +14,7 @@ import { FormsModule } from '@angular/forms';
 import { BracketsApiService, InvitationParticipant } from '../data-access/brackets-api.service';
 import { SessionPlaylist, BracketSession, BracketSessionsData, BracketInput, BracketParticipant, BracketRecord, BracketSong, BracketAlbum, TiebreakerOption, RandomizationMode } from '../data-access/bracket.model';
 @Component({
-    selector: 'app-brackets-page', standalone: true, imports: [CommonModule, FormsModule],
+    selector: 'app-brackets-page', standalone: true, imports: [CommonModule, FormsModule, BracketEmailComposerComponent],
     templateUrl: './brackets-page.component.html', styleUrls: ['./brackets-page.component.css']
 })
 export class BracketsPageComponent implements OnInit, OnDestroy {

@@ -23,3 +23,13 @@ test('custom bracket email rejects missing provider and empty recipient list',as
   await assert.rejects(sendBracketEmail(pool,1,input,{env:{}}),{status:503});
   await assert.rejects(sendBracketEmail(pool,1,input,{env}),{status:400});
 });
+
+test('recipient selection excludes unchecked people and rejects ineligible selections before sending',async()=>{
+  const pool={execute:async()=>[[{userId:1,email:'a@example.com'},{userId:2,email:'b@example.com'}]]};
+  const messages=[];const options={env,pause:async()=>{},deliver:async message=>messages.push(message)};
+  assert.deepEqual(await sendBracketEmail(pool,5,{...input,recipientIds:[2,2]},options),{sent:1,failed:0});
+  assert.deepEqual(messages.map(m=>m.to),['b@example.com']);
+  for(const recipientIds of [[],['2'],[0],null])await assert.rejects(sendBracketEmail(pool,5,{...input,recipientIds},options),{status:400});
+  await assert.rejects(sendBracketEmail(pool,5,{...input,recipientIds:[1,999]},options),{status:409});
+  assert.equal(messages.length,1,'invalid recipient set must not partially send');
+});

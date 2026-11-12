@@ -1,0 +1,22 @@
+<dialog #dialog aria-labelledby="write-email-title" (cancel)="sending ? $event.preventDefault() : close()">
+  <h2 id="write-email-title">Write email</h2>
+  <p><strong>{{ title }}</strong></p>
+  <p>Choose which accepted participants should receive this email. Pending and declined invitations are excluded. Each person receives a separate email.</p>
+  <form (ngSubmit)="send()">
+    <fieldset [disabled]="loading || attempted">
+      <legend>Recipients</legend>
+      <p *ngIf="loading" role="status">Loading participants…</p>
+      <div class="recipient-actions"><span>{{ selected.size }} selected</span><button type="button" (click)="selectAll()" [disabled]="!recipients.length">Select all</button><button type="button" (click)="deselectAll()" [disabled]="!selected.size">Deselect all</button></div>
+      <div class="recipients">
+        <label *ngFor="let person of recipients" class="recipient"><input type="checkbox" [checked]="selected.has(person.userId)" (change)="toggle(person.userId)"><span><strong>{{ person.displayName }}</strong><small>{{ person.email }}</small></span><span class="role">{{ person.bracket_role === 'commissioner' ? 'Commissioner' : 'Member' }}</span></label>
+      </div>
+      <p *ngIf="!loading && !recipients.length">There are no accepted participants to email. Save participant changes before opening this form.</p>
+    </fieldset>
+    <label for="bracket-email-subject" class="field-label">Subject</label>
+    <input id="bracket-email-subject" name="subject" [(ngModel)]="subject" maxlength="200" required [disabled]="attempted" autofocus>
+    <label for="bracket-email-body" class="field-label">Body</label>
+    <textarea id="bracket-email-body" name="body" [(ngModel)]="body" rows="8" maxlength="20000" required [disabled]="attempted"></textarea>
+    <p *ngIf="feedback" role="status">{{ feedback }}</p>
+    <div class="actions"><button type="submit" class="primary" [disabled]="sending || loading || !selected.size || !subject.trim() || !body.trim()">{{ sending ? 'Sending…' : attempted ? 'Retry send' : 'Send' }}</button><button type="button" (click)="close()" [disabled]="sending">{{ attempted ? 'Close' : 'Cancel' }}</button></div>
+  </form>
+</dialog>

@@ -69,9 +69,6 @@ export class ActiveBracketApiService {
   setAutomaticEmailsDisabled(bracketId:number, automaticEmailsDisabled:boolean): Promise<{automaticEmailsDisabled:boolean}> {
     return apiRequest(`/api/admin/brackets/${bracketId}/automatic-emails`, {method:'PUT',json:{automaticEmailsDisabled}});
   }
-  sendEmail(bracketId: number, subject: string, body: string, requestId: string): Promise<{sent:number;failed:number}> {
-    return apiRequest(`/api/admin/brackets/${bracketId}/email`, {method:'POST', json:{subject,body,requestId}, timeoutMs:120000});
-  }
   getVotingPage(bracketId: number, signal?: AbortSignal): Promise<ActiveBracketVotingData> {
     return apiRequest(`/api/brackets/${bracketId}/voting`, {signal});
   }
