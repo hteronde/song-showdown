@@ -122,7 +122,19 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const [[source]]=await db.pool.execute('SELECT song_id FROM bracket_songs WHERE bracket_song_id=?',[br.entries[0]]);
       await db.pool.execute('UPDATE bracket_songs SET song_id=? WHERE bracket_song_id=?',[source.song_id,other.entries[0]]);
       const detail=(await http(path,{cookie:a.member.cookie})).body.bracket;
-      const edited=await http(`${path}/songs`,{cookie:a.member.cookie,method:'PUT',body:{songs:detail.songs.map((song,i)=>({...song,title:i===0?'Commissioner edit':song.title}))}});
+      await db.pool.execute('INSERT INTO votes (bracket_id,matchup_id,user_id,selected_entry_id,submitted_at) VALUES (?,?,?,?,NOW())',[br.id,br.matches[0],a.member.id,br.entries[0]]);
+      const structure=async()=>{
+        const snapshots=[];
+        for(const table of ['brackets','matchups','votes','bracket_weeks','bracket_rounds']) snapshots.push((await db.pool.execute(`SELECT * FROM ${table} WHERE bracket_id=?`,[br.id]))[0]);
+        snapshots.push((await db.pool.execute('SELECT bracket_song_id,position,seed_number,assigned_seed FROM bracket_songs WHERE bracket_id=? ORDER BY position',[br.id]))[0]);
+        return snapshots;
+      };
+      const before=await structure();
+      const body={metadataOnly:true,resetHistory:true,songs:detail.songs.map((song,i)=>({...song,seed:16,assignedSeed:16,title:i===0?'Commissioner edit':song.title,youtubeUrl:'https://youtube.com/watch?v=test'}))};
+      const edited=await http(`${path}/songs`,{cookie:a.member.cookie,method:'PUT',body});
+      assert.deepEqual(await structure(),before,'metadata edits preserve the entire tournament and ballots');
+      assert.equal((await http(`${path}/songs`,{cookie:a.member.cookie,method:'PUT',body:{...body,songs:[...body.songs].reverse()}})).status,409);
+      assert.deepEqual(await structure(),before,'stale order cannot reset a tournament');
       assert.equal(edited.status,200,JSON.stringify(edited.body));
       const [[original]]=await db.pool.execute('SELECT title FROM songs WHERE song_id=?',[source.song_id]);
       assert.notEqual(original.title,'Commissioner edit');

@@ -61,8 +61,8 @@ export class BracketsApiService {
     return this.request(`${this.baseUrl}/${bracketId}`, { method: 'PUT', body: JSON.stringify(input),timeoutMs:120000 });
   }
 
-  async saveSongs(bracketId: number | null, songs: BracketSong[], title: string, artist: string, resetHistory = false): Promise<{ bracketId: number; songs: BracketSong[]; needsSetup: boolean }> {
-    return this.request(`${this.baseUrl}${bracketId ? '/' + bracketId : ''}/songs`, { method: 'PUT', body: JSON.stringify({ songs, title, artist, resetHistory }) });
+  async saveSongs(bracketId: number | null, songs: BracketSong[], title: string, artist: string, resetHistory = false, metadataOnly = false): Promise<{ bracketId: number; songs: BracketSong[]; needsSetup: boolean }> {
+    return this.request(`${this.baseUrl}${bracketId ? '/' + bracketId : ''}/songs`, { method: 'PUT', body: JSON.stringify({ songs, title, artist, resetHistory, metadataOnly }) });
   }
 
   async saveAlbum(bracketId: number | null, album: Omit<BracketAlbum,'albumId'> & { albumId?: number }, title: string, artist: string): Promise<{bracketId:number;albums:BracketAlbum[]}> {

@@ -22,6 +22,8 @@ export function validateBracketSongs(songs) {
 
 export async function saveBracketSongs(connection, { bracketId, familyId, userId, input }) {
   let seeds;
+  if (!Array.isArray(input.songs)) throw new Error('Provide a list of songs.');
+  if (input.metadataOnly && !bracketId) throw new Error('Save the bracket before editing song details.');
   // Validate metadata first; legacy regional seed numbers are independent of list position.
   validateBracketSongs(input.songs.map(song=>({...song,seed:null})));
   let bracket;
@@ -38,6 +40,14 @@ export async function saveBracketSongs(connection, { bracketId, familyId, userId
   input={...input,songs:await resolveSongAlbums(connection,bracketId,input.songs)};
   const [[activity]] = await connection.execute('SELECT (SELECT COUNT(*) FROM votes WHERE bracket_id=?) + (SELECT COUNT(*) FROM bracket_finale_sessions WHERE bracket_id=?) + (SELECT COUNT(*) FROM matchups WHERE bracket_id=? AND winner_entry_id IS NOT NULL) AS total',[bracketId,bracketId,bracketId]);
   const [existing] = await connection.execute('SELECT bracket_song_id,song_id,seed_number,assigned_seed FROM bracket_songs WHERE bracket_id=? ORDER BY position,bracket_song_id',[bracketId]);
+  if(input.metadataOnly) {
+    // Never let a stale editor or supplied reset flag rebuild a live tournament.
+    if(!existing.length || existing.length!==input.songs.length || !existing.every((entry,i)=>Number(entry.bracket_song_id)===input.songs[i].bracketSongId))
+      throw Object.assign(new Error('The bracket song list changed. Reopen the bracket and try editing the song again.'),{status:409});
+    seeds=existing.map(entry=>Number(entry.seed_number));
+    await updateSongDetailsInPlace(connection,bracketId,existing,input.songs,seeds,{preserveStructure:true});
+    return {bracketId,songs:input.songs.map((song,i)=>({...song,seed:seeds[i],assignedSeed:existing[i].assigned_seed??null})),needsSetup:false};
+  }
   const orderedExisting=input.songs.map(song=>existing.find(entry=>Number(entry.bracket_song_id)===song.bracketSongId));
   const sameEntries=existing.length===input.songs.length && existing.length>0 && orderedExisting.every(Boolean) && new Set(input.songs.map(song=>song.bracketSongId)).size===existing.length;
   seeds=sameEntries && input.songs.every((song,i)=>song.seed==null || Number(song.seed)===Number(orderedExisting[i].seed_number))?orderedExisting.map(entry=>Number(entry.seed_number)):validateBracketSongs(input.songs);

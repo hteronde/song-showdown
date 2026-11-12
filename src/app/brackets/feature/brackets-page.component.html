@@ -243,11 +243,12 @@
     <dialog #songDialog class="song-dialog" aria-labelledby="song-dialog-title" (close)="onSongModalClosed()" (cancel)="songSaving && $event.preventDefault()">
       <span class="stat-label">{{ editingSongIndex === null ? 'NEW SONG' : 'EDIT SONG' }}</span>
       <h3 id="song-dialog-title">{{ editingSongIndex === null ? 'Add a song' : 'Edit song' }}</h3>
+      <p class="hint" *ngIf="editingSongIndex !== null">Update song details here. Saving keeps the bracket order, seeds, matchups, and votes unchanged.</p>
       <form ngNativeValidate (ngSubmit)="addSong()">
         <div class="song-fields">
           <label>Song title<input name="songTitle" [(ngModel)]="songDraft.title" required maxlength="200"></label>
           <label>Album<select name="songAlbum" [(ngModel)]="songDraft.albumId"><option [ngValue]="null">No album</option><option *ngFor="let album of albums" [ngValue]="album.albumId">{{ album.title }}{{ album.year ? ' · ' + album.year : '' }}</option></select></label>
-          <label *ngIf="!useSeeds">Seed (optional)<input name="songSeed" [(ngModel)]="songDraft.seed" type="number" inputmode="numeric" min="1" max="16" step="1" (keydown)="seedKeydown($event)" (beforeinput)="seedBeforeInput($event)" (paste)="seedPaste($event)" placeholder="Auto" title="Whole number from 1 to 16; leave blank for automatic seeding"></label>
+          <label *ngIf="!useSeeds && editingSongIndex === null">Seed (optional)<input name="songSeed" [(ngModel)]="songDraft.seed" type="number" inputmode="numeric" min="1" max="16" step="1" (keydown)="seedKeydown($event)" (beforeinput)="seedBeforeInput($event)" (paste)="seedPaste($event)" placeholder="Auto" title="Whole number from 1 to 16; leave blank for automatic seeding"></label>
           <label>YouTube URL<input name="songYoutube" [(ngModel)]="songDraft.youtubeUrl" type="url" maxlength="2048" placeholder="https://youtube.com/watch?v=…"></label>
           <label>Spotify URL<input name="songSpotify" [(ngModel)]="songDraft.spotifyUrl" type="url" maxlength="2048" placeholder="https://open.spotify.com/track/…"></label>
           <label>Category<input name="songCategory" [(ngModel)]="songDraft.category" maxlength="255" autofocus></label>

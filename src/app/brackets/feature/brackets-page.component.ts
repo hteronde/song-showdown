@@ -365,7 +365,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             : this.songs.map((item, index) => index === this.editingSongIndex ? song : item);
         this.songSaving = true;
         try {
-            await this.persistSongs(songs, resetHistory);
+            await this.persistSongs(songs, resetHistory, this.editingSongIndex !== null);
             this.songDialog?.nativeElement.close();
         }
         catch (error) {
@@ -405,8 +405,8 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.changeDetector.markForCheck();
         }
     }
-    private async persistSongs(songs: BracketSong[], resetHistory = false): Promise<void> {
-        const result = await this.bracketsApi.saveSongs(this.editingId, songs, this.title, this.artist, resetHistory);
+    private async persistSongs(songs: BracketSong[], resetHistory = false, metadataOnly = false): Promise<void> {
+        const result = await this.bracketsApi.saveSongs(this.editingId, songs, this.title, this.artist, resetHistory, metadataOnly);
         this.editingId = result.bracketId;
         this.songs = result.songs.map(song => { const draft = songs.find(draft => draft.title === song.title); return { ...song, reorderLocked: draft?.reorderLocked ?? song.reorderLocked, assignedSeed: draft ? draft.assignedSeed ?? null : song.assignedSeed ?? null }; });
         if (resetHistory)
