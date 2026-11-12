@@ -359,7 +359,7 @@
   <span class="stat-label">CONFIRM DELETION</span>
   <h3 id="delete-bracket-title">Delete this bracket?</h3>
   <p id="delete-bracket-description">Are you sure you wish to permanently delete <strong>{{ bracketToDelete?.title }}</strong>?</p>
-  <p>This also deletes all votes, matchup results, sessions, and participant invitations for this bracket. This cannot be undone.</p>
+  <p>This also deletes all votes, matchup results, sessions, participant invitations, and songs belonging only to this bracket. Songs used by another bracket are kept. This cannot be undone.</p>
   <p *ngIf="deleteError" class="error" role="alert">{{ deleteError }}</p>
   <div class="song-modal-actions">
     <button class="cancel" type="button" (click)="cancelBracketDeletion()" [disabled]="deletingBracket" autofocus>Cancel</button>

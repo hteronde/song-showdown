@@ -358,13 +358,18 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const path=`/api/admin/brackets/${br.id}`;
       assert.equal((await http(path,{cookie:a.member.cookie,method:'DELETE'})).status,403);
       assert.equal((await http(path,{cookie:b.owner.cookie,method:'DELETE'})).status,404);
+      const [ownedSongs]=await db.pool.execute('SELECT song_id FROM bracket_songs WHERE bracket_id=? ORDER BY song_id',[br.id]);
+      const sharedId=ownedSongs[0].song_id;
+      await db.pool.execute('UPDATE bracket_songs SET song_id=? WHERE bracket_song_id=?',[sharedId,other.entries[0]]);
       const [[songsBefore]]=await db.pool.execute('SELECT COUNT(*) AS total FROM songs');
       const [[usersBefore]]=await db.pool.execute('SELECT COUNT(*) AS total FROM users');
       const result=await http(path,{cookie:a.owner.cookie,method:'DELETE'});assert.equal(result.status,200,JSON.stringify(result.body));
       for(const table of ['brackets','votes','matchup_reported_totals','matchups','bracket_finale_sessions','bracket_playlists','bracket_weeks','bracket_rounds','bracket_songs','bracket_albums','bracket_members']) {
         const [[row]]=await db.pool.execute(`SELECT COUNT(*) AS total FROM ${table} WHERE bracket_id=?`,[br.id]);assert.equal(Number(row.total),0,table);
       }
-      const [[songsAfter]]=await db.pool.execute('SELECT COUNT(*) AS total FROM songs');assert.equal(songsAfter.total,songsBefore.total);
+      const [[songsAfter]]=await db.pool.execute('SELECT COUNT(*) AS total FROM songs');assert.equal(Number(songsAfter.total),Number(songsBefore.total)-3);
+      const [retained]=await db.pool.execute('SELECT song_id FROM songs WHERE song_id IN (?,?,?,?)',ownedSongs.map(row=>row.song_id));
+      assert.deepEqual(retained.map(row=>Number(row.song_id)),[Number(sharedId)]);
       const [[usersAfter]]=await db.pool.execute('SELECT COUNT(*) AS total FROM users');assert.equal(usersAfter.total,usersBefore.total);
       assert.equal((await http(`/api/admin/brackets/${other.id}`,{cookie:a.owner.cookie})).status,200);
       assert.equal((await http(path,{cookie:a.owner.cookie,method:'DELETE'})).status,404);
@@ -372,6 +377,7 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
     await t.test('failed bracket deletion rolls back votes and tournament records',async()=>{
       const br=await bracket(a);
       assert.equal((await vote(br,a.member)).status,200);
+      const [songsBefore]=await db.pool.execute('SELECT song_id FROM bracket_songs WHERE bracket_id=? ORDER BY song_id',[br.id]);
       await db.pool.query(`CREATE TRIGGER integration_reject_delete BEFORE DELETE ON brackets FOR EACH ROW BEGIN IF OLD.bracket_id=${br.id} THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Integration deletion failure'; END IF; END`);
       try {
         assert.equal((await http(`/api/admin/brackets/${br.id}`,{cookie:a.owner.cookie,method:'DELETE'})).status,500);
@@ -379,6 +385,8 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
         const [[matches]]=await db.pool.execute('SELECT COUNT(*) AS total FROM matchups WHERE bracket_id=?',[br.id]);assert.equal(Number(matches.total),3);
         const [[link]]=await db.pool.execute('SELECT next_matchup_id FROM matchups WHERE matchup_id=?',[br.matches[0]]);assert.equal(Number(link.next_matchup_id),br.matches[2]);
         assert.equal((await http(`/api/admin/brackets/${br.id}`,{cookie:a.owner.cookie})).status,200);
+        const [retained]=await db.pool.execute('SELECT s.song_id FROM songs s JOIN bracket_songs bs ON bs.song_id=s.song_id WHERE bs.bracket_id=? ORDER BY s.song_id',[br.id]);
+        assert.deepEqual(retained,songsBefore);
       } finally { await db.pool.query('DROP TRIGGER integration_reject_delete'); }
     });
 

@@ -664,11 +664,14 @@ const server = createServer(async (request, response) => {
           await connection.beginTransaction();
           const [rows]=await connection.execute('SELECT bracket_id FROM brackets WHERE bracket_id=? AND family_id=? FOR UPDATE',[id,familyId]);
           if (!rows.length) { await connection.rollback(); send(404,{error:'Bracket not found.'}); return; }
+          // Capture only this bracket's catalog songs, locking them before unlinking.
+          const [ownedSongs]=await connection.execute('SELECT s.song_id FROM songs s JOIN bracket_songs bs ON bs.song_id=s.song_id WHERE bs.bracket_id=? ORDER BY s.song_id FOR UPDATE',[id]);
           // Remove dependent records inside the same transaction as the bracket.
           await connection.execute('DELETE FROM votes WHERE bracket_id=?',[id]);
           await connection.execute('DELETE FROM bracket_finale_sessions WHERE bracket_id=?',[id]);
           await connection.execute('UPDATE matchups SET next_matchup_id=NULL,next_slot=NULL WHERE bracket_id=?',[id]);
           for(const table of ['matchups','bracket_playlists','bracket_weeks','bracket_rounds','bracket_songs','bracket_albums','bracket_members']) await connection.execute(`DELETE FROM ${table} WHERE bracket_id=?`,[id]);
+          for(const song of ownedSongs) await connection.execute('DELETE FROM songs WHERE song_id=? AND NOT EXISTS (SELECT 1 FROM bracket_songs bs WHERE bs.song_id=songs.song_id)',[song.song_id]);
           await connection.execute('DELETE FROM brackets WHERE bracket_id=?',[id]); await connection.commit(); send(200,{deleted:true}); return;
         } catch(error) { await connection.rollback(); throw error; } finally { connection.release(); }
       }

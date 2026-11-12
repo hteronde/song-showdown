@@ -231,3 +231,9 @@ The bracket form saves **Disable Automatic Emails** with the bracket. Accepted c
 ### Winner announcement emails
 
 Before deploying winner announcements, run each statement in `database/migrate_winner_emails.sql` once on existing databases. The existing production email worker sends a champion announcement after a bracket completes, including finale mode. It names the winning song/artist, thanks accepted participants (including finale-only members), and links to `/history/:bracketId`. Delivery uses the persisted queue, retries, and provider idempotency. Disable Automatic Emails also suppresses winner announcements. Brackets completed before this migration are excluded to avoid unexpectedly emailing historical participants.
+
+### Song cleanup when deleting brackets
+
+Deleting a bracket also deletes its catalog songs only when no remaining bracket references them. Shared songs and unrelated unassigned songs remain. Song removal is part of the same transaction as bracket deletion, so failures restore all affected records.
+
+For the one-time Radiohead testing cleanup, `node --env-file=.env scripts/cleanup-radiohead-songs.mjs` previews unassigned duplicates of songs in exactly `Radiohead Bracket` and `Radiohead Bracket copy`. Add `--apply` to delete the verified duplicates. A private recovery JSON is written under the gitignored `.local-backups/` directory before deletion. The tool refuses conflicting assignments or mismatched retained song lists. Use `--expected-brackets=1` only when intentionally keeping just `Radiohead Bracket` in a local database. A separate ignored environment file can supply the live database connection; never commit credentials or recovery copies.
