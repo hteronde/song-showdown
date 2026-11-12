@@ -331,7 +331,7 @@
   <div class="empty" *ngIf="loading">Loading brackets…</div>
   <div class="empty" *ngIf="pageMode === 'list' && !loading && brackets.length===0">No brackets yet. Create one to get started.</div>
   <div class="list" *ngIf="pageMode === 'list' && !loading && brackets.length">
-    <article class="card" *ngFor="let bracket of brackets"><div><h2>{{ bracket.title }}</h2><div class="muted">{{ bracket.artist }} · {{ bracket.songCount }} songs · {{ bracket.pausedAt ? 'on hold' : bracket.status }}<span *ngIf="bracket.startAt && bracket.status !== 'complete'"> · starts {{ bracket.startAt | date:'medium' }}</span></div><div class="muted">Tiebreaker option: {{ tiebreakerLabels[bracket.tiebreakerOption] }}</div></div><div class="actions"><button *ngIf="bracket.status === 'active'" [disabled]="pauseSavingId === bracket.bracketId" (click)="togglePaused(bracket)">{{ pauseSavingId === bracket.bracketId ? 'Saving…' : bracket.pausedAt ? 'Resume' : 'Pause' }}</button><button (click)="edit(bracket)">Edit</button><button *ngIf="isSuper" (click)="duplicateBracket(bracket)" [disabled]="duplicatingId != null">{{ duplicatingId === bracket.bracketId ? 'Duplicating…' : 'Duplicate' }}</button><button *ngIf="isSuper" (click)="remove(bracket)" [disabled]="deletingBracketIds.has(bracket.bracketId)">{{ deletingBracketIds.has(bracket.bracketId) ? 'Deleting…' : 'Delete' }}</button></div></article>
+    <article class="card" *ngFor="let bracket of brackets"><div><h2>{{ bracket.title }}</h2><div class="muted">{{ bracket.artist }} · {{ bracket.songCount }} songs · {{ bracket.pausedAt ? 'on hold' : bracket.status }}<span *ngIf="bracket.startAt && bracket.status !== 'complete'"> · starts {{ bracket.startAt | date:'medium' }}</span></div><div class="muted">Tiebreaker option: {{ tiebreakerLabels[bracket.tiebreakerOption] }}</div></div><div class="actions"><button *ngIf="bracket.status === 'active'" [disabled]="pauseSavingId === bracket.bracketId" (click)="togglePaused(bracket)">{{ pauseSavingId === bracket.bracketId ? 'Saving…' : bracket.pausedAt ? 'Resume' : 'Pause' }}</button><button (click)="edit(bracket)">Edit</button><button *ngIf="isSuper" (click)="duplicateBracket(bracket)" [disabled]="duplicatingId != null">{{ duplicatingId === bracket.bracketId ? 'Duplicating…' : 'Duplicate' }}</button><button *ngIf="isSuper" (click)="remove(bracket)" aria-haspopup="dialog" aria-controls="delete-bracket-dialog" [disabled]="deletingBracketIds.has(bracket.bracketId)">{{ deletingBracketIds.has(bracket.bracketId) ? 'Deleting…' : 'Delete' }}</button></div></article>
   </div>
 </section>
 
@@ -353,4 +353,16 @@
   <p class="error">{{ resetWarning }}</p>
   <p>This cannot be undone. Everyone will need to vote again. Cancel keeps the existing bracket and votes.</p>
   <div class="song-modal-actions"><button class="add-song" type="button" (click)="confirmHistoryReset()">Rebuild and clear history</button><button class="cancel" type="button" (click)="cancelHistoryReset()" autofocus>Cancel</button></div>
+</dialog>
+
+<dialog #deleteBracketDialog id="delete-bracket-dialog" class="song-dialog delete-bracket-dialog" aria-labelledby="delete-bracket-title" aria-describedby="delete-bracket-description" (cancel)="deletingBracket ? $event.preventDefault() : cancelBracketDeletion()">
+  <span class="stat-label">CONFIRM DELETION</span>
+  <h3 id="delete-bracket-title">Delete this bracket?</h3>
+  <p id="delete-bracket-description">Are you sure you wish to permanently delete <strong>{{ bracketToDelete?.title }}</strong>?</p>
+  <p>This also deletes all votes, matchup results, sessions, and participant invitations for this bracket. This cannot be undone.</p>
+  <p *ngIf="deleteError" class="error" role="alert">{{ deleteError }}</p>
+  <div class="song-modal-actions">
+    <button class="cancel" type="button" (click)="cancelBracketDeletion()" [disabled]="deletingBracket" autofocus>Cancel</button>
+    <button class="delete-confirm" type="button" (click)="confirmBracketDeletion()" [disabled]="deletingBracket || !bracketToDelete">{{ deletingBracket ? 'Deleting…' : 'Delete bracket' }}</button>
+  </div>
 </dialog>

@@ -1156,19 +1156,40 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         }
     }
     readonly deletingBracketIds = new Set<number>();
-    async remove(bracket: BracketRecord): Promise<void> {
-        if (this.deletingBracketIds.has(bracket.bracketId) || !window.confirm(`Permanently delete “${bracket.title}”? This will also delete all votes, matchup results, sessions, and participant invitations for this bracket. This cannot be undone.`))
-            return;
+    @ViewChild('deleteBracketDialog') deleteBracketDialog?: ElementRef<HTMLDialogElement>;
+    bracketToDelete: BracketRecord | null = null;
+    deleteError = '';
+    get deletingBracket(): boolean {
+        return !!this.bracketToDelete && this.deletingBracketIds.has(this.bracketToDelete.bracketId);
+    }
+    remove(bracket: BracketRecord): void {
+        if (!this.isSuper || this.deletingBracket) return;
+        this.bracketToDelete = bracket;
+        this.deleteError = '';
+        this.deleteBracketDialog?.nativeElement.showModal();
+    }
+    cancelBracketDeletion(): void {
+        if (this.deletingBracket) return;
+        this.deleteBracketDialog?.nativeElement.close();
+        this.bracketToDelete = null;
+        this.deleteError = '';
+    }
+    async confirmBracketDeletion(): Promise<void> {
+        const bracket = this.bracketToDelete;
+        if (!this.isSuper || !bracket || this.deletingBracket) return;
+        this.deleteError = '';
         this.error = '';
         this.success = '';
         this.deletingBracketIds.add(bracket.bracketId);
         try {
             await this.bracketsApi.remove(bracket.bracketId);
             this.brackets = this.brackets.filter(item => item.bracketId !== bracket.bracketId);
+            this.deleteBracketDialog?.nativeElement.close();
+            this.bracketToDelete = null;
             this.success = 'Bracket deleted.';
         }
         catch (error) {
-            this.error = this.message(error);
+            this.deleteError = this.message(error);
         }
         finally {
             this.deletingBracketIds.delete(bracket.bracketId);

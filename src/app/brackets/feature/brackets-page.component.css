@@ -1018,3 +1018,7 @@
 @media (max-width: 650px) { .participant-email-row { grid-template-columns: 1fr; } }
 
 @media (min-width: 651px) and (max-width: 900px) { .participant-email-row { grid-template-columns: 1fr 1fr; } }
+
+.delete-bracket-dialog { width: min(560px,calc(100vw - 32px)); }
+.delete-bracket-dialog .delete-confirm { background: #a13d32; color: #fff; border: 1px solid #a13d32; border-radius: 5px; padding: 10px 14px; cursor: pointer; }
+.delete-bracket-dialog .delete-confirm:disabled { opacity: .6; cursor: default; }
