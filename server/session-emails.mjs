@@ -27,7 +27,7 @@ const joins=`FROM bracket_weeks w JOIN brackets b ON b.bracket_id=w.bracket_id
   JOIN bracket_members bm ON bm.bracket_id=b.bracket_id AND bm.family_id=b.family_id
   JOIN users u ON u.user_id=bm.user_id AND u.family_id=bm.family_id
   JOIN session_email_settings settings ON settings.settings_id=1`;
-const eligible=`bm.invitation_status='accepted' AND bm.non_finale_participant=TRUE
+const eligible=`b.automatic_emails_disabled=FALSE AND bm.invitation_status='accepted' AND bm.non_finale_participant=TRUE
   AND b.status<>'draft' AND b.start_at<=NOW(6) AND b.paused_at IS NULL
   AND w.opens_at IS NOT NULL AND w.opens_at<=NOW(6)
   AND (b.finale_start_round IS NULL OR r.round_number<b.finale_start_round)
@@ -36,10 +36,10 @@ const eligible=`bm.invitation_status='accepted' AND bm.non_finale_participant=TR
   AND EXISTS (SELECT 1 FROM matchups m WHERE m.bracket_id=b.bracket_id AND m.week_id=w.week_id)
   AND NOT EXISTS (SELECT 1 FROM matchups m JOIN matchups feeder ON feeder.bracket_id=m.bracket_id AND feeder.next_matchup_id=m.matchup_id WHERE m.week_id=w.week_id AND feeder.winner_entry_id IS NULL)`;
 const due=type=>type==='start'
-  ? `b.status='active' AND b.completed_at IS NULL AND w.opens_at>=settings.enabled_at AND (w.closes_at IS NULL OR w.closes_at>NOW(6))
+  ? `b.status='active' AND b.completed_at IS NULL AND w.opens_at>=GREATEST(settings.enabled_at,COALESCE(b.automatic_emails_enabled_at,settings.enabled_at)) AND (w.closes_at IS NULL OR w.closes_at>NOW(6))
      AND NOT EXISTS (SELECT 1 FROM bracket_finale_sessions f WHERE f.bracket_id=b.bracket_id)
      AND EXISTS (SELECT 1 FROM matchups m WHERE m.week_id=w.week_id AND m.winner_entry_id IS NULL)`
-  : 'w.closes_at>=settings.enabled_at AND w.closes_at<=NOW(6)';
+  : 'w.closes_at>=GREATEST(settings.enabled_at,COALESCE(b.automatic_emails_enabled_at,settings.enabled_at)) AND w.closes_at<=NOW(6)';
 
 export async function processSessionEmails(pool,{env=process.env,deliver=deliverEmail}={}) {
   const summary={sent:0,failed:0};
@@ -49,9 +49,12 @@ export async function processSessionEmails(pool,{env=process.env,deliver=deliver
     SELECT UUID(),b.bracket_id,w.week_id,u.user_id,? ${joins} WHERE ${eligible} AND ${due(type)}`,[type]);
   await pool.execute(`UPDATE session_email_deliveries d
     JOIN bracket_weeks w ON w.week_id=d.week_id AND w.bracket_id=d.bracket_id
+    JOIN brackets b ON b.bracket_id=d.bracket_id
     LEFT JOIN bracket_members bm ON bm.bracket_id=d.bracket_id AND bm.user_id=d.user_id
     SET d.delivery_status='skipped'
-    WHERE d.delivery_status='pending' AND (bm.user_id IS NULL OR bm.invitation_status<>'accepted' OR bm.non_finale_participant=FALSE
+    WHERE d.delivery_status='pending' AND (b.automatic_emails_disabled=TRUE
+      OR (d.event_type='start' AND w.opens_at<b.automatic_emails_enabled_at)
+      OR (d.event_type='end' AND w.closes_at<b.automatic_emails_enabled_at) OR bm.user_id IS NULL OR bm.invitation_status<>'accepted' OR bm.non_finale_participant=FALSE
       OR (d.event_type='start' AND w.closes_at<=NOW(6)))`);
   const [pending]=await pool.execute(`SELECT delivery_id AS id,event_type AS eventType FROM session_email_deliveries
     WHERE (delivery_status='pending' AND (attempt_at IS NULL OR attempt_at<DATE_SUB(NOW(6),INTERVAL 1 MINUTE)))

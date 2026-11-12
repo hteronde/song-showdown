@@ -24,6 +24,7 @@
         <label for="bracket-logo">Logo</label>
         <input id="bracket-logo" name="logoUrl" type="url" maxlength="2048" [(ngModel)]="logoUrl" placeholder="https://example.com/logo.png">
       </div>
+      <div class="field anonymous-field"><label for="disable-automatic-emails"><input id="disable-automatic-emails" type="checkbox" name="automaticEmailsDisabled" [(ngModel)]="automaticEmailsDisabled">Disable Automatic Emails</label><span class="hint">Stops session start and end emails. Invitations and manually written emails are still sent.</span></div>
       <div class="field anonymous-field"><label for="bracket-anonymous"><input id="bracket-anonymous" type="checkbox" name="anonymous" [(ngModel)]="anonymous">Anonymous?</label><span class="hint">Members see results and totals, but only the commissioner can see individual votes.</span></div>
       <div class="field wide">
         <span class="participant-label">Sessions</span>

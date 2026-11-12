@@ -467,6 +467,50 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const [[count]]=await db.pool.execute('SELECT COUNT(*) AS total FROM session_email_deliveries WHERE bracket_id=?',[br.id]);assert.equal(Number(count.total),0);
     });
 
+    await t.test('automatic email preference survives draft, publishing, and live edits',async()=>{
+      const draft=await http('/api/admin/brackets/draft',{cookie:a.owner.cookie,method:'POST',body:{title:'Email preference',artist:'Test',automaticEmailsDisabled:true}});
+      assert.equal(draft.status,201);
+      const id=draft.body.bracketId,path=`/api/admin/brackets/${id}`;
+      assert.equal((await http(path,{cookie:a.owner.cookie})).body.bracket.automaticEmailsDisabled,true);
+      const published=await http(path,{cookie:a.owner.cookie,method:'PUT',body:{title:'Email preference',artist:'Test',songCount:4,songList:'Mail A\nMail B\nMail C\nMail D',participantIds:[a.owner.id,a.member.id],startAt:new Date(Date.now()-3600000).toISOString(),songsPerSession:2,sessionDurationMinutes:null,tiebreakerOption:'random',automaticEmailsDisabled:true}});
+      assert.equal(published.status,200);
+      const stored=(await http(path,{cookie:a.owner.cookie})).body.bracket;
+      assert.equal(stored.automaticEmailsDisabled,true);
+      const edited=await http(path,{cookie:a.owner.cookie,method:'PUT',body:{...stored,anonymous:!!stored.anonymous,automaticEmailsDisabled:false}});
+      assert.equal(edited.status,200);
+      assert.equal((await http(path,{cookie:a.owner.cookie})).body.bracket.automaticEmailsDisabled,false);
+    });
+
+    await t.test('automatic email setting is scoped and suppresses starts, ends, retries, and catch-up mail',async()=>{
+      const br=await bracket(a), path=`/api/admin/brackets/${br.id}/automatic-emails`;
+      const toggle=(cookie,disabled)=>http(path,{cookie,method:'PUT',body:{automaticEmailsDisabled:disabled}});
+      assert.notEqual((await toggle(a.member.cookie,true)).status,200);
+      assert.notEqual((await toggle(b.owner.cookie,true)).status,200);
+      assert.equal((await toggle(a.owner.cookie,'true')).status,400);
+      await db.pool.execute("UPDATE bracket_members SET bracket_role='commissioner' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
+      assert.equal((await toggle(a.member.cookie,true)).status,200);
+      const page=await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie});
+      assert.equal(page.body.isCommissioner,true);assert.equal(Number(page.body.bracket.automaticEmailsDisabled),1);
+      const env={NODE_ENV:'production',APP_URL:'https://example.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'};
+      const messages=[];const deliver=async m=>{if(m.text.includes(`/brackets/${br.id}`))messages.push(m);};
+      await db.pool.execute('UPDATE session_email_settings SET enabled_at=NOW(6) WHERE settings_id=1');
+      await db.pool.execute('UPDATE bracket_weeks SET opens_at=NOW(6),closes_at=DATE_ADD(NOW(6),INTERVAL 1 HOUR) WHERE week_id=?',[br.weeks[0]]);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,0);
+      await db.pool.execute('UPDATE bracket_weeks SET closes_at=NOW(6) WHERE week_id=?',[br.weeks[0]]);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,0);
+      assert.equal((await toggle(a.member.cookie,false)).status,200);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,0,'no catch-up after enabling');
+      await db.pool.execute('UPDATE bracket_weeks SET opens_at=NOW(6),closes_at=DATE_ADD(NOW(6),INTERVAL 1 HOUR) WHERE week_id=?',[br.weeks[0]]);
+      await processSessionEmails(db.pool,{env,deliver:async m=>{if(m.text.includes(`/brackets/${br.id}`))throw Error('Test failure');}});
+      assert.equal((await toggle(a.owner.cookie,true)).status,200);
+      await db.pool.execute("UPDATE session_email_deliveries SET attempt_at=DATE_SUB(NOW(6),INTERVAL 2 MINUTE) WHERE bracket_id=?",[br.id]);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,0,'queued retries are suppressed');
+      await toggle(a.owner.cookie,false);
+      await db.pool.execute('UPDATE bracket_weeks SET closes_at=NOW(6) WHERE week_id=?',[br.weeks[0]]);
+      await processSessionEmails(db.pool,{env,deliver});assert.equal(messages.length,2,'future ends resume');
+      await db.pool.execute("UPDATE bracket_members SET bracket_role='member' WHERE bracket_id=?",[br.id]);
+    });
+
     await t.test('only the last of multiple online sessions announces the finale date',async()=>{
       const br=await bracket(a);
       const env={NODE_ENV:'production',APP_URL:'https://thesongshowdown.com',RESEND_API_KEY:'fake',EMAIL_FROM:'sender@example.com'};

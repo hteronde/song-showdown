@@ -1,3 +1,4 @@
+import {saveAutomaticEmailSetting} from './bracket-email-settings.mjs';
 import {sendBracketEmail} from './bracket-email.mjs';
 import { processSessionEmails } from './session-emails.mjs';
 import { sendInvitationStatusEmails } from './invitation-status-email.mjs';
@@ -329,6 +330,13 @@ const server = createServer(async (request, response) => {
     try {
       const familyId = Number((await pool.execute('SELECT family_id FROM users WHERE user_id = ?', [authenticatedUser.userId]))[0][0]?.family_id);
       if (!familyId) { send(400, { error: 'Your account is not connected to a family.' }); return; }
+      const emailSettingsRoute=url.pathname.match(/^\/api\/admin\/brackets\/(\d+)\/automatic-emails$/);
+      if (emailSettingsRoute && request.method==='PUT') {
+        const input=await readJson(request);
+        if(typeof input.automaticEmailsDisabled!=='boolean'){send(400,{error:'Choose whether to disable automatic emails.'});return;}
+        await saveAutomaticEmailSetting(pool,Number(emailSettingsRoute[1]),input.automaticEmailsDisabled);
+        send(200,{automaticEmailsDisabled:input.automaticEmailsDisabled});return;
+      }
       const emailRoute=url.pathname.match(/^\/api\/admin\/brackets\/(\d+)\/email$/);
       if (emailRoute && request.method==='POST') {
         try { send(200,await sendCustomEmail(pool,Number(emailRoute[1]),await readJson(request))); }
@@ -485,7 +493,7 @@ const server = createServer(async (request, response) => {
       if (request.method === 'GET' && url.pathname === '/api/admin/brackets') {
         const [rows] = await pool.execute(
           `SELECT b.bracket_id AS bracketId,b.title,b.artist,b.logo_url AS logoUrl,b.draft_settings AS draftSettings,${effectiveBracketStatus} AS status,b.start_at AS startAt,b.paused_at AS pausedAt,
-                  b.songs_per_session AS songsPerSession,b.session_duration_minutes AS sessionDurationMinutes,b.tiebreaker_option AS tiebreakerOption,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound,
+                  b.songs_per_session AS songsPerSession,b.session_duration_minutes AS sessionDurationMinutes,b.tiebreaker_option AS tiebreakerOption,b.automatic_emails_disabled AS automaticEmailsDisabled,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound,
                   COUNT(DISTINCT bs.bracket_song_id) AS songCount
            FROM brackets b LEFT JOIN bracket_songs bs ON bs.bracket_id=b.bracket_id
            WHERE b.family_id=? AND (?='super' OR EXISTS (SELECT 1 FROM bracket_members cm WHERE cm.bracket_id=b.bracket_id AND cm.user_id=? AND cm.bracket_role='commissioner' AND cm.invitation_status='accepted')) GROUP BY b.bracket_id ORDER BY b.created_at DESC`, [familyId,authenticatedUser.user_role,authenticatedUser.userId]);
@@ -495,7 +503,7 @@ const server = createServer(async (request, response) => {
         const id = Number(url.pathname.split('/').at(-1));
         const [rows] = await pool.execute(
           `SELECT b.bracket_id AS bracketId,b.title,b.artist,b.logo_url AS logoUrl,b.draft_settings AS draftSettings,${effectiveBracketStatus} AS status,b.start_at AS startAt,b.paused_at AS pausedAt,
-                  b.songs_per_session AS songsPerSession,b.session_duration_minutes AS sessionDurationMinutes,b.tiebreaker_option AS tiebreakerOption,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound
+                  b.songs_per_session AS songsPerSession,b.session_duration_minutes AS sessionDurationMinutes,b.tiebreaker_option AS tiebreakerOption,b.automatic_emails_disabled AS automaticEmailsDisabled,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound
            FROM brackets b WHERE b.bracket_id=? AND b.family_id=?`, [id,familyId]);
         if (!rows.length) { send(404, { error:'Bracket not found.' }); return; }
         const [[songs],[members],[rounds]] = await Promise.all([
@@ -505,7 +513,7 @@ const server = createServer(async (request, response) => {
         ]);
         const lockedSongIds=await getSongOrderLocks(pool,id);
         const restored=restoreBracketDraft(rows[0],songs.map(song=>({...song,reorderLocked:lockedSongIds.has(Number(song.bracketSongId))})));
-        send(200, { bracket: { ...rows[0], ...restored.settings, albums:await getBracketAlbums(pool,id), sessionPlaylists:restored.settings.sessionPlaylists??await getSessionPlaylists(pool,id), songCount:restored.settings.songCount??(rounds[0].roundCount ? 2 ** Number(rounds[0].roundCount) : Math.max(16,2 ** Math.ceil(Math.log2(songs.length || 1)))), songs:restored.songs.map(song=>({...song,category:song.category??'',album:song.album??'',youtubeUrl:song.youtubeUrl??'',spotifyUrl:song.spotifyUrl??'',albumCoverUrl:song.albumCoverUrl??''})), songList:songs.map(song=>song.title).join('\n'), canAssignRoles:authenticatedUser.user_role==='super', participantRoles:restored.settings.participantRoles??Object.fromEntries(members.map(member=>[member.userId,member.bracket_role])), participantIds:restored.settings.participantIds??members.map(member=>Number(member.userId)) } }); return;
+        send(200, { bracket: { ...rows[0], automaticEmailsDisabled:!!rows[0].automaticEmailsDisabled, ...restored.settings, albums:await getBracketAlbums(pool,id), sessionPlaylists:restored.settings.sessionPlaylists??await getSessionPlaylists(pool,id), songCount:restored.settings.songCount??(rounds[0].roundCount ? 2 ** Number(rounds[0].roundCount) : Math.max(16,2 ** Math.ceil(Math.log2(songs.length || 1)))), songs:restored.songs.map(song=>({...song,category:song.category??'',album:song.album??'',youtubeUrl:song.youtubeUrl??'',spotifyUrl:song.spotifyUrl??'',albumCoverUrl:song.albumCoverUrl??''})), songList:songs.map(song=>song.title).join('\n'), canAssignRoles:authenticatedUser.user_role==='super', participantRoles:restored.settings.participantRoles??Object.fromEntries(members.map(member=>[member.userId,member.bracket_role])), participantIds:restored.settings.participantIds??members.map(member=>Number(member.userId)) } }); return;
       }
       if (['POST','PUT'].includes(request.method) && (url.pathname === '/api/admin/brackets' || /^\/api\/admin\/brackets\/\d+$/.test(url.pathname))) {
         const input = await readJson(request), isUpdate = request.method === 'PUT';
@@ -514,6 +522,7 @@ const server = createServer(async (request, response) => {
         const tiebreakerOption = input.tiebreakerOption ?? 'admin_pick';
         const randomizationMode=input.randomizationMode ?? null;
         if(randomizationMode!==null && !randomizationModes.includes(randomizationMode)) {send(400,{error:'Choose a valid song randomization option.'});return;}
+        if(input.automaticEmailsDisabled!==undefined && typeof input.automaticEmailsDisabled!=='boolean'){send(400,{error:'Choose whether to disable automatic emails.'});return;}
         const anonymous=input.anonymous ?? null;
         if(anonymous!==null && typeof anonymous!=='boolean') {send(400,{error:'Anonymous must be true or false.'});return;}
         if (!tiebreakerOptions.includes(tiebreakerOption)) { send(400, { error: 'Choose a valid tiebreaker option.' }); return; }
@@ -558,6 +567,7 @@ const server = createServer(async (request, response) => {
               if(unchangedLegacySeeds)seeds=existingEntries.map(entry=>Number(entry.seed_number));
               else if(seedError)throw seedError;
               await applyLiveBracketEdit(connection,exists[0],existingEntries,liveInput,seeds);
+              await saveAutomaticEmailSetting(connection,id,input.automaticEmailsDisabled);
               if (input.logoUrl !== undefined) await connection.execute('UPDATE brackets SET logo_url=? WHERE bracket_id=?',[logoUrl,id]);
               await connection.execute("UPDATE brackets SET status=CASE WHEN status='draft' THEN 'active' ELSE status END,draft_settings=NULL WHERE bracket_id=?",[id]);
               await applySubmittedSessionSchedule(connection,id,familyId,input.sessionSchedule);
@@ -587,6 +597,7 @@ const server = createServer(async (request, response) => {
             const [res]=await connection.execute("INSERT INTO brackets (family_id,created_by_user_id,title,artist,start_at,songs_per_session,session_duration_minutes,tiebreaker_option,anonymous,randomization_mode,status) VALUES (?,?,?,?,?,?,?,?,?,?,'active')",[familyId,authenticatedUser.userId,String(input.title).trim(),String(input.artist).trim(),new Date(input.startAt),sessionSize,duration,tiebreakerOption,anonymous??false,randomizationMode??'none']);
             id=res.insertId;
           }
+          await saveAutomaticEmailSetting(connection,id,input.automaticEmailsDisabled);
           await connection.execute('UPDATE brackets SET seeding_size=?,draft_settings=NULL WHERE bracket_id=?',[seedingSize??null,id]);
           if (input.logoUrl !== undefined) await connection.execute('UPDATE brackets SET logo_url=? WHERE bracket_id=?',[logoUrl,id]);
           if(finalePlan!==undefined) await connection.execute('UPDATE brackets SET finale_at=?,finale_start_round=? WHERE bracket_id=?',[finalePlan.finaleAt,finalePlan.finaleStartRound,id]);
@@ -822,7 +833,7 @@ const server = createServer(async (request, response) => {
       const [bracketRows] = await pool.execute(
         `SELECT b.bracket_id AS bracketId,b.title,b.artist,b.logo_url AS logoUrl,b.bracket_year AS bracketYear,b.session_duration_minutes AS sessionDurationMinutes,
                 b.start_at AS startAt,(b.start_at > NOW() AND b.status <> 'complete' AND b.completed_at IS NULL) AS isUpcoming,
-                ${effectiveBracketStatus} AS status,b.paused_at AS pausedAt,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound,${awaitingFinaleSql('b')} AS awaitingFinale,
+                ${effectiveBracketStatus} AS status,b.paused_at AS pausedAt,b.automatic_emails_disabled AS automaticEmailsDisabled,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound,${awaitingFinaleSql('b')} AS awaitingFinale,
                 (SELECT status FROM bracket_finale_sessions WHERE bracket_id=b.bracket_id) AS finaleStatus,
                 (SELECT start_round_number FROM bracket_finale_sessions WHERE bracket_id=b.bracket_id) AS finaleSessionStartRound,
                 (SELECT COUNT(*) FROM bracket_songs bs WHERE bs.bracket_id=b.bracket_id) AS songCount
@@ -839,7 +850,7 @@ const server = createServer(async (request, response) => {
       if (bracketRows[0].isUpcoming) {
         send(200, { bracket: bracketRows[0], isUpcoming: true, weeks: [], playlists: [],
           finaleModeActive: false, awaitingFinale: false, canViewBallots: false,
-          currentWeekNumber: null, canManage:!!bracketAccess?.canManage, ballotEditingRound: null });
+          currentWeekNumber: null, canManage:!!bracketAccess?.canManage, isCommissioner:!!Number(bracketAccess?.isCommissioner), ballotEditingRound: null });
         return;
       }
 
@@ -966,7 +977,7 @@ const server = createServer(async (request, response) => {
       const activeWeek = weeks.find(week => week.isCurrent);
       const assignedPlaylists=await getSessionPlaylists(pool,bracketId);
       const playlists=assignedPlaylists.filter(playlist=>weeks.some(week=>week.weekNumber===playlist.weekNumber && (!!bracketAccess?.canManage||week.isCurrent||week.isClosed||((finaleModeActive||awaitingFinale)&&week.roundNumber>=Number(bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound??999)))));
-      send(200, { playlists, canParticipateOnline, bracket: {...bracketRows[0],finaleStartRound:bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound}, finaleModeActive, awaitingFinale, canViewBallots, currentWeekNumber: activeWeek?.weekNumber ?? null, weeks, canManage:!!bracketAccess?.canManage, ballotEditingRound:!!bracketAccess?.canManage ? await getBallotEditingRound(pool,bracketId) : null });
+      send(200, { playlists, canParticipateOnline, bracket: {...bracketRows[0],finaleStartRound:bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound}, finaleModeActive, awaitingFinale, canViewBallots, currentWeekNumber: activeWeek?.weekNumber ?? null, weeks, canManage:!!bracketAccess?.canManage, isCommissioner:!!Number(bracketAccess?.isCommissioner), ballotEditingRound:!!bracketAccess?.canManage ? await getBallotEditingRound(pool,bracketId) : null });
     } catch (error) {
       console.error('Weekly bracket request failed:', error.message);
       send(500, { error: 'Could not load current bracket matchups.' });
@@ -1177,7 +1188,7 @@ const server = createServer(async (request, response) => {
   try {
     const [bracketRows] = await pool.execute(
       `SELECT b.bracket_id AS bracketId, b.title, b.artist,b.logo_url AS logoUrl,
-              b.bracket_year AS bracketYear, ${effectiveBracketStatus} AS status,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound,
+              b.bracket_year AS bracketYear, ${effectiveBracketStatus} AS status,b.automatic_emails_disabled AS automaticEmailsDisabled,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound,
               f.name AS familyName,
               (SELECT COUNT(*) FROM bracket_songs bs WHERE bs.bracket_id = b.bracket_id) AS songCount
        FROM brackets b
@@ -1192,7 +1203,7 @@ const server = createServer(async (request, response) => {
 
     // Members use the voting endpoint for unfinished brackets, where song reveals are enforced.
     if (!bracketAccess?.canManage && bracketRows[0].status !== 'complete') {
-      send(200,{bracket:bracketRows[0],songs:[],rounds:[],playlists:[],participants:[],champion:null,finaleSession:null,canManage:!!bracketAccess?.canManage, ballotEditingRound:null});
+      send(200,{bracket:bracketRows[0],songs:[],rounds:[],playlists:[],participants:[],champion:null,finaleSession:null,canManage:!!bracketAccess?.canManage, isCommissioner:!!Number(bracketAccess?.isCommissioner), ballotEditingRound:null});
       return;
     }
     const [roundRows] = await pool.execute(
@@ -1318,7 +1329,7 @@ const server = createServer(async (request, response) => {
     send(200, {
       bracket: bracketRows[0],
       canViewBallots,
-      canManage:!!bracketAccess?.canManage, ballotEditingRound:!!bracketAccess?.canManage ? await getBallotEditingRound(pool,bracketId) : null,
+      canManage:!!bracketAccess?.canManage, isCommissioner:!!Number(bracketAccess?.isCommissioner), ballotEditingRound:!!bracketAccess?.canManage ? await getBallotEditingRound(pool,bracketId) : null,
       songs: songRows.map(row => row.title),
       champion: championship?.winner ?? null,
       playlists: playlistRows,

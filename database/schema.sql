@@ -56,6 +56,8 @@ CREATE TABLE brackets (
   finale_at DATETIME NULL,
   finale_start_round SMALLINT UNSIGNED NULL,
   paused_at DATETIME(6) NULL,
+  automatic_emails_disabled BOOLEAN NOT NULL DEFAULT FALSE,
+  automatic_emails_enabled_at DATETIME(6) NULL,
   anonymous BOOLEAN NOT NULL DEFAULT FALSE,
   seeding_size SMALLINT UNSIGNED NULL,
   randomization_mode ENUM('none','round1','each_round') NOT NULL DEFAULT 'none',

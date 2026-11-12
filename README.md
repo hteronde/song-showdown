@@ -221,3 +221,9 @@ The running API checks every 15 seconds after advancing sessions; a browser does
 Use the existing `RESEND_API_KEY`, `EMAIL_FROM`, and HTTPS `APP_URL`. Session emails default on in production and off locally to prevent duplicate emails from a local database copy. Set `SESSION_EMAILS_ENABLED=false` to disable, or `true` to explicitly enable local testing with an email provider. Railway must keep the API running; notifications cannot fire while its container is asleep or stopped.
 
 Delivery records survive restarts. Failed attempts retry after one minute; abandoned worker leases expire after ten minutes. Resend retries use a stable idempotency key and payload (provider keys last 24 hours: https://resend.com/docs/dashboard/emails/idempotency-keys). A successful submission to the provider is recorded as sent; inbox delivery is not guaranteed. If recipient/deadline content changes after a failed attempt, that event is skipped rather than sending obsolete content. No start email is sent after its session has already closed. Historical completed sessions are not replayed on installation, and deleting a bracket also deletes its notification records.
+
+### Per-bracket automatic session emails
+
+Before deploying this version, run `database/migrate_bracket_automatic_emails.sql` once on each existing `music_bracket` database. New databases include these columns in `database/schema.sql`.
+
+The bracket form saves **Disable Automatic Emails** with the bracket. Accepted commissioners also have an immediately saved checkbox on the active bracket page. This disables session start/end notifications (including the last online session announcement), not invitations, invitation-status messages, or Write email. Re-enabling applies to future session events without sending missed notifications. An email already submitted to the delivery provider cannot be recalled.

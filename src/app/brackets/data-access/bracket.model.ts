@@ -12,6 +12,7 @@ export interface BracketRecord {
   sessionSchedule?: Array<{weekNumber:number;opensAt:string|null;closesAt:string|null}>;
   finaleAt?: string | null;
   finaleStartRound?: number | null;
+  automaticEmailsDisabled?: boolean;
   anonymous?: boolean;
   randomizationMode?: RandomizationMode;
   seedingSize?: number | null;
@@ -52,6 +53,7 @@ export interface BracketInput {
   sessionScheduleRevision?:string;
   finaleAt?: string | null;
   finaleStartRound?: number | null;
+  automaticEmailsDisabled?: boolean;
   anonymous?: boolean;
   randomizationMode?: RandomizationMode;
   seedingSize?: number | null;

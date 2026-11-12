@@ -49,13 +49,14 @@ export interface VotingWeek {
 
 export interface ActiveBracketVotingData {
   canManage?:boolean;
+  isCommissioner?:boolean;
   canParticipateOnline?: boolean;
   isUpcoming?: boolean;
   playlists?:Array<{weekNumber:number;playlistName:string;playlistUrl:string}>;
   awaitingFinale: boolean;
   canViewBallots: boolean;
   ballotEditingRound: number | null;
-  bracket: { startAt?: string | null; bracketId: number; title: string; artist: string; logoUrl?: string | null; bracketYear: number | null; status: string; sessionDurationMinutes: number | null; finaleAt: string | null; finaleStartRound: number | null; pausedAt: string | null; randomizationMode: 'none' | 'round1' | 'each_round'; songCount: number };
+  bracket: { automaticEmailsDisabled?:boolean; startAt?: string | null; bracketId: number; title: string; artist: string; logoUrl?: string | null; bracketYear: number | null; status: string; sessionDurationMinutes: number | null; finaleAt: string | null; finaleStartRound: number | null; pausedAt: string | null; randomizationMode: 'none' | 'round1' | 'each_round'; songCount: number };
   finaleModeActive: boolean;
   currentWeekNumber: number | null;
   weeks: VotingWeek[];
@@ -65,6 +66,9 @@ export interface AdvanceWeekPlan {weekId:number;weekNumber:number;nextWeekId:num
 
 @Injectable({ providedIn: 'root' })
 export class ActiveBracketApiService {
+  setAutomaticEmailsDisabled(bracketId:number, automaticEmailsDisabled:boolean): Promise<{automaticEmailsDisabled:boolean}> {
+    return apiRequest(`/api/admin/brackets/${bracketId}/automatic-emails`, {method:'PUT',json:{automaticEmailsDisabled}});
+  }
   sendEmail(bracketId: number, subject: string, body: string, requestId: string): Promise<{sent:number;failed:number}> {
     return apiRequest(`/api/admin/brackets/${bracketId}/email`, {method:'POST', json:{subject,body,requestId}, timeoutMs:120000});
   }

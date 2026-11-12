@@ -52,6 +52,22 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         return final.winnerEntryId === final.songA.entryId ? final.songA : final.songB;
     }
     get connectorMatches(): VotingMatchup[] { return (this.data?.weeks ?? []).flatMap(week => week.matchups); }
+    emailSettingSaving = false;
+    async setAutomaticEmailsDisabled(event:Event): Promise<void> {
+        const checkbox=event.target as HTMLInputElement;
+        const disabled=checkbox.checked;
+        if (!this.data?.isCommissioner || this.emailSettingSaving) return;
+        const data=this.data;
+        this.emailSettingSaving=true;
+        try {
+            const result=await this.api.setAutomaticEmailsDisabled(data.bracket.bracketId,disabled);
+            if(this.data?.bracket.bracketId===data.bracket.bracketId) {
+                this.data.bracket.automaticEmailsDisabled=result.automaticEmailsDisabled;
+                this.notice=disabled ? 'Automatic session emails disabled.' : 'Automatic session emails enabled for future events.';
+            }
+        } catch(error) { this.error=error instanceof Error ? error.message : 'Could not save email settings.'; }
+        finally {checkbox.checked=!!this.data?.bracket.automaticEmailsDisabled;this.emailSettingSaving=false;this.changeDetector.markForCheck();}
+    }
     @ViewChild('writeEmailDialog') writeEmailDialog?: ElementRef<HTMLDialogElement>;
     emailSubject = '';
     emailBody = '';

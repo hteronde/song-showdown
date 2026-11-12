@@ -1,6 +1,7 @@
+import {saveAutomaticEmailSetting} from './bracket-email-settings.mjs';
 import {validateSessionPlaylists} from './session-playlists.mjs';
 const fail=(status,message)=>Object.assign(new Error(message),{status});
-const draftKeys=['sessionPlaylists','sessionSchedule','logoUrl','songCount','songs','participantIds','participantRoles','startAt','songsPerSession','sessionDurationMinutes','durationValue','durationUnit','finaleAt','finaleStartRound','seedingSize','randomizationMode','tiebreakerOption','anonymous'];
+const draftKeys=['automaticEmailsDisabled','sessionPlaylists','sessionSchedule','logoUrl','songCount','songs','participantIds','participantRoles','startAt','songsPerSession','sessionDurationMinutes','durationValue','durationUnit','finaleAt','finaleStartRound','seedingSize','randomizationMode','tiebreakerOption','anonymous'];
 export function parseDraftSettings(value) {
   if(!value)return {};
   return typeof value==='string'?JSON.parse(value):value;
@@ -30,6 +31,7 @@ export async function saveBracketDraft(c,{bracketId,familyId,userId,input}) {
     const [created]=await c.execute("INSERT INTO brackets (family_id,created_by_user_id,title,artist,status,draft_settings) VALUES (?,?,?,?,'draft',?)",[familyId,userId,title,artist,JSON.stringify(settings)]);
     bracketId=Number(created.insertId);
   }
+  await saveAutomaticEmailSetting(c,bracketId,settings.automaticEmailsDisabled);
   return {bracketId,saved:true,status:'draft'};
 }
 // Song metadata saves separately; restore current songs and only overlay draft seed assignments.
