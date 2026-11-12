@@ -34,6 +34,8 @@
           <span>SONG<span class="brand-light">SHOWDOWN</span></span>
         </a>
         <div class="side-label">YOUR BRACKETS</div>
+        <p class="sidebar-empty" role="status" *ngIf="bracketsLoaded && !bracketsError && !userBrackets.length">You haven’t joined any brackets yet. Your invitations will appear here.</p>
+        <p class="sidebar-empty" role="status" *ngIf="bracketsError">{{ bracketsError }}</p>
         <button class="bracket-link" *ngFor="let bracket of activeBrackets" [class.active]="activeBracketId === bracket.bracketId" [routerLink]="['/brackets', bracket.bracketId]" [attr.title]="bracket.artist"><span class="bracket-icon">◒</span><span>{{ bracket.title }}</span><small *ngIf="bracket.invitationStatus === 'pending'">Invited</small><span class="link-dot" *ngIf="activeBracketId === bracket.bracketId"></span></button>
         <button class="bracket-link history-link" [class.active]="activePage === 'history'" routerLink="/history"><span class="bracket-icon">◷</span><span>History</span></button>
         <ng-container *ngIf="upcomingBrackets.length">
@@ -48,7 +50,6 @@
           <button *ngIf="isAdmin" class="bracket-link" [class.active]="activePage === 'playlists'" routerLink="/manage/playlists"><span class="bracket-icon">▤</span><span>Playlists</span></button>
         </ng-container>
         <div class="sidebar-bottom">
-          <div class="help-card" *ngIf="isAdmin"><span class="help-icon">✳</span><div><strong>Family invitations</strong><p>Preview a sample link. Joining by invitation is not available yet.</p></div><button class="invite-button" (click)="copyInvite()">{{ inviteCopied ? 'Demo link copied!' : 'Copy demo invite link ↗' }}</button></div>
           <div class="profile-switch">
             <span class="avatar" [style.background]="currentMember.color">{{ currentMember.initials }}</span>
             <span class="profile-name"><strong>{{ currentMember.name }}</strong><small>{{ isAdmin ? 'Super' : 'Viewer' }}</small></span>

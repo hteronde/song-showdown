@@ -1,10 +1,10 @@
 <div class="page-wrap history-page">
   <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">◷</span> THE FAMILY ARCHIVE <span class="eyebrow-divider">·</span> PAST & PRESENT</div><h1>Every bracket<br><em>has a story.</em></h1><p class="hero-subtitle">Look back at the songs, surprises, and family champions.</p></section>
-  <div class="history-heading"><div><span class="stat-label">YOUR COLLECTION</span><h2>Bracket history</h2></div><span class="history-count">{{ historyBrackets.length + 1 }} BRACKETS</span></div>
+  <div class="history-heading"><div><span class="stat-label">YOUR COLLECTION</span><h2>Bracket history</h2></div><span class="history-count">{{ historyBrackets.length }} BRACKETS</span></div>
   <div class="notice-bar" *ngIf="historyLoading"><span class="notice-icon">◌</span><span>Loading bracket history from the database…</span></div>
   <div class="notice-bar" *ngIf="historyError"><span class="notice-icon">!</span><span>{{ historyError }}</span></div>
+  <div class="notice-bar" role="status" *ngIf="!historyLoading && !historyError && !isBracketDetailOpen && !historyBrackets.length">No bracket history yet. Your completed brackets will appear here.</div>
   <section class="history-list" *ngIf="!isBracketDetailOpen">
-    <article class="history-card current-history"><div class="history-card-top"><div class="history-band-icon fleetwood-icon">FM</div><div class="history-card-title"><span>FLEETWOOD MAC</span><strong>Song Showdown</strong><small>2025 · 8 songs · Week 1 of 2</small></div><span class="archive-status ongoing"><i></i> IN PROGRESS</span></div><div class="history-card-bottom"><span>Two matchups open this week</span><button (click)="returnToBracket.emit()">Return to bracket ↗</button></div></article>
     <article class="history-card" *ngFor="let bracket of historyBrackets">
       <div class="history-card-top">
         <img class="history-bracket-logo" *ngIf="bracket.logoUrl && !failedAlbumCovers.has(bracket.logoUrl!)" [src]="bracket.logoUrl" [alt]="bracket.artist + ' logo'" loading="lazy" referrerpolicy="no-referrer" (error)="albumCoverFailed(bracket.logoUrl!)">

@@ -5,7 +5,7 @@ import { SongAlbumArtComponent } from '../../brackets/ui/song-album-art.componen
 import { AdminBallotEditorComponent } from '../../brackets/ui/admin-ballot-editor.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ChangeDetectorRef, Component, ElementRef, EventEmitter, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthApiService } from '../../auth/data-access/auth-api.service';
 import { BracketHistoryInfo, BracketHistoryResponse, FinaleOptions, PastMatch, PastRound } from '../data-access/history.models';
@@ -67,8 +67,6 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
         if (this.selectedBracket)
             await this.loadBracketDetails(this.selectedBracket.bracketId);
     }
-    @Output()
-    returnToBracket = new EventEmitter<void>();
     isBracketDetailOpen = false;
     historyBrackets: BracketHistoryInfo[] = [];
     selectedBracket: BracketHistoryInfo | null = null;

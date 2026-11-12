@@ -4,7 +4,6 @@ import { ChangeDetectorRef, Component, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { BracketInvitationPageComponent } from './brackets/feature/bracket-invitation-page.component';
-import { HistoryPageComponent } from './history/feature/history-page.component';
 import type { BracketsPageComponent } from './brackets/feature/brackets-page.component';
 import { FamilyMember } from './family-members/data-access/family-member.model';
 import { AuthApiService, AuthUser } from './auth/data-access/auth-api.service';
@@ -42,7 +41,8 @@ export class AppComponent implements OnDestroy {
   userBrackets: UserBracketLink[] = [];
   get activeBrackets(): UserBracketLink[] { return this.userBrackets.filter(bracket => bracket.navigationStatus !== 'upcoming'); }
   get upcomingBrackets(): UserBracketLink[] { return this.userBrackets.filter(bracket => bracket.navigationStatus === 'upcoming').sort((a, b) => new Date(a.startAt!).getTime() - new Date(b.startAt!).getTime()); }
-  inviteCopied = false;
+  bracketsLoaded = false;
+  bracketsError = '';
   toast = '';
   private toastTimer?: ReturnType<typeof setTimeout>;
   private bracketLoadVersion = 0;
@@ -62,8 +62,7 @@ export class AppComponent implements OnDestroy {
       ? component as Pick<BracketsPageComponent, 'showList'> : null;
     if (component instanceof BracketInvitationPageComponent) {
       component.toastMessage.subscribe(message => this.showToast(message));
-    } else if (component instanceof HistoryPageComponent) {
-      component.returnToBracket.subscribe(() => this.selectPage('home'));
+
     }
   }
 
@@ -153,6 +152,8 @@ export class AppComponent implements OnDestroy {
     if (this.bracketRefreshTimer) clearInterval(this.bracketRefreshTimer);
     this.bracketRefreshTimer = undefined;
     this.userBrackets = [];
+    this.bracketsLoaded = false;
+    this.bracketsError = '';
     this.password = '';
     this.confirmPassword = '';
   }
@@ -216,26 +217,16 @@ export class AppComponent implements OnDestroy {
     const version = ++this.bracketLoadVersion;
     try {
       const brackets = await this.userBracketsApi.getParticipating();
-      if (version === this.bracketLoadVersion && this.isSignedIn) this.userBrackets = brackets;
+      if (version === this.bracketLoadVersion && this.isSignedIn) {
+        this.userBrackets = brackets;
+        this.bracketsLoaded = true;
+        this.bracketsError = '';
+      }
     } catch {
-      if (version === this.bracketLoadVersion) this.userBrackets = [];
+      if (version === this.bracketLoadVersion && this.isSignedIn) this.bracketsError = 'Could not load your brackets. Please try again shortly.';
     } finally {
       this.changeDetector.markForCheck();
     }
-  }
-
-  async copyInvite(): Promise<void> {
-    const inviteLink = new URL(window.location.href);
-    inviteLink.searchParams.set('join', 'FLEETWOOD-2025');
-    this.inviteCopied = true;
-    try {
-      await navigator.clipboard.writeText(inviteLink.toString());
-      this.showToast('Demo invite link copied. Joining by invitation is not available yet.');
-    } catch {
-      this.inviteCopied = false;
-      this.showToast('Clipboard access is unavailable in this browser.');
-    }
-    window.setTimeout(() => this.inviteCopied = false, 2200);
   }
 
   showToast(message: string): void {
