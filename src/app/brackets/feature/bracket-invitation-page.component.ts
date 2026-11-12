@@ -31,7 +31,10 @@ interface Invitation {
           <button type="button" class="secondary" [disabled]="saving" (click)="respond('declined')">Decline invitation</button>
         </div>
       </ng-container>
-      <p *ngIf="invitation.invitationStatus === 'declined'">You declined this invitation. Contact your admin if you change your mind.</p>
+      <ng-container *ngIf="invitation.invitationStatus === 'declined'">
+        <p>You declined this invitation. Changed your mind? You can still join the bracket. Voting follows the scheduled session times.</p>
+        <div class="actions"><button type="button" [disabled]="saving" (click)="respond('accepted')">{{ saving ? 'Joining…' : 'Change my mind — join bracket' }}</button></div>
+      </ng-container>
       <button *ngIf="invitation.canAccess" class="secondary" type="button" (click)="showBracket=true">View bracket as admin</button>
     </section>
     <app-active-bracket-page *ngIf="showBracket" (toastMessage)="toastMessage.emit($event)"></app-active-bracket-page>

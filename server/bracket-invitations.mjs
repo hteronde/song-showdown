@@ -36,7 +36,8 @@ export async function respondToInvitation(c, bracketId, userId, response) {
     WHERE bm.bracket_id=? AND bm.user_id=? FOR UPDATE`, [bracketId, userId]);
   if (!members.length) throw fail(404, 'Invitation not found or no longer available.');
   if (members[0].status === response) return { invitationStatus: response };
-  if (members[0].status !== 'pending') throw fail(409, 'You have already responded to this invitation. Contact your admin to change participation.');
+  const rejoining=members[0].status==='declined' && response==='accepted';
+  if (members[0].status !== 'pending' && !rejoining) throw fail(409, 'You have already accepted this invitation. Contact your admin to change participation.');
   await c.execute('UPDATE bracket_members SET invitation_status=?,invitation_responded_at=NOW(6) WHERE bracket_id=? AND user_id=?', [response, bracketId, userId]);
   return { invitationStatus: response };
 }

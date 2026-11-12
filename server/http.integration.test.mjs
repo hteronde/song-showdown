@@ -219,15 +219,28 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,404);
     });
 
-    await t.test('declining is idempotent, keeps details private, and cannot be reversed by replay',async()=>{
+    await t.test('declined users can rejoin their invitation without bypassing timing or membership removal',async()=>{
       const br=await bracket(a);
       await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
       for(let i=0;i<2;i++)assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie,method:'POST',body:{response:'declined'}})).status,200);
-      assert.equal((await http(`/api/brackets/${br.id}/invitation`,{cookie:a.member.cookie,method:'POST',body:{response:'accepted'}})).status,409);
+
       assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).status,404);
       assert.ok(!(await http('/api/my/brackets',{cookie:a.member.cookie})).body.brackets.some(row=>row.bracketId===br.id));
       assert.equal((await http(`/api/admin/brackets/${br.id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[]}})).status,400);
       const [[count]]=await db.pool.execute('SELECT COUNT(*) AS total FROM bracket_members WHERE bracket_id=?',[br.id]);assert.equal(Number(count.total),2);
+      await db.pool.execute('UPDATE brackets SET start_at=DATE_ADD(NOW(),INTERVAL 1 HOUR) WHERE bracket_id=?',[br.id]);
+      const invitation=`/api/brackets/${br.id}/invitation`;
+      assert.equal((await http(invitation,{cookie:b.member.cookie,method:'POST',body:{response:'accepted'}})).status,404);
+      for(let i=0;i<2;i++)assert.equal((await http(invitation,{cookie:a.member.cookie,method:'POST',body:{response:'accepted'}})).status,200);
+      const joined=await http(invitation,{cookie:a.member.cookie});
+      assert.equal(joined.body.invitationStatus,'accepted');assert.equal(joined.body.canAccess,true);
+      const upcoming=await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie});
+      assert.equal(upcoming.status,200);assert.equal(upcoming.body.isUpcoming,true);assert.deepEqual(upcoming.body.weeks,[]);
+      assert.notEqual((await vote(br,a.member)).status,200);
+      assert.ok((await http('/api/my/brackets',{cookie:a.member.cookie})).body.brackets.some(row=>row.bracketId===br.id));
+      assert.equal((await http(`/api/admin/brackets/${br.id}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:[a.owner.id]}})).status,200);
+      assert.equal((await http(invitation,{cookie:a.member.cookie,method:'POST',body:{response:'accepted'}})).status,404);
+
     });
 
     await t.test('publishing creates pending invitations; email retry and concurrent response preserve consent',async()=>{

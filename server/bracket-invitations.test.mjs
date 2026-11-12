@@ -22,14 +22,15 @@ test('missing and draft invitations are unavailable to members',async()=>{
  }
 });
 
-test('responses validate selection, reject removed invitations, and cannot reverse a decision',async()=>{
+test('responses allow declined invitations to rejoin but reject removed invitations and withdrawal after acceptance',async()=>{
  const writes=[];
  const db=status=>({async execute(sql,args){if(sql.startsWith('SELECT bracket_id'))return [[{status:'active'}]];if(sql.startsWith('SELECT bm.'))return [status?[{status}]:[]];writes.push(args);return [{affectedRows:1}];}});
  await assert.rejects(respondToInvitation(db('pending'),1,2,'maybe'),{status:400});
  await assert.rejects(respondToInvitation(db(null),1,2,'accepted'),{status:404});
- await assert.rejects(respondToInvitation(db('declined'),1,2,'accepted'),{status:409});
+ await assert.rejects(respondToInvitation(db('accepted'),1,2,'declined'),{status:409});
  await respondToInvitation(db('accepted'),1,2,'accepted');assert.equal(writes.length,0);
- await respondToInvitation(db('pending'),1,2,'accepted');assert.deepEqual(writes,[['accepted',1,2]]);
+ await respondToInvitation(db('pending'),1,2,'accepted');
+ await respondToInvitation(db('declined'),1,2,'accepted');assert.deepEqual(writes,[['accepted',1,2],['accepted',1,2]]);
 });
 
 test('delivery reports partial failure and only sends successfully claimed invitations',async()=>{
