@@ -1241,11 +1241,11 @@ const server = createServer(async (request, response) => {
        LEFT JOIN matchups feeder_a ON feeder_a.bracket_id=m.bracket_id AND feeder_a.next_matchup_id=m.matchup_id AND feeder_a.next_slot='A'
        LEFT JOIN matchups feeder_b ON feeder_b.bracket_id=m.bracket_id AND feeder_b.next_matchup_id=m.matchup_id AND feeder_b.next_slot='B'
        LEFT JOIN bracket_songs a ON a.bracket_id = m.bracket_id
-         AND a.bracket_song_id = CASE WHEN feeder_a.matchup_id IS NOT NULL AND feeder_a.winner_entry_id IS NULL THEN NULL ELSE m.song_a_entry_id END
+         AND a.bracket_song_id = CASE WHEN historyBracket.status<>'complete' AND historyBracket.completed_at IS NULL AND NOT ${readyRoundSql('historyBracket','r')} THEN NULL WHEN feeder_a.matchup_id IS NOT NULL AND feeder_a.winner_entry_id IS NULL THEN NULL ELSE m.song_a_entry_id END
        LEFT JOIN songs sa ON sa.song_id = a.song_id
        LEFT JOIN bracket_albums albumA ON albumA.bracket_id=a.bracket_id AND albumA.bracket_album_id=a.bracket_album_id
        LEFT JOIN bracket_songs b ON b.bracket_id = m.bracket_id
-         AND b.bracket_song_id = CASE WHEN feeder_b.matchup_id IS NOT NULL AND feeder_b.winner_entry_id IS NULL THEN NULL ELSE m.song_b_entry_id END
+         AND b.bracket_song_id = CASE WHEN historyBracket.status<>'complete' AND historyBracket.completed_at IS NULL AND NOT ${readyRoundSql('historyBracket','r')} THEN NULL WHEN feeder_b.matchup_id IS NOT NULL AND feeder_b.winner_entry_id IS NULL THEN NULL ELSE m.song_b_entry_id END
        LEFT JOIN songs sb ON sb.song_id = b.song_id
        LEFT JOIN bracket_albums albumB ON albumB.bracket_id=b.bracket_id AND albumB.bracket_album_id=b.bracket_album_id
        LEFT JOIN bracket_songs winning_entry

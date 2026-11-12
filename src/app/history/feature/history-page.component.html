@@ -56,7 +56,7 @@
       </div>
     </section>
     <div class="history-subhead"><div><span class="stat-label">TOURNAMENT HISTORY</span><h3>Every recorded matchup</h3></div><span class="history-count">{{ selectedBracket?.songCount || 0 }} SONGS · {{ historyRounds.length }} ROUNDS</span></div>
-    <p class="no-vote-history" *ngIf="selectedBracket?.randomizationMode === 'each_round'">Matchups were redrawn between rounds. Each round shows its saved pairings.</p>
+    <p class="no-vote-history" *ngIf="selectedBracket?.randomizationMode === 'each_round'">{{ selectedBracket.status === 'complete' ? 'Matchups were redrawn between rounds. Each round shows its saved pairings.' : 'Matchups are redrawn between rounds. Future songs stay TBD until the preceding round is finished and the new pairings are drawn.' }}</p>
     <label class="bracket-round-filter">Show from round
       <select [(ngModel)]="firstVisibleRound" [ngModelOptions]="{standalone:true}"><option *ngFor="let round of historyRounds" [ngValue]="round.roundNumber">{{ round.roundNumber === 1 ? 'All rounds' : round.name }}</option></select>
     </label>

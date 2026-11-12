@@ -1,3 +1,4 @@
+import {randomizeReadyRounds} from './round-randomization.mjs';
 import {sendBracketEmail} from './bracket-email.mjs';
 import { processSessionEmails } from './session-emails.mjs';
 import test from 'node:test';
@@ -749,6 +750,30 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const changed=completedPlan.sessions.map(({weekId,opensAt,closesAt},i)=>({weekId,opensAt:i?opensAt:new Date(Date.now()-7200000).toISOString(),closesAt}));
       assert.equal((await http(path,{method:'POST',cookie:a.owner.cookie,body:{revision:completedPlan.revision,pausedAt:completedPlan.effectiveAt,sessions:changed}})).status,409);
       const [[state]]=await db.pool.execute('SELECT paused_at FROM brackets WHERE bracket_id=?',[br.id]);assert.ok(state.paused_at);
+    });
+    await t.test('finale randomized rounds hide every future slot until the full round is drawn',async()=>{
+      const br=await bracket(a,{finale:true}),path=`/api/brackets/${br.id}`;
+      await db.pool.execute("UPDATE brackets SET randomization_mode='each_round' WHERE bracket_id=?",[br.id]);
+      const read=async()=>{const response=await http(path,{cookie:a.owner.cookie});assert.equal(response.status,200);return response.body;};
+      let data=await read();assert.ok(data.rounds[0].matchups.every(match=>match.songA&&match.songB));
+      const hidden=data=>{assert.equal(data.rounds[1].matchups[0].songA,null);assert.equal(data.rounds[1].matchups[0].songB,null);};
+      hidden(data);
+      // One winner has been propagated into a placeholder, but its drawn slot is still unknown.
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE matchup_id=?',[br.matches[0]]);
+      hidden(await read());
+      // Even all feeder winners do not reveal slots until the draw has been persisted.
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE matchup_id=?',[br.matches[1]]);
+      hidden(await read());
+      const connection=await db.pool.getConnection();
+      try {await connection.beginTransaction();await randomizeReadyRounds(connection,br.id);await connection.commit();}
+      catch(error){await connection.rollback();throw error;}finally{connection.release();}
+      data=await read();const final=data.rounds[1].matchups[0];
+      assert.deepEqual([final.songA.entryId,final.songB.entryId].sort((a,b)=>a-b),[br.entries[0],br.entries[2]].sort((a,b)=>a-b));
+      const traditional=await bracket(a,{finale:true});
+      await db.pool.execute('UPDATE matchups SET winner_entry_id=song_a_entry_id WHERE matchup_id=?',[traditional.matches[0]]);
+      const traditionalData=(await http(`/api/brackets/${traditional.id}`,{cookie:a.owner.cookie})).body;
+      assert.equal(traditionalData.rounds[1].matchups[0].songA.entryId,traditional.entries[0]);
+      assert.equal(traditionalData.rounds[1].matchups[0].songB,null);
     });
     await t.test('legacy role migration preserves accounts and assigns bracket role defaults',async()=>{
       await db.pool.query("ALTER TABLE users MODIFY user_role ENUM('super','viewer','owner','member') NULL");
