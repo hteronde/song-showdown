@@ -11,8 +11,9 @@ import {EditableSessionRow,SessionDateFieldsComponent} from './session-date-fiel
     <p *ngIf="loading" role="status">Loading sessions…</p>
     <ng-container *ngIf="plan && !loading">
       <span class="stat-label">BRACKET SCHEDULE</span><h3>Individual sessions</h3>
-      <p>Dates use your local time zone. Sessions cannot overlap. Past sessions and the opening time of a session already underway are locked.</p>
+      <p>Dates use your local time zone. Sessions cannot overlap. Only current and upcoming sessions are shown. The opening time of a session already underway is locked.</p>
       <p *ngIf="plan.noTimer">Untimed sessions may have no end date. Leave a future start blank to open it after the preceding session is decided.</p>
+      <p *ngIf="!onlineSessions.length">There are no current or upcoming online sessions to reschedule.</p>
       <app-session-date-fields [sessions]="onlineSessions" [saving]="saving" [noTimer]="plan.noTimer"></app-session-date-fields>
       <p *ngIf="hasFinale">Finale scheduling stays unchanged. You can manage it from Edit bracket.</p>
     </ng-container>
@@ -29,7 +30,9 @@ export class ResumeBracketDialogComponent implements OnDestroy {
   loading=false;saving=false;error='';
   private controller?:AbortController;
   private version=0;
-  get onlineSessions():EditableSessionRow[]{return this.sessions.filter(row=>!row.isFinale);}
+  // Use the saved state at pause time, not the edited dates or today's clock.
+  // Keep all rows in the save payload so hidden past dates remain unchanged.
+  get onlineSessions():EditableSessionRow[]{return this.sessions.filter(row=>!row.isFinale && row.state!=='Decided' && row.state!=='Awaiting results');}
   get hasFinale():boolean{return this.sessions.some(row=>row.isFinale);}
   async open(id:number):Promise<void>{
     if(this.saving)return;
