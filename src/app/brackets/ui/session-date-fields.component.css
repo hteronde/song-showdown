@@ -44,4 +44,4 @@
 }
 @media(max-width:760px){.session-row{grid-template-columns:1fr}}
 
-.schedule-hint{font-size:13px;line-height:1.6;color:#667267}input[readonly]{background:#f2f3ef}
+.schedule-hint{font-size:13px;line-height:1.6;color:#667267}
