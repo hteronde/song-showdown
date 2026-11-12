@@ -108,7 +108,11 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const assign=(role)=>http(`${path}/participants`,{cookie:a.owner.cookie,method:'PUT',body:{participantIds:members,participantRoles:{[a.member.id]:role}}});
       assert.equal((await assign('commissioner')).status,200);
       assert.equal((await http(path,{cookie:a.member.cookie})).body.bracket.participantRoles[a.member.id],'commissioner');
-      assert.equal((await http(`${path}/pause`,{cookie:a.member.cookie,method:'POST',body:{}})).status,200);
+      // Match both browser Pause buttons: POST with no JSON body.
+      assert.equal((await http(`${path}/pause`,{cookie:a.member.cookie,method:'POST'})).status,200);
+      const [[paused]]=await db.pool.execute('SELECT paused_at FROM brackets WHERE bracket_id=?',[br.id]);
+      assert.ok(paused.paused_at);
+      assert.equal((await http(`${path}/pause`,{cookie:a.member.cookie,method:'POST'})).status,200);
       assert.equal((await http(`${path}/resume`,{cookie:a.member.cookie,method:'POST',body:{}})).status,200);
       assert.equal((await http(`/api/brackets/${br.id}/voting`,{cookie:a.member.cookie})).body.canManage,true);
       const list=await http('/api/admin/brackets',{cookie:a.member.cookie});

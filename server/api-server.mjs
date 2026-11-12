@@ -405,7 +405,8 @@ const server = createServer(async (request, response) => {
         return;
       }
       if (request.method === 'POST' && pauseRoute) {
-        const input=await readJson(request);
+        // Pause has no payload; only scheduled resume needs JSON.
+        const input=pauseRoute[2]==='resume' ? await readJson(request) : {};
         const connection = await pool.getConnection();
         try {
           await connection.beginTransaction();
