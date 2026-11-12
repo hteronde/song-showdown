@@ -16,7 +16,7 @@ export function sessionEmail(row,appUrl) {
   const text=row.eventType==='start'
     ? `${session} begins now!\n\n${deadline ? `You have until ${deadline} (Central time / America/Chicago) to vote.` : 'This session has no fixed deadline. It closes once every participating member has voted on every matchup. Please cast your votes.'}`
     : closing;
-  return {to:row.email,subject:`${row.title}: ${session} ${row.eventType==='start'?'begins now':'has ended'}`,
+  return {to:row.email,subject:lastOnlineEnd ? 'Our final online week has come to an end!' : `${row.title}: ${session} ${row.eventType==='start'?'begins now':'has ended'}`,
     text:`${row.title}\nTheme: ${row.artist}\n\n${text}\n\nOpen the bracket:\n${link}`};
 }
 
