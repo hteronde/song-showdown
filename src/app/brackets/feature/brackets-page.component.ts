@@ -490,6 +490,12 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     startAt = '';
     finaleDate = '';
     finaleStartRound: number | null = null;
+    get hasScheduledFinale(): boolean { return this.finaleStartRound !== null || !!this.finaleDate; }
+    setScheduledFinale(enabled: boolean): void {
+        if (enabled) this.finaleStartRound ??= Math.log2(this.songCount);
+        else { this.finaleDate = ''; this.finaleStartRound = null; }
+        this.updateSessionPreview();
+    }
     private finaleOptionsSongCount: number | null = null;
     private cachedFinaleRoundOptions: Array<{
         roundNumber: number;
