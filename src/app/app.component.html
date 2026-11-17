@@ -4,13 +4,13 @@
   <form class="login-card" (ngSubmit)="submitAuth()">
     <span class="brand-mark login-mark"><span></span><span></span><span></span><span></span></span>
     <div class="eyebrow">THE FAMILY MUSIC BRACKET</div>
-    <h1>{{ authMode === 'forgot' ? 'Forgot your password?' : authMode === 'reset' ? 'Reset your password.' : authMode === 'login' ? 'Welcome back.' : 'Set your password.' }}</h1>
-    <p class="login-subtitle">{{ authMode === 'forgot' ? 'Enter your account email to request a reset link.' : authMode === 'reset' ? 'Choose a new password for your account.' : authMode === 'login' ? 'Sign in to continue to Song Showdown.' : 'Create a password for your family account.' }}</p>
+    <h1>{{ authMode === 'forgot' ? 'Forgot your password?' : authMode === 'reset' ? 'Reset your password.' : authMode === 'login' ? 'Welcome back.' : 'Set up your password' }}</h1>
+    <p class="login-subtitle">{{ authMode === 'forgot' ? 'Enter your account email to request a reset link.' : authMode === 'reset' ? 'Choose a new password for your account.' : authMode === 'login' ? 'Sign in to continue to Song Showdown.' : 'Enter the email address you were invited with to request a password setup link.' }}</p>
     <ng-container *ngIf="authMode !== 'reset'">
-    <label for="login-username">{{ authMode === 'forgot' ? 'Email address' : 'Username' }}</label>
+    <label for="login-username">{{ authMode === 'login' ? 'Username' : 'Email address' }}</label>
     <input id="login-username" name="username" type="email" [(ngModel)]="username" autocomplete="username" placeholder="you@example.com" required>
     </ng-container>
-    <ng-container *ngIf="authMode !== 'forgot'">
+    <ng-container *ngIf="authMode === 'login' || authMode === 'reset'">
     <label for="login-password">{{ authMode === 'login' ? 'Password' : 'Create password' }}</label>
     <input id="login-password" name="password" type="password" [(ngModel)]="password" [autocomplete]="authMode === 'login' ? 'current-password' : 'new-password'" [minlength]="authMode !== 'login' ? 12 : 1" required>
     <ng-container *ngIf="authMode === 'reset'">
@@ -21,9 +21,9 @@
     </ng-container>
     <p class="login-notice" role="status" *ngIf="authNotice">{{ authNotice }}</p>
     <div class="login-error" role="alert" *ngIf="authError">{{ authError }}</div>
-    <button class="login-submit" type="submit" [disabled]="authBusy">{{ authBusy ? 'Please wait…' : authMode === 'forgot' ? 'Send reset link' : authMode === 'reset' ? 'Save new password' : authMode === 'login' ? 'Log in' : 'Set password and log in' }}</button>
+    <button class="login-submit" type="submit" [disabled]="authBusy">{{ authBusy ? 'Please wait…' : authMode === 'forgot' ? 'Send reset link' : authMode === 'reset' ? 'Save new password' : authMode === 'login' ? 'Log in' : 'Send setup link' }}</button>
     <button class="login-mode-toggle" type="button" *ngIf="authMode === 'login'" [disabled]="authBusy" (click)="setAuthMode('forgot')">Forgot password?</button>
-    <button class="login-mode-toggle" type="button" [disabled]="authBusy" (click)="setAuthMode(authMode === 'login' ? 'forgot' : 'login')">{{ authMode === 'login' ? 'First time? Request a password link' : 'Already have a password? Log in' }}</button>
+    <button class="login-mode-toggle" type="button" [disabled]="authBusy" (click)="setAuthMode(authMode === 'login' ? 'setup' : 'login')">{{ authMode === 'login' ? 'First time? Request a password link' : 'Already have a password? Log in' }}</button>
   </form>
 </section>
 

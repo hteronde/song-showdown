@@ -30,7 +30,7 @@ export class AppComponent implements OnDestroy {
   currentMember: FamilyMember = { id: 'you', name: 'Family member', initials: 'FM', color: '#c47d51' };
   authUser: AuthUser | null = null;
   authState: 'checking' | 'signedOut' | 'signedIn' = 'checking';
-  authMode: 'login' | 'forgot' | 'reset' = 'login';
+  authMode: 'login' | 'setup' | 'forgot' | 'reset' = 'login';
   authNotice = '';
   resetToken = new URLSearchParams(window.location.hash.slice(1)).get('resetToken') || '';
   username = '';
@@ -98,16 +98,18 @@ export class AppComponent implements OnDestroy {
     if (this.authBusy) return;
     this.authError = '';
     this.authNotice = '';
-    if (this.authMode === 'forgot' || this.authMode === 'reset') {
+    if (this.authMode !== 'login') {
       if (this.authMode === 'reset' && (this.password.length < 12 || this.password !== this.confirmPassword)) {
         this.authError = 'Use at least 12 characters and make sure the passwords match.'; return;
       }
       this.authBusy = true;
       try {
-        if (this.authMode === 'forgot') {
+        if (this.authMode !== 'reset') {
           if (!this.username.trim()) { this.authError = 'Enter your email address.'; return; }
           await this.authApi.requestPasswordReset(this.username);
-          this.authNotice = 'If an account matches that email, a reset link has been sent. The link expires in 30 minutes.';
+          this.authNotice = this.authMode === 'setup'
+            ? 'If an account matches that email, a password setup link has been sent. The link expires in 30 minutes.'
+            : 'If an account matches that email, a reset link has been sent. The link expires in 30 minutes.';
         } else {
           await this.authApi.resetPassword(this.resetToken, this.password);
           this.resetToken = '';
@@ -165,7 +167,7 @@ export class AppComponent implements OnDestroy {
     apiSession.end();
   }
 
-  setAuthMode(mode: 'login' | 'forgot' | 'reset'): void {
+  setAuthMode(mode: 'login' | 'setup' | 'forgot' | 'reset'): void {
     this.authMode = mode;
     this.authNotice = '';
     this.authError = '';
