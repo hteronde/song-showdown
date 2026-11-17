@@ -33,7 +33,7 @@ export async function requestPasswordReset(pool, username, deliver) {
 
 export async function completePasswordReset(pool, token, password, { hash = hashPassword } = {}) {
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw Object.assign(new Error('This reset link is invalid or expired. Request a new link.'), { status: 400 });
-  validatePassword(password, 12);
+  validatePassword(password, 8);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();

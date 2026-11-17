@@ -12,11 +12,11 @@
     </ng-container>
     <ng-container *ngIf="authMode === 'login' || authMode === 'reset'">
     <label for="login-password">{{ authMode === 'login' ? 'Password' : 'Create password' }}</label>
-    <input id="login-password" name="password" type="password" [(ngModel)]="password" [autocomplete]="authMode === 'login' ? 'current-password' : 'new-password'" [minlength]="authMode !== 'login' ? 12 : 1" required>
+    <input id="login-password" name="password" type="password" [(ngModel)]="password" [autocomplete]="authMode === 'login' ? 'current-password' : 'new-password'" [minlength]="authMode !== 'login' ? 8 : 1" required>
     <ng-container *ngIf="authMode === 'reset'">
       <label for="confirm-password">Confirm password</label>
-      <input id="confirm-password" name="confirmPassword" type="password" [(ngModel)]="confirmPassword" autocomplete="new-password" minlength="12" required>
-      <small class="password-hint">Use at least 12 characters.</small>
+      <input id="confirm-password" name="confirmPassword" type="password" [(ngModel)]="confirmPassword" autocomplete="new-password" minlength="8" required>
+      <small class="password-hint">Use at least 8 characters.</small>
     </ng-container>
     </ng-container>
     <p class="login-notice" role="status" *ngIf="authNotice">{{ authNotice }}</p>

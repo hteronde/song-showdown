@@ -99,8 +99,8 @@ export class AppComponent implements OnDestroy {
     this.authError = '';
     this.authNotice = '';
     if (this.authMode !== 'login') {
-      if (this.authMode === 'reset' && (this.password.length < 12 || this.password !== this.confirmPassword)) {
-        this.authError = 'Use at least 12 characters and make sure the passwords match.'; return;
+      if (this.authMode === 'reset' && (this.password.length < 8 || this.password !== this.confirmPassword)) {
+        this.authError = 'Use at least 8 characters and make sure the passwords match.'; return;
       }
       this.authBusy = true;
       try {

@@ -50,7 +50,7 @@ npm run dev
 
 Open the local URL printed by Angular CLI. Run `npm run build` to create a production build in `dist/song-showdown`.
 
-Log in with the email stored on your family account as the username. If the account has no password yet, choose “First time? Request a password link” and follow the emailed link; passwords must be at least 12 characters. Email and a new password alone cannot claim an account. Passwords are stored as scrypt hashes. A successful login creates a 14-day HttpOnly session cookie; use **Log out** to revoke it. For existing databases, run `database/migrate_auth_sessions.sql` once before starting the API.
+Log in with the email stored on your family account as the username. If the account has no password yet, choose “First time? Request a password link” and follow the emailed link; passwords must be at least 8 characters. Email and a new password alone cannot claim an account. Passwords are stored as scrypt hashes. A successful login creates a 14-day HttpOnly session cookie; use **Log out** to revoke it. For existing databases, run `database/migrate_auth_sessions.sql` once before starting the API.
 
 ## Connect the application to MAMP MySQL
 
@@ -135,7 +135,7 @@ This check creates two test families inside a transaction, uses connection-local
 
 ## Authentication abuse controls
 
-Authentication JSON bodies are limited to 8 KB; usernames to 254 characters; passwords to 1,024 UTF-8 bytes (at least 12 characters for setup/recovery); and reset tokens to exactly 43 URL-safe characters. Login accepts existing passwords of at least one character within the byte limit.
+Authentication JSON bodies are limited to 8 KB; usernames to 254 characters; passwords to 1,024 UTF-8 bytes (at least 8 characters for setup/recovery); and reset tokens to exactly 43 URL-safe characters. Login accepts existing passwords of at least one character within the byte limit.
 
 Limits apply to attempts, including successful ones:
 

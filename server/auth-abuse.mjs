@@ -59,7 +59,7 @@ export async function readAuthInput(request, path, limiter) {
   if (path === '/api/auth/login') validatePassword(input.password);
   if (['/api/auth/setup-password','/api/auth/reset-password'].includes(path)) {
     if (typeof input.token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(input.token)) throw fail(400, 'This reset link is invalid or expired. Request a new link.');
-    validatePassword(input.password, 12);
+    validatePassword(input.password, 8);
   }
   limiter.checkSubject(path, input);
   return input;
