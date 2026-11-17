@@ -36,31 +36,39 @@
   <section class="week-section">
     <div class="section-heading"><div><div class="eyebrow small-eyebrow">THE TOURNAMENT SO FAR</div><h2>The full bracket.</h2></div></div>
     <div class="notice-bar" *ngIf="!isComplete && !currentWeek && !paused && !finaleModeActive && !awaitingFinale"><span class="notice-icon">◉</span><span>We're between rounds. View the results decided so far below, and check back for the next voting session.</span></div>
-    <p class="bracket-visibility-note" *ngIf="hasOnlineVoting && !paused">Select a matchup marked “Voting this week” to submit or update your vote.</p>
+    <p class="bracket-visibility-note" *ngIf="hasOnlineVoting && !paused">Select a green matchup to submit or update your vote.</p>
     <div class="notice-bar" *ngIf="hasOnlineVoting && !currentWeek?.closesAt"><span>No session timer. This week advances when every assigned participant has voted in every matchup.</span></div>
     <div class="notice-bar" *ngIf="currentWeek && !currentWeek.isReady" role="status">This round is waiting for every winner from the previous round. Matchups will be drawn randomly before voting opens.</div>
     <p class="bracket-visibility-note">{{ isComplete ? 'View every round, matchup, and recorded result from the completed bracket.' : isAdmin ? 'Admin view includes every round and matchup. Click any matchup to view its details. Participant votes can be edited in the current or immediately previous round. Undecided slots show which matchup will supply the winner.' : finaleModeActive ? 'Follow each matchup as the admin records the show-of-hands results. The bracket updates automatically.' : bracketData.bracket.showFullFirstRound ? 'All first-round matchups are visible. Voting opens on the usual schedule.' : 'View every round and matchup. First-round songs stay TBD until their voting week opens.' }}</p>
-    <p class="bracket-visibility-note" *ngIf="bracketData.bracket.randomizationMode === 'each_round'">Each round gets a new draw after all preceding winners are known. Dashed lines show provisional paths until the next round is drawn.</p>
+    <p class="bracket-visibility-note" *ngIf="bracketData.bracket.randomizationMode === 'each_round'">Each round gets a new draw after all preceding winners are known. Lines connect bracket positions. Songs advance according to the new draw.</p>
     <label class="bracket-round-filter">Show from round
       <select [(ngModel)]="firstVisibleRound" [ngModelOptions]="{standalone:true}"><option *ngFor="let round of revealedRounds; trackBy: trackRound" [ngValue]="round.roundNumber">{{ round.roundNumber === 1 ? 'All rounds' : round.roundName }}</option></select>
     </label>
-    <div #bracketBoard class="revealed-bracket full-tournament-bracket" [class.redrawn-rounds]="bracketData.bracket.randomizationMode === 'each_round'" [style.--bracket-round-count]="visibleRounds.length" [style.--bracket-row-count]="visibleRounds[0]?.matchups?.length || 1" *ngIf="revealedRounds.length">
-      <div [appBracketConnectors]="connectorMatches"></div>
-      <section class="revealed-round" *ngFor="let round of visibleRounds; trackBy: trackRound">
-        <h3>{{ round.roundName }}</h3>
-        <div class="revealed-round-games">
-        <article class="revealed-game" role="button" tabindex="0" [attr.aria-label]="'View matchup: ' + item.matchup.bracketSongATitle + ' versus ' + item.matchup.bracketSongBTitle" (click)="openMatchupDetails(item.matchup)" (keydown.enter)="openMatchupDetails(item.matchup)" (keydown.space)="$event.preventDefault(); openMatchupDetails(item.matchup)" *ngFor="let item of round.matchups; trackBy: trackMatch" [attr.data-matchup-id]="item.matchup.matchupId" [style.grid-row]="'span ' + bracketRoundSpan(round.roundNumber)" [style.--feeder-offset]="bracketRoundSpan(round.roundNumber) * 60 + 'px'">
-          <div class="revealed-game-label">{{ matchupWeekLabel(round.roundNumber, item.weekNumber) }} · MATCHUP {{ item.matchup.matchupNumber }}</div>
-          <div class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId"><span>{{ item.matchup.bracketSongATitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId">✓</b></div>
-          <div class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId"><span>{{ item.matchup.bracketSongBTitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId">✓</b></div>
-          <div class="revealed-result" *ngIf="item.matchup.selectedEntryId != null">Your vote: {{ songName(item.matchup, item.matchup.selectedEntryId) }}</div>
-          <div class="revealed-result" *ngIf="item.matchup.winnerEntryId">{{ songName(item.matchup, item.matchup.winnerEntryId) }} advances · {{ resultTally(item.matchup) }} <span class="random-tie-badge" *ngIf="item.matchup.randomTiebreakerVoteEntryId">TIE</span></div>
-          <p class="random-tie-note" *ngIf="item.matchup.randomTiebreakerVoteEntryId">The participants voting ended in a tie. Tie was broken randomly.</p>
-          <div class="revealed-result pending" *ngIf="!item.matchup.winnerEntryId">{{ awaitingFinale && item.matchup.roundNumber >= (bracketData.bracket.finaleStartRound || 999) ? 'At the finale' : finaleModeActive ? 'Awaiting the admin’s count' : item.isUpcoming ? 'Upcoming' : paused && item.weekNumber === currentWeek?.weekNumber ? 'On hold' : item.weekNumber === currentWeek?.weekNumber ? 'Voting this week' : 'Winner pending' }}</div>
-        </article>
+    <ng-container *ngIf="bracketColumns as columns">
+      <div #bracketViewport class="bracket-scroll" (scroll)="syncBracketScroll(bracketViewport, bracketScrollControl)">
+        <div #bracketBoard class="revealed-bracket full-tournament-bracket" [style.--bracket-round-count]="columns.length" [style.--bracket-row-count]="columns[0]?.matchups?.length || 1" *ngIf="revealedRounds.length">
+          <div [appBracketConnectors]="connectorMatches"></div>
+          <section class="revealed-round" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
+            <h3>{{ columnIndex === (columns.length - 1) / 2 ? 'Championship' : round.roundName }}</h3>
+            <div class="revealed-round-games">
+            <article class="revealed-game" [class.voting-open]="item.status === 'Voting open'" role="button" tabindex="0" [attr.aria-label]="item.status + (item.matchup.selectedEntryId != null ? '. Vote saved' : '') + '. View matchup: ' + item.matchup.bracketSongATitle + ' versus ' + item.matchup.bracketSongBTitle" (click)="openMatchupDetails(item.matchup)" (keydown.enter)="openMatchupDetails(item.matchup)" (keydown.space)="$event.preventDefault(); openMatchupDetails(item.matchup)" *ngFor="let item of round.matchups; trackBy: trackMatch" [attr.data-matchup-id]="item.matchup.matchupId" [style.grid-row]="'span ' + bracketRoundSpan(round.roundNumber)">
+              @let statusLabel = item.status === 'On hold' || item.status === 'Finale' || item.status === 'Awaiting result' ? item.status : null;
+              <div class="revealed-game-label" *ngIf="statusLabel">
+                <span class="revealed-status">{{ statusLabel }}</span>
+              </div>
+              <div class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId"><span [title]="item.matchup.bracketSongATitle">{{ item.matchup.bracketSongATitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId">✓</b></div>
+              <div class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId"><span [title]="item.matchup.bracketSongBTitle">{{ item.matchup.bracketSongBTitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId">✓</b></div>
+            </article>
+            </div>
+          </section>
         </div>
-      </section>
-    </div>
+      </div>
+      <label class="bracket-scroll-control" [hidden]="!bracketOverflows">
+        Scroll bracket
+        <input #bracketScrollControl type="range" min="0" max="100" step="0.1" value="0"
+          (input)="scrollBracket(bracketViewport, bracketScrollControl)">
+      </label>
+    </ng-container>
     <div class="no-matchups" *ngIf="!revealedRounds.length">No matchups have been scheduled yet.</div>
   </section>
 

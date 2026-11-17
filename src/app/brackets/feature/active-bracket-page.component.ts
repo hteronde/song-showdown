@@ -14,13 +14,15 @@ import { ChangeDetectorRef, Component, ElementRef, EventEmitter, OnDestroy, OnIn
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../../auth/data-access/auth-api.service';
 import { AdvanceWeekPlan, ActiveBracketApiService, ActiveBracketVotingData, VotingMatchup, VotingWeek } from '../data-access/active-bracket-api.service';
+type MatchupStatus = 'Voting open' | 'Completed' | 'Upcoming' | 'On hold' | 'Finale' | 'Awaiting result';
+
 interface RevealedRound {
     roundNumber: number;
     roundName: string;
     matchups: Array<{
         matchup: VotingMatchup;
         weekNumber: number;
-        isUpcoming: boolean;
+        status: MatchupStatus;
     }>;
 }
 @Component({
@@ -47,6 +49,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     get picks(): Record<number, number | null> { return this.voteDrafts.picks; }
     get comments(): Record<number, string> { return this.voteDrafts.comments; }
     trackRound(_index: number, round: RevealedRound): number { return round.roundNumber; }
+    trackBracketColumn(index: number, round: RevealedRound): string { return index + '-' + round.roundNumber; }
     trackMatch(_index: number, item: RevealedRound['matchups'][number]): number { return item.matchup.matchupId; }
     get champion(): BracketChampion | null {
         const final = this.revealedRounds.at(-1)?.matchups[0]?.matchup;
@@ -54,7 +57,20 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
             return null;
         return final.winnerEntryId === final.songA.entryId ? final.songA : final.songB;
     }
-    get connectorMatches(): VotingMatchup[] { return (this.data?.weeks ?? []).flatMap(week => week.matchups); }
+    get connectorMatches(): Pick<VotingMatchup, 'matchupId' | 'nextMatchupId' | 'drawPending'>[] {
+        if (this.data?.bracket.randomizationMode !== 'each_round')
+            return (this.data?.weeks ?? []).flatMap(week => week.matchups);
+
+        const rounds = this.visibleRounds;
+        return rounds.flatMap((round, index) => {
+            const nextRound = rounds[index + 1];
+            return round.matchups.map(({matchup}, position) => ({
+                matchupId: matchup.matchupId,
+                nextMatchupId: nextRound?.matchups[Math.floor(position / 2)]?.matchup.matchupId ?? null,
+                drawPending: matchup.drawPending
+            }));
+        });
+    }
     firstRoundVisibilitySaving = false;
     async setFirstRoundVisibility(event: Event): Promise<void> {
         const checkbox = event.target as HTMLInputElement;
@@ -289,6 +305,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         }
     }
     ngOnDestroy(): void {
+        this.bracketResizeObserver?.disconnect();
         clearInterval(this.refreshTimer);
         this.routeSubscription?.unsubscribe();
         this.requests.invalidate();
@@ -319,7 +336,57 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     }
     firstVisibleRound = 1;
     get visibleRounds(): RevealedRound[] { return this.revealedRounds.filter(round => round.roundNumber >= this.firstVisibleRound); }
+    bracketOverflows = false;
+    private bracketResizeObserver?: ResizeObserver;
+
+    @ViewChild('bracketBoard')
+    set bracketBoard(ref: ElementRef<HTMLElement> | undefined) {
+        this.bracketResizeObserver?.disconnect();
+        const board = ref?.nativeElement;
+        const viewport = board?.parentElement;
+        if (!board || !viewport) return;
+        this.bracketResizeObserver = new ResizeObserver(() => {
+            const overflows = viewport.scrollWidth > viewport.clientWidth;
+            if (this.bracketOverflows !== overflows) {
+                this.bracketOverflows = overflows;
+                this.changeDetector.markForCheck();
+            }
+        });
+        this.bracketResizeObserver.observe(board);
+        this.bracketResizeObserver.observe(viewport);
+    }
+    scrollBracket(viewport: HTMLElement, control: HTMLInputElement): void {
+        const scrollDistance = viewport.scrollWidth - viewport.clientWidth;
+        viewport.scrollLeft = scrollDistance * control.valueAsNumber / 100;
+        if (!scrollDistance) control.value = '0';
+    }
+    syncBracketScroll(viewport: HTMLElement, control: HTMLInputElement): void {
+        const scrollDistance = viewport.scrollWidth - viewport.clientWidth;
+        control.valueAsNumber = scrollDistance ? viewport.scrollLeft * 100 / scrollDistance : 0;
+    }
+    get bracketColumns(): RevealedRound[] {
+        const rounds = this.visibleRounds;
+        const championship = rounds.at(-1);
+        if (!championship) return [];
+        const earlier = rounds.slice(0, -1).map(round => {
+            const {matchups} = round;
+            const middle = Math.ceil(matchups.length / 2);
+            return {
+                left: { ...round, matchups: matchups.slice(0, middle) },
+                right: { ...round, matchups: matchups.slice(middle) }
+            };
+        });
+        return [...earlier.map(round => round.left), championship, ...earlier.reverse().map(round => round.right)];
+    }
     bracketRoundSpan(roundNumber: number): number { return 2 ** (roundNumber - (this.visibleRounds[0]?.roundNumber ?? 1)); }
+    private matchupStatus(week: VotingWeek, matchup: VotingMatchup): MatchupStatus {
+        if (this.isComplete || week.isClosed || matchup.winnerEntryId != null) return 'Completed';
+        if (week.isCurrent && this.paused) return 'On hold';
+        if (!this.finaleModeActive && !this.awaitingFinale && week.isCurrent && week.isReady) return 'Voting open';
+        if ((this.finaleModeActive || this.awaitingFinale) && week.roundNumber >= (this.data?.bracket.finaleStartRound ?? Infinity))
+            return 'Finale';
+        return week.isUpcoming || !week.isReady ? 'Upcoming' : 'Awaiting result';
+    }
     get revealedRounds(): RevealedRound[] {
         const rounds = new Map<number, RevealedRound>();
         for (const week of this.data?.weeks ?? []) {
@@ -329,8 +396,10 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
                 rounds.set(week.roundNumber, round);
             }
             for (const matchup of week.matchups)
-                round.matchups.push({ matchup, weekNumber: week.weekNumber, isUpcoming: week.isUpcoming });
+                round.matchups.push({ matchup, weekNumber: week.weekNumber, status: this.matchupStatus(week, matchup) });
         }
+        for (const round of rounds.values())
+            round.matchups.sort((a, b) => a.matchup.matchupNumber - b.matchup.matchupNumber);
         return [...rounds.values()].sort((a, b) => a.roundNumber - b.roundNumber);
     }
     ngOnInit(): void {

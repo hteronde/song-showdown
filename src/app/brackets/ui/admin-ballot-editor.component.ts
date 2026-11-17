@@ -41,8 +41,18 @@ import { FormsModule } from '@angular/forms';
               </div>
             </div>
             <p *ngIf="!match.participants.length">No participants are assigned to this matchup.</p>
-            <label class="tie-choice" *ngIf="match.inFinale || match.tiebreakerOption === 'admin_pick'">Resolve a tie (used only when votes are even)
-              <select name="tie-choice" [(ngModel)]="tiePick"><option [ngValue]="null">{{ match.inFinale ? 'No tie break' : 'Choose a tiebreaker' }}</option><option value="admin_vote">Use the admin’s vote (one extra vote)</option><option *ngIf="match.inFinale" value="random">Random</option><option *ngIf="match.inFinale && match.seedingSize" value="seed">Seed (higher seed wins, #1 beats #2)</option><option *ngIf="match.inFinale && match.seedingSize" value="seed_low">Seed (lower seed wins, #2 beats #1)</option><option [ngValue]="match.songAEntryId">{{ match.songATitle }}</option><option [ngValue]="match.songBEntryId">{{ match.songBTitle }}</option></select>
+            @let canChooseMethod = match.inFinale || match.isClosed || match.winnerEntryId != null;
+            <label class="tie-choice">Resolve a tie (used only when votes are even)
+              <select name="tie-choice" [(ngModel)]="tiePick" [disabled]="!canChooseMethod && match.tiebreakerOption !== 'admin_pick'">
+                <option [ngValue]="null">{{ match.inFinale ? 'No tie break' : 'Use bracket setting (' + tiebreakerLabels[match.tiebreakerOption] + ')' }}</option>
+                <option value="admin_vote">Use the admin’s vote (one extra vote)</option>
+                <option *ngIf="canChooseMethod" value="random">Random</option>
+                <option *ngIf="canChooseMethod && match.seedingSize" value="seed">Seed (higher seed wins, #1 beats #2)</option>
+                <option *ngIf="canChooseMethod && match.seedingSize" value="seed_low">Seed (lower seed wins, #2 beats #1)</option>
+                <option [ngValue]="match.songAEntryId">{{ match.songATitle }}</option>
+                <option [ngValue]="match.songBEntryId">{{ match.songBTitle }}</option>
+              </select>
+              <small *ngIf="!match.inFinale && canChooseMethod">Random and seed selections apply to this correction.</small>
             </label>
           </fieldset>
           <p class="error" *ngIf="error" role="alert">{{ error }}</p>
@@ -73,6 +83,9 @@ export class AdminBallotEditorComponent implements OnDestroy {
   picks:Record<number,number|null>={};
   loading=false; saving=false; error=''; confirmReset=false; resetMessage='';
   tiePick:TieBreakSelection=null;
+  readonly tiebreakerLabels = {
+    random: 'Random', seed: 'Higher seed', seed_low: 'Lower seed', admin_pick: 'Admin vote'
+  };
   revealing=false;
   revealedWinner='';
   unresolvedTie=false;

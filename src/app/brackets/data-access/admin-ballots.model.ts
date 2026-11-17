@@ -6,6 +6,7 @@ export interface AdminBallotEditorData {
   songAYear: number|null; songBYear: number|null;
   songAAlbum: string|null; songBAlbum: string|null; songAAlbumCoverUrl: string|null; songBAlbumCoverUrl: string|null;
   tieBreakEntryId: number|null;
+  isClosed: boolean | number | null; winnerEntryId: number | null;
   participants: BallotPerson[]; revision: string; canEdit: boolean; editRestriction: string; inFinale: boolean; seedingSize: number|null; tiebreakerOption: 'random'|'seed'|'seed_low'|'admin_pick';
 }
 export type TieBreakSelection = number | 'admin_vote' | 'random' | 'seed' | 'seed_low' | null;

@@ -36,8 +36,9 @@ export class BracketConnectorsDirective implements AfterViewChecked, OnDestroy {
     const paths = this.appBracketConnectors.flatMap(match => {
       const from = boxes.get(match.matchupId), to = match.nextMatchupId == null ? undefined : boxes.get(match.nextMatchupId);
       if (!from || !to) return [];
-      return [{ x1: from.right - bounds.left + board.scrollLeft, y1: (from.top + from.bottom) / 2 - bounds.top + board.scrollTop,
-        x2: to.left - bounds.left + board.scrollLeft, y2: (to.top + to.bottom) / 2 - bounds.top + board.scrollTop,
+      const movesRight = from.left < to.left;
+      return [{ x1: (movesRight ? from.right : from.left) - bounds.left + board.scrollLeft, y1: (from.top + from.bottom) / 2 - bounds.top + board.scrollTop,
+        x2: (movesRight ? to.left : to.right) - bounds.left + board.scrollLeft, y2: (to.top + to.bottom) / 2 - bounds.top + board.scrollTop,
         pending: !!byId.get(match.nextMatchupId!)?.drawPending }];
     });
     const signature = JSON.stringify(paths);
@@ -48,9 +49,9 @@ export class BracketConnectorsDirective implements AfterViewChecked, OnDestroy {
       const middle = (path.x1 + path.x2) / 2;
       const border = `1px ${path.pending ? 'dashed' : 'solid'} ${path.pending ? '#c7b8a8' : '#c7c2b5'}`;
       for (const [left, top, width, height, vertical] of [
-        [path.x1, path.y1, middle - path.x1, 0, false],
+        [Math.min(path.x1, middle), path.y1, Math.abs(middle - path.x1), 0, false],
         [middle, Math.min(path.y1, path.y2), 0, Math.abs(path.y2 - path.y1), true],
-        [middle, path.y2, path.x2 - middle, 0, false]
+        [Math.min(middle, path.x2), path.y2, Math.abs(path.x2 - middle), 0, false]
       ] as Array<[number, number, number, number, boolean]>) {
         const line = document.createElement('span');
         Object.assign(line.style, { position: 'absolute', left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`, boxSizing: 'border-box', [vertical ? 'borderLeft' : 'borderTop']: border });

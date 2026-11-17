@@ -15,17 +15,26 @@ export function validateBallotEdits(ballots, participants, match) {
     seen.add(ballot.userId);
   }
 }
+function selectedAdminVote(match, participants) {
+  const admin = participants.filter(p => (p.user_role === 'super' || p.bracket_role === 'commissioner') && p.selectedEntryId != null)
+    .sort((a,b) => (Number(b.userId) === Number(match.createdBy)) - (Number(a.userId) === Number(match.createdBy)) || Number(a.userId) - Number(b.userId))[0];
+  return admin ? Number(admin.selectedEntryId) : null;
+}
+
 export function correctedWinner(match, participants, tieBreakEntryId, draw) {
   const a=Number(match.songAEntryId), b=Number(match.songBEntryId);
   const votesForA=participants.filter(p=>Number(p.selectedEntryId)===a).length;
   const votesForB=participants.filter(p=>Number(p.selectedEntryId)===b).length;
   if (!match.isClosed && !match.winnerEntryId && !match.inFinale) return {winner:null,randomVote:null};
-  const policy=match.inFinale ? (['random','seed','seed_low'].includes(tieBreakEntryId) ? tieBreakEntryId : 'admin_pick') : match.tiebreakerOption;
-  const admin=participants.filter(p=>(p.user_role==='super' || p.bracket_role==='commissioner') && p.selectedEntryId!=null).sort((x,y)=>(Number(y.userId)===Number(match.createdBy))-(Number(x.userId)===Number(match.createdBy)) || Number(x.userId)-Number(y.userId))[0];
-  const pick=match.inFinale ? (tieBreakEntryId==='admin_vote' ? (admin ? Number(admin.selectedEntryId) : null) : tieBreakEntryId) : tieBreakEntryId ?? (match.tieBreakEntryId != null ? Number(match.tieBreakEntryId) : admin ? Number(admin.selectedEntryId):null);
+  const methodOverride = ['random','seed','seed_low'].includes(tieBreakEntryId);
+  const manualOverride = tieBreakEntryId === 'admin_vote' || typeof tieBreakEntryId === 'number' || match.tieBreakEntryId != null;
+  const policy = methodOverride ? tieBreakEntryId : match.inFinale || manualOverride ? 'admin_pick' : match.tiebreakerOption;
+  const adminVote = selectedAdminVote(match, participants);
+  const pick = tieBreakEntryId === 'admin_vote' ? adminVote : match.inFinale ? tieBreakEntryId
+    : tieBreakEntryId ?? (match.tieBreakEntryId != null ? Number(match.tieBreakEntryId) : adminVote);
   // Retain an already-recorded random draw while the participant count remains tied.
   const existingRandom=match.randomVote == null ? null : Number(match.randomVote);
-  const winner=policy==='random' && votesForA===votesForB && [a,b].includes(existingRandom)
+  const winner=policy==='random' && (match.inFinale || match.tieBreakEntryId == null) && votesForA===votesForB && [a,b].includes(existingRandom)
     ? existingRandom
     : resolveWinner({votesForA,votesForB,songAEntryId:a,songBEntryId:b,songASeed:Number(match.songASeed),songBSeed:Number(match.songBSeed),tiebreakerOption:policy,adminPick:pick},draw);
   return {winner,randomVote:(!match.inFinale || tieBreakEntryId==='admin_vote') && policy==='admin_pick' && votesForA===votesForB ? winner : randomTiebreakerVote({votesForA,votesForB,tiebreakerOption:policy},winner)};
@@ -56,7 +65,7 @@ export async function loadAdminBallots(c,bracketId,matchupId,familyId,lock=false
     CASE WHEN albumA.bracket_album_id IS NOT NULL THEN albumA.year ELSE sa.year END AS songAYear,
     CASE WHEN albumB.bracket_album_id IS NOT NULL THEN albumB.year ELSE sb.year END AS songBYear,
     CASE WHEN br.seeding_size IS NOT NULL THEN a.assigned_seed ELSE a.seed_number END AS songASeed,CASE WHEN br.seeding_size IS NOT NULL THEN b.assigned_seed ELSE b.seed_number END AS songBSeed,
-    br.seeding_size AS seedingSize,br.tiebreaker_option AS tiebreakerOption,br.created_by_user_id AS createdBy,br.finale_start_round AS plannedFinaleRound,f.bracket_id AS finaleSessionId,${readyRoundSql('br','r')} AS roundReady,
+    br.seeding_size AS seedingSize,br.randomization_mode AS randomizationMode,br.tiebreaker_option AS tiebreakerOption,br.created_by_user_id AS createdBy,br.finale_start_round AS plannedFinaleRound,f.bracket_id AS finaleSessionId,${readyRoundSql('br','r')} AS roundReady,
     (w.closes_at<=COALESCE(br.paused_at,NOW(6))) AS isClosed,
     (br.start_at IS NOT NULL AND br.start_at<=NOW(6) AND br.status<>'draft') AS hasStarted,
     (w.opens_at<=COALESCE(br.paused_at,NOW(6))) AS hasOpened,
@@ -92,23 +101,17 @@ export async function saveAdminBallots(c,bracketId,matchupId,familyId,input) {
   if(!match.canEdit) throw fail(409,match.editRestriction);
   if(input.revision!==match.revision) throw fail(409,'Votes have changed since this editor opened. Close and reopen the editor to load the latest votes.');
   if (!(Array.isArray(input.ballots) && input.ballots.length===0 && Object.hasOwn(input,'tieBreakEntryId'))) validateBallotEdits(input.ballots,match.participants,match);
-  let tiePick=Object.hasOwn(input,'tieBreakEntryId') ? input.tieBreakEntryId : match.tieBreakEntryId??null;
-  if(tiePick==='admin_vote' && !match.inFinale && match.tiebreakerOption==='admin_pick') {
-    const admin=match.participants.filter(p=>(p.user_role==='super' || p.bracket_role==='commissioner')).sort((a,b)=>(Number(b.userId)===Number(match.createdBy))-(Number(a.userId)===Number(match.createdBy)) || Number(a.userId)-Number(b.userId)).find(p=>{
-      const edit=input.ballots.find(ballot=>ballot.userId===Number(p.userId));
-      return (edit ? edit.selectedEntryId : p.selectedEntryId)!=null;
-    });
-    if(!admin) throw fail(400,'Record the admin’s participant vote first, or choose a song for the tiebreaker.');
-    tiePick=Number(input.ballots.find(ballot=>ballot.userId===Number(admin.userId))?.selectedEntryId ?? admin.selectedEntryId);
-  }
-
+  const tiePick=Object.hasOwn(input,'tieBreakEntryId') ? input.tieBreakEntryId : match.tieBreakEntryId??null;
+  const canResolveNow = !!(match.inFinale || match.isClosed || match.winnerEntryId != null);
+  const methodSelected = ['random','seed','seed_low'].includes(tiePick);
+  if (!canResolveNow && match.tiebreakerOption !== 'admin_pick' && tiePick != null) throw fail(400,'The configured tiebreaker applies while voting is open.');
   if(['seed','seed_low'].includes(tiePick) && !match.seedingSize) throw fail(400,'Select Use Seeds before choosing a seed tiebreaker.');
-  if(tiePick!==null && !(match.inFinale && ['random','seed','seed_low','admin_vote'].includes(tiePick)) && ![Number(match.songAEntryId),Number(match.songBEntryId)].includes(tiePick)) throw fail(400,'Choose a valid tiebreaker song.');
+  if(tiePick!==null && !(canResolveNow && methodSelected) && tiePick!=='admin_vote' && ![Number(match.songAEntryId),Number(match.songBEntryId)].includes(tiePick)) throw fail(400,'Choose a valid tiebreaker song.');
   const edited=match.participants.map(person=>{
     const edit=input.ballots.find(ballot=>ballot.userId===Number(person.userId));
     return edit?{...person,selectedEntryId:edit.selectedEntryId}:person;
   });
-  const result=correctedWinner(match,edited,tiePick);
+  const result=correctedWinner(tiePick === null && Object.hasOwn(input,'tieBreakEntryId') ? {...match,tieBreakEntryId:null} : match,edited,tiePick);
   const previous=match.winnerEntryId==null?null:Number(match.winnerEntryId);
   const descendants=[];
   if(result.winner!==previous) {
@@ -118,7 +121,12 @@ export async function saveAdminBallots(c,bracketId,matchupId,familyId,input) {
       if(seen.has(Number(next))) throw fail(409,'The bracket has an invalid progression link.');
       seen.add(Number(next));
       const [rows]=await c.execute(`SELECT m.matchup_id AS matchupId,m.next_matchup_id AS nextMatchupId,m.next_slot AS nextSlot,m.song_a_entry_id AS songAEntryId,m.winner_entry_id AS winnerEntryId,
-        (SELECT COUNT(*) FROM votes v WHERE v.bracket_id=m.bracket_id AND v.matchup_id=m.matchup_id) AS voteCount FROM matchups m WHERE m.bracket_id=? AND m.matchup_id=? FOR UPDATE`,[bracketId,next]);
+        r.randomized_at AS randomizedAt,
+        (SELECT COUNT(*) FROM votes v WHERE v.bracket_id=m.bracket_id AND v.matchup_id=m.matchup_id) AS voteCount
+        FROM matchups m
+        JOIN bracket_weeks w ON w.bracket_id=m.bracket_id AND w.week_id=m.week_id
+        JOIN bracket_rounds r ON r.bracket_id=w.bracket_id AND r.round_id=w.round_id
+        WHERE m.bracket_id=? AND m.matchup_id=? FOR UPDATE`,[bracketId,next]);
       if(!rows.length) throw fail(409,'The next matchup could not be found.');
       descendants.push(rows[0]);next=rows[0].nextMatchupId;
     }
@@ -127,7 +135,10 @@ export async function saveAdminBallots(c,bracketId,matchupId,familyId,input) {
     if((ballots||results)&&input.resetLaterRounds!==true) throw fail(409,`This changes the advancing song. Continuing will clear ${ballots} later ballot(s) and ${results} later result(s) on this path. Other matchups are kept.`,{requiresReset:true});
   }
   // No database changes occur until validation and downstream confirmation succeed.
-  if(!match.inFinale && match.tiebreakerOption==='admin_pick') await c.execute('UPDATE matchups SET admin_tiebreaker_entry_id=? WHERE bracket_id=? AND matchup_id=?',[tiePick,bracketId,matchupId]);
+  if (!match.inFinale) {
+    const explicitPick = tiePick === 'admin_vote' ? selectedAdminVote(match, edited) : typeof tiePick === 'number' ? tiePick : null;
+    await c.execute('UPDATE matchups SET admin_tiebreaker_entry_id=? WHERE bracket_id=? AND matchup_id=?',[explicitPick,bracketId,matchupId]);
+  }
   for(const ballot of input.ballots) {
     if(ballot.selectedEntryId===null) await c.execute('DELETE FROM votes WHERE bracket_id=? AND matchup_id=? AND user_id=?',[bracketId,matchupId,ballot.userId]);
     else await c.execute(`INSERT INTO votes (bracket_id,matchup_id,user_id,selected_entry_id,submitted_at) VALUES (?,?,?,?,NOW())
@@ -141,6 +152,9 @@ export async function saveAdminBallots(c,bracketId,matchupId,familyId,input) {
   if(result.winner!==previous) {
     let slot=match.nextSlot, anchor=result.winner??Number(match.songAEntryId);
     for(const downstream of descendants) {
+      // Undrawn rounds still hold their original placeholder songs. Their draw
+      // fills both slots together once the preceding round has actual winners.
+      if (match.randomizationMode === 'each_round' && !downstream.randomizedAt) break;
       if(!['A','B'].includes(slot)) throw fail(409,'The bracket has an invalid next slot.');
       await c.execute(`UPDATE matchups SET ${slot==='A'?'song_a_entry_id':'song_b_entry_id'}=? WHERE bracket_id=? AND matchup_id=?`,[anchor,bracketId,downstream.matchupId]);
       anchor=slot==='A'?anchor:Number(downstream.songAEntryId);slot=downstream.nextSlot;

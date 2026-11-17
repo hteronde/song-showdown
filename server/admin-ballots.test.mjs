@@ -79,3 +79,11 @@ test('finale can use the configured admin vote to break a tie',()=>{
   assert.deepEqual(correctedWinner(finale,people.map(p=>({...p,selectedEntryId:20})),'admin_vote'),{winner:20,randomVote:null});
   assert.deepEqual(correctedWinner(finale,people.filter(p=>p.user_role!=='super').concat({userId:4,user_role:'viewer',selectedEntryId:10}),'admin_vote'),{winner:null,randomVote:null});
 });
+
+test('commissioners can select a method or song for a completed online tie', () => {
+  const online = {...match, randomVote: null};
+  assert.deepEqual(correctedWinner(online, people, 'seed_low'), {winner: 20, randomVote: null});
+  assert.deepEqual(correctedWinner(online, people, 20), {winner: 20, randomVote: 20});
+  assert.deepEqual(correctedWinner({...online, tiebreakerOption: 'seed'}, people, 'random', () => 1), {winner: 20, randomVote: 20});
+  assert.deepEqual(correctedWinner(online, people.slice(0, 1), 20), {winner: 10, randomVote: null});
+});

@@ -206,15 +206,17 @@
 .revealed-game-label {
   font: 8px 'DM Mono',monospace;
   color: #aaa79c;
-  letter-spacing: .07em;
-  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 3px;
 }
 
 .revealed-team {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 0;
+  padding: 4px 0;
   border-bottom: 1px solid #f0eee8;
   font-size: 11px;
   color: #77776e;
@@ -239,8 +241,23 @@
   margin-top: 7px;
 }
 
-.revealed-result.pending {
-  color: #aaa79c;
+.revealed-status {
+  align-self: flex-start;
+  color: #646459;
+  font: 600 10px 'DM Mono', monospace;
+  line-height: 1.4;
+}
+
+.revealed-game.voting-open {
+  background: #edf5e9;
+  border-color: #426d4b;
+  box-shadow: inset 4px 0 #426d4b;
+}
+
+.voting-open .revealed-team {
+  color: #263e2b;
+  border-color: #d3e1cf;
+  font-weight: 650;
 }
 
 .revealed-round-games {
@@ -249,12 +266,40 @@
   gap: 12px;
 }
 
+.bracket-scroll-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 0;
+  color: #646459;
+  font: 11px 'DM Mono', monospace;
+}
+
+.bracket-scroll-control[hidden] {
+  display: none;
+}
+
+.bracket-scroll-control input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  accent-color: #426d4b;
+  cursor: ew-resize;
+}
+
+.bracket-scroll {
+  overflow-x: auto;
+  scrollbar-color: #787d6d #e7e6dc;
+}
+
 .full-tournament-bracket {
-  --connector-half-gap: 12px;
+  --column-gap: 8px;
+  --column-min: 88px;
   display: grid;
-  grid-template-columns: repeat(var(--bracket-round-count),minmax(0,1fr));
-  gap: calc(2 * var(--connector-half-gap));
-  overflow-x: visible;
+  grid-template-columns: repeat(var(--bracket-round-count),minmax(var(--column-min), 1fr));
+  gap: var(--column-gap);
+  overflow: visible;
+  min-width: calc(var(--bracket-round-count) * (var(--column-min) + var(--column-gap)) - var(--column-gap));
   width: 100%;
 }
 
@@ -264,19 +309,22 @@
 }
 
 .full-tournament-bracket .revealed-round h3 {
-  font-size: clamp(9px,1vw,13px);
+  font-size: clamp(9px, .9vw, 11px);
+  letter-spacing: .04em;
   overflow-wrap: anywhere;
-  height: 34px;
+  height: 27px;
   box-sizing: border-box;
   margin: 0;
   display: flex;
   align-items: flex-start;
+  justify-content: center;
+  text-align: center;
 }
 
 .full-tournament-bracket .revealed-round-games {
   display: grid;
-  grid-template-rows: repeat(var(--bracket-row-count),minmax(180px,auto));
-  gap: 0;
+  grid-template-rows: repeat(var(--bracket-row-count),minmax(69px,auto));
+  row-gap: 6px;
 }
 
 .full-tournament-bracket .revealed-game {
@@ -284,7 +332,8 @@
   width: 100%;
   overflow-wrap: anywhere;
   height: auto;
-  min-height: 140px;
+  min-height: 60px;
+  padding: 4px 5px;
   box-sizing: border-box;
   align-self: center;
   position: relative;
