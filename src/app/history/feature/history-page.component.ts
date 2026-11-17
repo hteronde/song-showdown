@@ -142,7 +142,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
         try {
             const payload = await this.historyApi.getBrackets(this.pageController.signal);
             if (this.pageController.signal.aborted) return;
-            this.historyBrackets = payload.brackets;
+            this.historyBrackets = payload.brackets.filter(bracket => bracket.status !== 'active');
         }
         catch (error) {
             if (!this.pageController.signal.aborted) this.historyError = apiErrorMessage(error, 'Could not load bracket history.');
@@ -153,7 +153,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
         }
     }
     async openBracket(bracket: BracketHistoryInfo): Promise<void> {
-        await this.router.navigate(bracket.status === 'active' ? ['/brackets', bracket.bracketId] : ['/history', bracket.bracketId]);
+        await this.router.navigate(['/history', bracket.bracketId]);
     }
     async showAllBrackets(): Promise<void> {
         await this.router.navigate(['/history']);

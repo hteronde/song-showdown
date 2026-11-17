@@ -14,11 +14,10 @@
           <strong>{{ bracket.title }}</strong>
           <small>{{ bracket.bracketYear ? bracket.bracketYear + ' · ' : '' }}{{ bracket.songCount }} songs · {{ bracket.roundCount }} rounds · {{ bracket.status | uppercase }}</small>
         </div>
-        <span class="archive-status" [class.complete]="bracket.status === 'complete'" [class.ongoing]="bracket.status === 'active'"><i></i> {{ bracket.status | uppercase }}</span>
+        <span class="archive-status" [class.complete]="bracket.status === 'complete'"><i></i> {{ bracket.status | uppercase }}</span>
       </div>
       <div class="history-card-bottom"><span>{{ bracket.songCount }} song field</span><button (click)="openBracket(bracket)">View bracket ↗</button></div>
     </article>
-    <div class="notice-bar" *ngIf="!historyLoading && !historyBrackets.length && !historyError"><span class="notice-icon">◉</span><span>No database brackets have been added yet.</span></div>
   </section>
   <section class="history-detail" *ngIf="isBracketDetailOpen">
     <button class="back-link" (click)="showAllBrackets()">← All brackets</button>
