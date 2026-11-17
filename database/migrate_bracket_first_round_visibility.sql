@@ -1,0 +1,1 @@
+ALTER TABLE brackets ADD COLUMN show_full_first_round BOOLEAN NOT NULL DEFAULT FALSE;

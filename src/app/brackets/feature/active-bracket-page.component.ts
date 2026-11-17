@@ -56,6 +56,29 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         return final.winnerEntryId === final.songA.entryId ? final.songA : final.songB;
     }
     get connectorMatches(): VotingMatchup[] { return (this.data?.weeks ?? []).flatMap(week => week.matchups); }
+    firstRoundVisibilitySaving = false;
+    async setFirstRoundVisibility(event: Event): Promise<void> {
+        const checkbox = event.target as HTMLInputElement;
+        const bracketId = this.data?.bracket.bracketId;
+        if (bracketId == null || !this.data?.canManage || this.firstRoundVisibilitySaving) return;
+        this.firstRoundVisibilitySaving = true;
+        this.error = '';
+        this.notice = '';
+        try {
+            const result = await this.api.setFirstRoundVisibility(bracketId, checkbox.checked);
+            if (this.data?.bracket.bracketId === bracketId) {
+                this.data.bracket.showFullFirstRound = result.showFullFirstRound;
+                this.notice = 'First-round visibility saved.';
+            }
+        } catch (error) {
+            if (this.data?.bracket.bracketId === bracketId)
+                this.error = error instanceof Error ? error.message : 'Could not save first-round visibility.';
+        } finally {
+            checkbox.checked = !!this.data?.bracket.showFullFirstRound;
+            this.firstRoundVisibilitySaving = false;
+            this.changeDetector.markForCheck();
+        }
+    }
     emailSettingSaving = false;
     async setAutomaticEmailsDisabled(event:Event): Promise<void> {
         const checkbox=event.target as HTMLInputElement;

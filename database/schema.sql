@@ -56,6 +56,7 @@ CREATE TABLE brackets (
   finale_at DATETIME NULL,
   finale_start_round SMALLINT UNSIGNED NULL,
   paused_at DATETIME(6) NULL,
+  show_full_first_round BOOLEAN NOT NULL DEFAULT FALSE,
   automatic_emails_disabled BOOLEAN NOT NULL DEFAULT FALSE,
   automatic_emails_enabled_at DATETIME(6) NULL,
   anonymous BOOLEAN NOT NULL DEFAULT FALSE,

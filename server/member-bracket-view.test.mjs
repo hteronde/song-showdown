@@ -26,3 +26,13 @@ test('unrevealed first-round songs cannot leak through later round anchor slots 
   assert.equal(projected.winnerEntryId,null);assert.equal(projected.winnerTitle,null);assert.deepEqual(projected.ballots,[]);
 });
 test('admins retain all song details',()=>assert.equal(memberMatchupView(matchup,{...context,isAdmin:true}),matchup));
+
+test('full first-round visibility reveals upcoming songs while keeping picks and later-round placeholders private', () => {
+  const settings = {...context, showFullFirstRound: true};
+  const upcoming = memberMatchupView(matchup, settings);
+  assert.deepEqual(upcoming.songA, matchup.songA);
+  assert.equal(upcoming.bracketSongBTitle, matchup.bracketSongBTitle);
+  assert.equal(upcoming.selectedEntryId, null);
+  assert.equal(upcoming.comment, null);
+  assert.equal(memberMatchupView(matchup, {...settings, roundNumber: 2}).songA.title, 'TBD');
+});

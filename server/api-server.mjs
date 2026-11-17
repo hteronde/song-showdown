@@ -330,6 +330,18 @@ const server = createServer(async (request, response) => {
     try {
       const familyId = Number((await pool.execute('SELECT family_id FROM users WHERE user_id = ?', [authenticatedUser.userId]))[0][0]?.family_id);
       if (!familyId) { send(400, { error: 'Your account is not connected to a family.' }); return; }
+      const visibilityRoute = url.pathname.match(/^\/api\/admin\/brackets\/(\d+)\/first-round-visibility$/);
+      if (visibilityRoute && request.method === 'PUT') {
+        const { showFullFirstRound } = await readJson(request);
+        if (typeof showFullFirstRound !== 'boolean') {
+          send(400, { error: 'Choose whether to show the full first round.' });
+          return;
+        }
+        await pool.execute('UPDATE brackets SET show_full_first_round=? WHERE bracket_id=? AND family_id=?',
+          [showFullFirstRound, Number(visibilityRoute[1]), familyId]);
+        send(200, { showFullFirstRound });
+        return;
+      }
       const emailSettingsRoute=url.pathname.match(/^\/api\/admin\/brackets\/(\d+)\/automatic-emails$/);
       if (emailSettingsRoute && request.method==='PUT') {
         const input=await readJson(request);
@@ -846,7 +858,7 @@ const server = createServer(async (request, response) => {
       const [bracketRows] = await pool.execute(
         `SELECT b.bracket_id AS bracketId,b.title,b.artist,b.logo_url AS logoUrl,b.bracket_year AS bracketYear,b.session_duration_minutes AS sessionDurationMinutes,
                 b.start_at AS startAt,(b.start_at > NOW() AND b.status <> 'complete' AND b.completed_at IS NULL) AS isUpcoming,
-                ${effectiveBracketStatus} AS status,b.paused_at AS pausedAt,b.automatic_emails_disabled AS automaticEmailsDisabled,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound,${awaitingFinaleSql('b')} AS awaitingFinale,
+                ${effectiveBracketStatus} AS status,b.paused_at AS pausedAt,b.show_full_first_round AS showFullFirstRound,b.automatic_emails_disabled AS automaticEmailsDisabled,b.anonymous,b.seeding_size AS seedingSize,b.randomization_mode AS randomizationMode,DATE_FORMAT(b.finale_at,'%Y-%m-%d') AS finaleAt,b.finale_start_round AS finaleStartRound,${awaitingFinaleSql('b')} AS awaitingFinale,
                 (SELECT status FROM bracket_finale_sessions WHERE bracket_id=b.bracket_id) AS finaleStatus,
                 (SELECT start_round_number FROM bracket_finale_sessions WHERE bracket_id=b.bracket_id) AS finaleSessionStartRound,
                 (SELECT COUNT(*) FROM bracket_songs bs WHERE bs.bracket_id=b.bracket_id) AS songCount
@@ -972,7 +984,7 @@ const server = createServer(async (request, response) => {
           selectedEntryId: row.selectedEntryId === null ? null : Number(row.selectedEntryId),
           comment: row.comment,
           ballots: [...(ballotsByMatchup.get(Number(row.matchupId)) ?? []), ...(row.winnerEntryId != null && row.randomTiebreakerVoteEntryId != null ? [{ displayName: row.adminTieBreakEntryId != null ? 'Admin tiebreaker' : 'Tiebreaker vote', selectedEntryId: Number(row.randomTiebreakerVoteEntryId) }] : [])]
-        },{isAdmin:!!bracketAccess?.canManage,roundNumber:Number(row.roundNumber),isUpcoming:revealAllSongs ? false : !!row.isUpcoming,revealedEntries,songAPending:!!row.isDrawPending||!!row.songAPending,songBPending:!!row.isDrawPending||!!row.songBPending}));
+        },{isAdmin:!!bracketAccess?.canManage,roundNumber:Number(row.roundNumber),isUpcoming:revealAllSongs ? false : !!row.isUpcoming,showFullFirstRound:!!bracketRows[0].showFullFirstRound,revealedEntries,songAPending:!!row.isDrawPending||!!row.songAPending,songBPending:!!row.isDrawPending||!!row.songBPending}));
       }
       const weeks = [...weeksByNumber.values()];
       if (bracketRows[0].finaleStatus != null) {

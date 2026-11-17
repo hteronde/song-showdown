@@ -57,7 +57,7 @@ export interface ActiveBracketVotingData {
   awaitingFinale: boolean;
   canViewBallots: boolean;
   ballotEditingRound: number | null;
-  bracket: { automaticEmailsDisabled?:boolean; startAt?: string | null; bracketId: number; title: string; artist: string; logoUrl?: string | null; bracketYear: number | null; status: string; sessionDurationMinutes: number | null; finaleAt: string | null; finaleStartRound: number | null; pausedAt: string | null; randomizationMode: 'none' | 'round1' | 'each_round'; songCount: number };
+  bracket: { showFullFirstRound?: boolean | number; automaticEmailsDisabled?:boolean; startAt?: string | null; bracketId: number; title: string; artist: string; logoUrl?: string | null; bracketYear: number | null; status: string; sessionDurationMinutes: number | null; finaleAt: string | null; finaleStartRound: number | null; pausedAt: string | null; randomizationMode: 'none' | 'round1' | 'each_round'; songCount: number };
   finaleModeActive: boolean;
   currentWeekNumber: number | null;
   weeks: VotingWeek[];
@@ -67,6 +67,9 @@ export interface AdvanceWeekPlan {revision:string;sessions:BracketSession[];week
 
 @Injectable({ providedIn: 'root' })
 export class ActiveBracketApiService {
+  setFirstRoundVisibility(bracketId: number, showFullFirstRound: boolean): Promise<{ showFullFirstRound: boolean }> {
+    return apiRequest(`/api/admin/brackets/${bracketId}/first-round-visibility`, {method: 'PUT', json: {showFullFirstRound}});
+  }
   setAutomaticEmailsDisabled(bracketId:number, automaticEmailsDisabled:boolean): Promise<{automaticEmailsDisabled:boolean}> {
     return apiRequest(`/api/admin/brackets/${bracketId}/automatic-emails`, {method:'PUT',json:{automaticEmailsDisabled}});
   }
