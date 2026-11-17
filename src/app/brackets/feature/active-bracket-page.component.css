@@ -375,6 +375,35 @@
   cursor: not-allowed;
 }
 
+.details-pick {
+  margin-top: 12px;
+}
+
+.details-pick[aria-pressed="true"] {
+  background: #eaf0e6;
+  border-color: #66816a;
+}
+
+.details-actions button:disabled,
+.details-pick:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.matchup-details-dialog .comment-field {
+  margin-top: 18px;
+}
+
+.matchup-details-dialog .comment-field label,
+.matchup-details-dialog .comment-field > small {
+  font-size: 11px;
+  color: #77776e;
+}
+
+.matchup-details-dialog .comment-field textarea {
+  font-size: 14px;
+}
+
 @media (max-width:460px) {
   .bracket-hold-banner {
     padding: 18px;
@@ -534,7 +563,8 @@
   margin-top: 20px;
 }
 
-.details-actions button {
+.details-actions button,
+.details-pick {
   padding: 10px 14px;
   border: 1px solid #d8d4c8;
   border-radius: 4px;

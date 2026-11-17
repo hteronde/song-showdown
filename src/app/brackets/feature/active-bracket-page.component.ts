@@ -44,7 +44,6 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     notice = '';
     @Output()
     toastMessage = new EventEmitter<string>();
-    viewMode: 'vote' | 'bracket' = 'vote';
     get picks(): Record<number, number | null> { return this.voteDrafts.picks; }
     get comments(): Record<number, string> { return this.voteDrafts.comments; }
     trackRound(_index: number, round: RevealedRound): number { return round.roundNumber; }
@@ -104,7 +103,16 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     matchupDetailsDialog?: ElementRef<HTMLDialogElement>;
     detailsMatch: VotingMatchup | null = null;
     detailsWeek: VotingWeek | null = null;
+    voteError = '';
+    voteNotice = '';
+    canVoteInMatchup(match: VotingMatchup): boolean {
+        return this.hasOnlineVoting && !this.paused && match.winnerEntryId == null
+            && match.songA.entryId != null && match.songB.entryId != null
+            && !!this.currentWeek?.matchups.some(item => item.matchupId === match.matchupId && item.winnerEntryId == null);
+    }
     openMatchupDetails(match: VotingMatchup): void {
+        this.voteError = '';
+        this.voteNotice = '';
         this.detailsMatch = match;
         this.detailsWeek = this.data?.weeks.find(week => week.matchups.some(item => item.matchupId === match.matchupId)) ?? null;
         this.matchupDetailsDialog?.nativeElement.showModal();
@@ -261,8 +269,6 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
                         this.clearSavedOverrides(match);
                 }
             this.refreshMatchupDetails();
-            if (!this.hasOnlineVoting && this.viewMode === 'vote')
-                this.viewMode = 'bracket';
         }
         catch (error) {
             if (this.requests.isCurrent(version, bracketId)) {
@@ -343,20 +349,20 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     private clearSavedOverrides(match: VotingMatchup): void { this.voteDrafts.clearSaved(match); }
     songPick(match: VotingMatchup): number | null { return this.voteDrafts.selection(match); }
     pick(match: VotingMatchup, entryId: number | null): void {
-        if (this.isComplete || this.finaleModeActive || this.awaitingFinale || this.paused || entryId === null)
+        if (!this.canVoteInMatchup(match) || this.savingMatchupId !== null || entryId === null)
             return;
         this.voteDrafts.select(match, entryId, this.savingMatchupId === match.matchupId);
         this.notice = '';
     }
     commentValue(match: VotingMatchup): string { return this.voteDrafts.comment(match); }
     updateComment(match: VotingMatchup, event: Event): void {
-        if (this.isComplete || this.finaleModeActive || this.awaitingFinale || this.paused)
+        if (!this.canVoteInMatchup(match) || this.savingMatchupId !== null)
             return;
         const comment = (event.target as HTMLTextAreaElement).value;
         this.voteDrafts.editComment(match, comment, this.savingMatchupId === match.matchupId);
     }
     async saveVote(match: VotingMatchup): Promise<void> {
-        if (this.isComplete || this.finaleModeActive || this.awaitingFinale || this.paused)
+        if (!this.canVoteInMatchup(match) || this.savingMatchupId !== null)
             return;
         const currentMatch = this.data?.weeks.flatMap(week => week.matchups).find(item => item.matchupId === match.matchupId) ?? match;
         const selectedEntryId = this.songPick(currentMatch);
@@ -364,11 +370,12 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         const version = this.requests.version;
         const bracketId = this.requests.bracketId;
         if (!selectedEntryId || !this.currentMemberId) {
-            this.error = 'Choose a song before saving your vote.';
+            this.voteError = 'Choose a song before saving your vote.';
             return;
         }
         this.savingMatchupId = match.matchupId;
-        this.error = '';
+        this.voteError = '';
+        this.voteNotice = '';
         this.notice = '';
         try {
             await this.api.saveVote(match.matchupId, this.currentMemberId, selectedEntryId, comment);
@@ -385,14 +392,22 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
                 delete this.picks[match.matchupId];
             if (this.comments[match.matchupId] === comment)
                 delete this.comments[match.matchupId];
-            this.toastMessage.emit('Your vote has been saved.');
+            this.refreshMatchupDetails();
+            if (this.detailsMatch?.matchupId === match.matchupId && this.matchupDetailsDialog?.nativeElement.open)
+                this.voteNotice = 'Your vote has been saved.';
+            else
+                this.toastMessage.emit('Your vote has been saved.');
         }
         catch (error) {
             if (bracketId !== null && this.requests.isCurrent(version, bracketId)) {
                 const latestMatch = this.data?.weeks.flatMap(week => week.matchups).find(item => item.matchupId === match.matchupId);
                 if (latestMatch)
                     this.clearSavedOverrides(latestMatch);
-                this.error = error instanceof Error ? error.message : 'Could not save your vote.';
+                const message = error instanceof Error ? error.message : 'Could not save your vote.';
+                if (this.detailsMatch?.matchupId === match.matchupId && this.matchupDetailsDialog?.nativeElement.open)
+                    this.voteError = message;
+                else
+                    this.error = message;
             }
         }
         finally {
@@ -442,7 +457,6 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
             this.firstVisibleRound = 1;
             this.data = data;
             this.isAdmin = !!data.canManage;
-            this.viewMode = this.hasOnlineVoting ? 'vote' : 'bracket';
             this.currentMemberId = user?.userId ?? null;
             this.isAdmin = !!data.canManage;
         }
