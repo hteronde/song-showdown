@@ -288,8 +288,6 @@
 }
 
 .bracket-scroll {
-  width: 100%;
-  min-width: 0;
   overflow-x: auto;
   scrollbar-color: #787d6d #e7e6dc;
 }

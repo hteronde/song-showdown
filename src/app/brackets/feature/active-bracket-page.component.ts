@@ -346,7 +346,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         const viewport = board?.parentElement;
         if (!board || !viewport) return;
         this.bracketResizeObserver = new ResizeObserver(() => {
-            const overflows = viewport.scrollWidth > viewport.clientWidth;
+            const overflows = board.offsetWidth > viewport.clientWidth;
             if (this.bracketOverflows !== overflows) {
                 this.bracketOverflows = overflows;
                 this.changeDetector.markForCheck();
