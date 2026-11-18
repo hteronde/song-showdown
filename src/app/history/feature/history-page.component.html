@@ -69,8 +69,8 @@
             <div class="history-team" [class.game-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId"><span>{{ match.left }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId">✓</b></div>
             <div class="history-team" [class.game-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId"><span>{{ match.right }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId">✓</b></div>
             <div class="history-result" *ngIf="match.selectedEntryId != null">Your vote: {{ match.selectedEntryId === match.leftEntryId ? match.left : match.right }}</div>
-            <div class="history-result" *ngIf="match.winnerEntryId">{{ match.winner }} {{ round.roundNumber === historyRounds[historyRounds.length - 1].roundNumber ? 'wins the championship' : 'advances' }}<ng-container *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null"> · {{ matchTally(match) }}</ng-container> <span class="random-tie-badge" *ngIf="match.randomTiebreakerVoteEntryId">TIE</span></div>
-            <p class="random-tie-note" *ngIf="match.randomTiebreakerVoteEntryId">The participants voting ended in a tie. Tie was broken randomly.</p>
+            <div class="history-result" *ngIf="match.winnerEntryId">{{ match.winner }} {{ round.roundNumber === historyRounds[historyRounds.length - 1].roundNumber ? 'wins the championship' : 'advances' }}<ng-container *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null"> · {{ matchTally(match) }}</ng-container> <span class="random-tie-badge" *ngIf="match.tieExplanation">TIE</span></div>
+            <p class="random-tie-note" *ngIf="match.tieExplanation">{{ match.tieExplanation }}</p>
             <div class="history-result pending" *ngIf="!match.winnerEntryId">Winner pending</div>
             <div class="view-votes-hint">{{ canViewBallots ? 'View votes ↗' : 'View result ↗' }}</div>
           </article>
@@ -90,8 +90,8 @@
     <span class="history-votes-label">{{ matchupWeekLabel(match) }} · MATCHUP {{ match.matchupNumber }}</span>
     <p class="no-vote-history" *ngIf="match.selectedEntryId != null">Your vote: {{ match.selectedEntryId === match.leftEntryId ? match.left : match.right }}</p>
     <h2 id="history-votes-title">{{ canViewBallots ? 'Who voted for each song' : 'Matchup result' }}</h2>
-    <div class="history-vote-tally" *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null">{{ matchTally(match) }} <span class="random-tie-badge" *ngIf="match.randomTiebreakerVoteEntryId">TIE</span></div>
-    <p class="random-tie-note" *ngIf="match.randomTiebreakerVoteEntryId">The participants voting ended in a tie. Tie was broken randomly.</p>
+    <div class="history-vote-tally" *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null">{{ matchTally(match) }} <span class="random-tie-badge" *ngIf="match.tieExplanation">TIE</span></div>
+    <p class="random-tie-note" *ngIf="match.tieExplanation">{{ match.tieExplanation }}</p>
     <p class="no-vote-history" *ngIf="!canViewBallots">Voting is anonymous. You can see your own vote; other participants’ votes are hidden.</p>
     <p class="no-vote-history" *ngIf="canViewBallots && match.reportedVoteCountA != null">Historical totals are preserved. Only voters whose choices are known are listed below.</p>
     <p class="no-vote-history" *ngIf="canViewBallots && !match.ballots.length && match.reportedVoteCountA == null">No submitted votes were recorded for this matchup.</p>

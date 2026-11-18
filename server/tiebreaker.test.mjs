@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveWinner, randomTiebreakerVote, validateSeedTiebreaker } from './tiebreaker.mjs';
+import { decidedTieMethod, matchupTieExplanation, resolveWinner, randomTiebreakerVote, validateSeedTiebreaker } from './tiebreaker.mjs';
 const tied={votesForA:2,votesForB:2,songAEntryId:10,songBEntryId:20,songASeed:1,songBSeed:2};
 test('majority wins regardless of tiebreaker',()=>{
   assert.equal(resolveWinner({...tied,votesForA:3,tiebreakerOption:'admin_pick',adminPick:20}),10);
@@ -53,4 +53,23 @@ test('seed tiebreakers require Use Seeds while other policies remain available',
     validateSeedTiebreaker(option,4);
   }
   for(const option of ['random','admin_pick'])validateSeedTiebreaker(option,null);
+});
+
+test('decided tiebreakers record the applied rule and equal seeds use a draw', () => {
+  const tie = {winner: 10, votesForA: 1, votesForB: 1, songASeed: 1, songBSeed: 2};
+  assert.equal(decidedTieMethod({...tie, policy: 'seed'}), 'seed');
+  assert.equal(decidedTieMethod({...tie, policy: 'seed_low'}), 'seed_low');
+  assert.equal(decidedTieMethod({...tie, policy: 'seed', songBSeed: 1}), 'random');
+  assert.equal(decidedTieMethod({...tie, policy: 'admin_pick'}), 'admin_pick');
+  assert.equal(decidedTieMethod({...tie, policy: 'admin_pick', votesForA: 2}), null);
+});
+
+test('matchup explanations prefer the saved rule and can recognize older tied results', () => {
+  const match = {winnerEntryId: 10, songAEntryId: 10, songBEntryId: 20, songASeed: 1, songBSeed: 2};
+  const tiedBallots = [{selectedEntryId: 10}, {selectedEntryId: 20}];
+  assert.match(matchupTieExplanation({...match, tieBreakMethod: 'seed_low'}, [], 'random', true), /lower-ranked/);
+  assert.match(matchupTieExplanation(match, tiedBallots, 'seed', false), /higher-ranked/);
+  assert.match(matchupTieExplanation({...match, randomTiebreakerVoteEntryId: 10}, tiedBallots, 'admin_pick', false), /commissioner or admin/);
+  assert.match(matchupTieExplanation(match, tiedBallots, 'random', true), /method was not recorded/);
+  assert.equal(matchupTieExplanation(match, tiedBallots.slice(0, 1), 'seed', false), null);
 });

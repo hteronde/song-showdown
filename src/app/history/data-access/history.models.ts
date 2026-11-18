@@ -17,6 +17,7 @@ export interface PastMatch {
   voteCountB?: number;
   reportedVoteCountA?: number | null;
   reportedVoteCountB?: number | null;
+  tieExplanation?: string | null;
   randomTiebreakerVoteEntryId: number | null;
   ballots: Array<{ userId: number | null; displayName?: string; selectedEntryId: number }>;
   span: number;
@@ -80,6 +81,7 @@ export interface BracketHistoryResponse {
   voteCountB?: number;
   reportedVoteCountA?: number | null;
   reportedVoteCountB?: number | null;
+      tieExplanation?: string | null;
       randomTiebreakerVoteEntryId: number | null;
       ballots: Array<{ userId: number | null; displayName?: string; selectedEntryId: number }>;
     }>;

@@ -222,6 +222,7 @@ CREATE TABLE matchups (
   winner_entry_id BIGINT UNSIGNED NULL,
   random_tiebreaker_vote_entry_id BIGINT UNSIGNED NULL,
   admin_tiebreaker_entry_id BIGINT UNSIGNED NULL,
+  decided_tiebreaker ENUM('random', 'seed', 'seed_low', 'admin_pick') NULL,
   -- The winning entry is routed to slot A or B of the next matchup.
   next_matchup_id BIGINT UNSIGNED NULL,
   next_slot ENUM('A', 'B') NULL,

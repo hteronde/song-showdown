@@ -1,6 +1,6 @@
 import { randomizeReadyRounds, readyRoundSql } from './round-randomization.mjs';
 import { createHash } from 'node:crypto';
-import { resolveWinner, randomTiebreakerVote } from './tiebreaker.mjs';
+import { resolveWinner, randomTiebreakerVote, decidedTieMethod } from './tiebreaker.mjs';
 const fail=(status,message,extra={})=>Object.assign(new Error(message),{status,...extra});
 
 export function ballotRevision(match, participants) {
@@ -21,14 +21,25 @@ function selectedAdminVote(match, participants) {
   return admin ? Number(admin.selectedEntryId) : null;
 }
 
+function correctionPolicy(match, tieBreakEntryId) {
+  const methodOverride = ['random','seed','seed_low'].includes(tieBreakEntryId);
+  const manualOverride = tieBreakEntryId === 'admin_vote' || typeof tieBreakEntryId === 'number' || match.tieBreakEntryId != null;
+  return methodOverride ? tieBreakEntryId : match.inFinale || manualOverride ? 'admin_pick' : match.tiebreakerOption;
+}
+
+export function correctedTieMethod(match, tieBreakEntryId, winner, votesForA, votesForB) {
+  return decidedTieMethod({
+    winner, votesForA, votesForB, policy: correctionPolicy(match, tieBreakEntryId),
+    songASeed: match.songASeed, songBSeed: match.songBSeed
+  });
+}
+
 export function correctedWinner(match, participants, tieBreakEntryId, draw) {
   const a=Number(match.songAEntryId), b=Number(match.songBEntryId);
   const votesForA=participants.filter(p=>Number(p.selectedEntryId)===a).length;
   const votesForB=participants.filter(p=>Number(p.selectedEntryId)===b).length;
   if (!match.isClosed && !match.winnerEntryId && !match.inFinale) return {winner:null,randomVote:null};
-  const methodOverride = ['random','seed','seed_low'].includes(tieBreakEntryId);
-  const manualOverride = tieBreakEntryId === 'admin_vote' || typeof tieBreakEntryId === 'number' || match.tieBreakEntryId != null;
-  const policy = methodOverride ? tieBreakEntryId : match.inFinale || manualOverride ? 'admin_pick' : match.tiebreakerOption;
+  const policy = correctionPolicy(match, tieBreakEntryId);
   const adminVote = selectedAdminVote(match, participants);
   const pick = tieBreakEntryId === 'admin_vote' ? adminVote : match.inFinale ? tieBreakEntryId
     : tieBreakEntryId ?? (match.tieBreakEntryId != null ? Number(match.tieBreakEntryId) : adminVote);
@@ -111,7 +122,11 @@ export async function saveAdminBallots(c,bracketId,matchupId,familyId,input) {
     const edit=input.ballots.find(ballot=>ballot.userId===Number(person.userId));
     return edit?{...person,selectedEntryId:edit.selectedEntryId}:person;
   });
-  const result=correctedWinner(tiePick === null && Object.hasOwn(input,'tieBreakEntryId') ? {...match,tieBreakEntryId:null} : match,edited,tiePick);
+  const correction = tiePick === null && Object.hasOwn(input,'tieBreakEntryId') ? {...match,tieBreakEntryId:null} : match;
+  const result = correctedWinner(correction, edited, tiePick);
+  const participantVotesA=edited.filter(person=>Number(person.selectedEntryId)===Number(match.songAEntryId)).length;
+  const participantVotesB=edited.filter(person=>Number(person.selectedEntryId)===Number(match.songBEntryId)).length;
+  const method = correctedTieMethod(correction, tiePick, result.winner, participantVotesA, participantVotesB);
   const previous=match.winnerEntryId==null?null:Number(match.winnerEntryId);
   const descendants=[];
   if(result.winner!==previous) {
@@ -146,9 +161,9 @@ export async function saveAdminBallots(c,bracketId,matchupId,familyId,input) {
   }
   for(const downstream of descendants) {
     await c.execute('DELETE FROM votes WHERE bracket_id=? AND matchup_id=?',[bracketId,downstream.matchupId]);
-    await c.execute('UPDATE matchups SET winner_entry_id=NULL,random_tiebreaker_vote_entry_id=NULL,admin_tiebreaker_entry_id=NULL WHERE bracket_id=? AND matchup_id=?',[bracketId,downstream.matchupId]);
+    await c.execute('UPDATE matchups SET winner_entry_id=NULL,random_tiebreaker_vote_entry_id=NULL,admin_tiebreaker_entry_id=NULL,decided_tiebreaker=NULL WHERE bracket_id=? AND matchup_id=?',[bracketId,downstream.matchupId]);
   }
-  await c.execute('UPDATE matchups SET winner_entry_id=?,random_tiebreaker_vote_entry_id=? WHERE bracket_id=? AND matchup_id=?',[result.winner,result.randomVote,bracketId,matchupId]);
+  await c.execute('UPDATE matchups SET winner_entry_id=?,random_tiebreaker_vote_entry_id=?,decided_tiebreaker=? WHERE bracket_id=? AND matchup_id=?',[result.winner,result.randomVote,method,bracketId,matchupId]);
   if(result.winner!==previous) {
     let slot=match.nextSlot, anchor=result.winner??Number(match.songAEntryId);
     for(const downstream of descendants) {
@@ -164,8 +179,6 @@ export async function saveAdminBallots(c,bracketId,matchupId,familyId,input) {
     await c.execute("UPDATE bracket_finale_sessions SET status=CASE WHEN ?=1 THEN 'complete' WHEN status='complete' THEN 'paused' ELSE status END,completed_at=CASE WHEN ?=1 THEN COALESCE(completed_at,NOW()) ELSE NULL END WHERE bracket_id=?",[final.winner?1:0,final.winner?1:0,bracketId]);
   }
   await randomizeReadyRounds(c,bracketId);
-  const participantVotesA=edited.filter(person=>Number(person.selectedEntryId)===Number(match.songAEntryId)).length;
-  const participantVotesB=edited.filter(person=>Number(person.selectedEntryId)===Number(match.songBEntryId)).length;
   return {saved:true,winnerEntryId:result.winner,randomTiebreakerVoteEntryId:result.randomVote,
     participantVotesA,participantVotesB,
     voteCountA:participantVotesA+(result.randomVote===Number(match.songAEntryId)?1:0),

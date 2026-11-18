@@ -13,7 +13,7 @@ export function memberMatchupView(matchup,{isAdmin,roundNumber,isUpcoming,showFu
   }
   if(isUpcoming) { projected.selectedEntryId=null;projected.comment=null;projected.reportedVoteCountA=null;projected.reportedVoteCountB=null; }
   if(projected.winnerEntryId!=null&&!revealedEntries.has(projected.winnerEntryId)) {
-    projected.winnerEntryId=null;projected.winnerTitle=null;projected.randomTiebreakerVoteEntryId=null;projected.ballots=[];
+    projected.winnerEntryId=null;projected.winnerTitle=null;projected.randomTiebreakerVoteEntryId=null;projected.tieExplanation=null;projected.ballots=[];
   }
   return projected;
 }

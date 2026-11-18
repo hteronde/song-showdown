@@ -28,6 +28,7 @@ export interface VotingMatchup {
   voteCountB?: number;
   reportedVoteCountA?: number | null;
   reportedVoteCountB?: number | null;
+  tieExplanation?: string | null;
   randomTiebreakerVoteEntryId: number | null;
   winnerTitle: string | null;
   selectedEntryId: number | null;

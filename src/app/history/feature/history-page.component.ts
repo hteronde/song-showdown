@@ -214,6 +214,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
                     voteCountB: match.voteCountB,
                     reportedVoteCountA: match.reportedVoteCountA,
                     reportedVoteCountB: match.reportedVoteCountB,
+                    tieExplanation: match.tieExplanation,
                     randomTiebreakerVoteEntryId: match.randomTiebreakerVoteEntryId,
                     selectedEntryId: match.selectedEntryId,
                     ballots: match.ballots,

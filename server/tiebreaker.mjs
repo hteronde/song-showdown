@@ -21,3 +21,39 @@ export function randomTiebreakerVote(matchup, winnerEntryId) {
   return matchup.tiebreakerOption === 'random' && matchup.votesForA === matchup.votesForB
     ? winnerEntryId : null;
 }
+
+export function decidedTieMethod({winner, votesForA, votesForB, policy, songASeed, songBSeed}) {
+  if (winner == null || votesForA !== votesForB) return null;
+  return ['seed', 'seed_low'].includes(policy) && Number(songASeed) === Number(songBSeed) ? 'random' : policy;
+}
+
+export function matchupTieExplanation(row, ballots, defaultPolicy, inFinale) {
+  if (row.winnerEntryId == null) return null;
+  let method = row.tieBreakMethod;
+  if (!method) {
+    if (row.randomTiebreakerVoteEntryId != null) {
+      method = row.adminTieBreakEntryId != null || (!inFinale && defaultPolicy === 'admin_pick') ? 'admin_pick' : 'random';
+    } else {
+      const count = entryId => ballots.filter(ballot => ballot.selectedEntryId === Number(entryId)).length;
+      const a = Number(row.reportedVoteCountA ?? count(row.songAEntryId));
+      const b = Number(row.reportedVoteCountB ?? count(row.songBEntryId));
+      if (!a || a !== b) return null;
+      const winnerSeed = Number(row.winnerEntryId) === Number(row.songAEntryId) ? row.songASeed : row.songBSeed;
+      const otherSeed = Number(row.winnerEntryId) === Number(row.songAEntryId) ? row.songBSeed : row.songASeed;
+      method = 'unknown';
+      if (!inFinale && winnerSeed != null && otherSeed != null) {
+        if (defaultPolicy === 'seed' && Number(winnerSeed) < Number(otherSeed)) method = 'seed';
+        if (defaultPolicy === 'seed_low' && Number(winnerSeed) > Number(otherSeed)) method = 'seed_low';
+      }
+    }
+  }
+
+  const descriptions = {
+    random: 'A random draw decided the winner.',
+    seed: 'The higher-ranked seed advanced.',
+    seed_low: 'The lower-ranked seed advanced.',
+    admin_pick: 'The commissioner or admin decided the winner.',
+    unknown: 'The tiebreaker method was not recorded.'
+  };
+  return `The participant votes were tied. ${descriptions[method] ?? descriptions.unknown}`;
+}

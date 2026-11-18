@@ -27,9 +27,9 @@ import { applyBallotPrivacy } from './ballot-privacy.mjs';
 import { getBracketAlbums, resolveSongAlbums, saveBracketAlbum, removeBracketAlbum } from './bracket-albums.mjs';
 import { canPreserveBracketStructure, applyLiveBracketEdit } from './live-bracket-edit.mjs';
 import { memberMatchupView } from './member-bracket-view.mjs';
-import { loadAdminBallots, saveAdminBallots, getBallotEditingRound, roundAllowsBallotEditing, correctedWinner } from './admin-ballots.mjs';
+import { loadAdminBallots, saveAdminBallots, getBallotEditingRound, roundAllowsBallotEditing, correctedWinner, correctedTieMethod } from './admin-ballots.mjs';
 import { setBracketPaused, getResumeSchedule, resumeWithSchedule } from './bracket-pause.mjs';
-import { tiebreakerOptions, validateSeedTiebreaker } from './tiebreaker.mjs';
+import { tiebreakerOptions, validateSeedTiebreaker, matchupTieExplanation } from './tiebreaker.mjs';
 import { saveBracketSongs } from './bracket-song-save.mjs';
 import { createServer } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
@@ -907,7 +907,7 @@ const server = createServer(async (request, response) => {
                 COALESCE(albumA.title,sa.album) AS songAAlbum,CASE WHEN albumA.bracket_album_id IS NOT NULL THEN albumA.year ELSE sa.year END AS songAYear,sa.youtube_url AS songAYoutubeUrl,sa.spotify_url AS songASpotifyUrl,CASE WHEN albumA.bracket_album_id IS NOT NULL THEN albumA.album_cover_url ELSE sa.album_cover_url END AS songAAlbumCoverUrl,
                 c.bracket_song_id AS songBEntryId,CASE WHEN b.seeding_size IS NOT NULL THEN c.assigned_seed ELSE c.seed_number END AS songBSeed,sb.title AS songBTitle,
                 COALESCE(albumB.title,sb.album) AS songBAlbum,CASE WHEN albumB.bracket_album_id IS NOT NULL THEN albumB.year ELSE sb.year END AS songBYear,sb.youtube_url AS songBYoutubeUrl,sb.spotify_url AS songBSpotifyUrl,CASE WHEN albumB.bracket_album_id IS NOT NULL THEN albumB.album_cover_url ELSE sb.album_cover_url END AS songBAlbumCoverUrl,
-                m.winner_entry_id AS winnerEntryId,m.random_tiebreaker_vote_entry_id AS randomTiebreakerVoteEntryId,m.admin_tiebreaker_entry_id AS adminTieBreakEntryId,reported.votes_a AS reportedVoteCountA,reported.votes_b AS reportedVoteCountB,sw.title AS winnerTitle,
+                m.winner_entry_id AS winnerEntryId,m.random_tiebreaker_vote_entry_id AS randomTiebreakerVoteEntryId,m.admin_tiebreaker_entry_id AS adminTieBreakEntryId,m.decided_tiebreaker AS tieBreakMethod,b.tiebreaker_option AS defaultTiePolicy,reported.votes_a AS reportedVoteCountA,reported.votes_b AS reportedVoteCountB,sw.title AS winnerTitle,
                 ownVote.selected_entry_id AS selectedEntryId,ownVote.comment
          FROM bracket_weeks w
          JOIN brackets b ON b.bracket_id=w.bracket_id
@@ -979,6 +979,8 @@ const server = createServer(async (request, response) => {
           songA: { entryId: Number(row.songAEntryId), title: row.songATitle, album: row.songAAlbum, year: row.songAYear, seed: Number(row.songASeed), youtubeUrl: row.songAYoutubeUrl, spotifyUrl: row.songASpotifyUrl, albumCoverUrl: row.songAAlbumCoverUrl },
           songB: { entryId: Number(row.songBEntryId), title: row.songBTitle, album: row.songBAlbum, year: row.songBYear, seed: Number(row.songBSeed), youtubeUrl: row.songBYoutubeUrl, spotifyUrl: row.songBSpotifyUrl, albumCoverUrl: row.songBAlbumCoverUrl },
           winnerEntryId: row.winnerEntryId === null ? null : Number(row.winnerEntryId),
+          tieExplanation: matchupTieExplanation(row, ballotsByMatchup.get(Number(row.matchupId)) ?? [], row.defaultTiePolicy,
+            bracketRows[0].finaleSessionStartRound != null && Number(row.roundNumber) >= Number(bracketRows[0].finaleSessionStartRound)),
           randomTiebreakerVoteEntryId: row.winnerEntryId != null && row.randomTiebreakerVoteEntryId != null ? Number(row.randomTiebreakerVoteEntryId) : null,
           winnerTitle: row.winnerTitle,
           selectedEntryId: row.selectedEntryId === null ? null : Number(row.selectedEntryId),
@@ -1105,7 +1107,8 @@ const server = createServer(async (request, response) => {
           await connection.rollback(); send(409, { error: 'The next matchup already has a winner, so this ballot can no longer be changed.' }); return;
         }
       }
-      await connection.execute('UPDATE matchups SET winner_entry_id=?,random_tiebreaker_vote_entry_id=? WHERE bracket_id=? AND matchup_id=?', [winnerEntryId, resolution.randomVote, bracketId, matchupId]);
+      const method = correctedTieMethod({...matchup,inFinale:true}, tieBreakEntryId, winnerEntryId, votesForA, votesForB);
+      await connection.execute('UPDATE matchups SET winner_entry_id=?,random_tiebreaker_vote_entry_id=?,decided_tiebreaker=? WHERE bracket_id=? AND matchup_id=?', [winnerEntryId, resolution.randomVote, method, bracketId, matchupId]);
       if (matchup.nextMatchupId && matchup.nextSlot === 'A') {
         await connection.execute('UPDATE matchups SET song_a_entry_id=? WHERE bracket_id=? AND matchup_id=?', [winnerEntryId, bracketId, matchup.nextMatchupId]);
       } else if (matchup.nextMatchupId && matchup.nextSlot === 'B') {
@@ -1241,7 +1244,7 @@ const server = createServer(async (request, response) => {
               b.bracket_song_id AS songBEntryId, b.region_number AS songBRegion,
               CASE WHEN historyBracket.seeding_size IS NOT NULL THEN b.assigned_seed ELSE b.seed_number END AS songBSeed, sb.title AS songBTitle,
               COALESCE(albumB.title,sb.album) AS songBAlbum,CASE WHEN albumB.bracket_album_id IS NOT NULL THEN albumB.year ELSE sb.year END AS songBYear,CASE WHEN albumB.bracket_album_id IS NOT NULL THEN albumB.album_cover_url ELSE sb.album_cover_url END AS songBAlbumCoverUrl,
-              m.winner_entry_id AS winnerEntryId,m.random_tiebreaker_vote_entry_id AS randomTiebreakerVoteEntryId,m.admin_tiebreaker_entry_id AS adminTieBreakEntryId,reported.votes_a AS reportedVoteCountA,reported.votes_b AS reportedVoteCountB,
+              m.winner_entry_id AS winnerEntryId,m.random_tiebreaker_vote_entry_id AS randomTiebreakerVoteEntryId,m.admin_tiebreaker_entry_id AS adminTieBreakEntryId,m.decided_tiebreaker AS tieBreakMethod,historyBracket.tiebreaker_option AS defaultTiePolicy,reported.votes_a AS reportedVoteCountA,reported.votes_b AS reportedVoteCountB,
               sw.title AS winnerTitle,COALESCE(winningAlbum.title,sw.album) AS winnerAlbum,CASE WHEN winningAlbum.bracket_album_id IS NOT NULL THEN winningAlbum.album_cover_url ELSE sw.album_cover_url END AS winnerAlbumCoverUrl,
               CASE WHEN winningAlbum.bracket_album_id IS NOT NULL THEN winningAlbum.year ELSE sw.year END AS winnerYear
        FROM bracket_rounds r
@@ -1335,6 +1338,8 @@ const server = createServer(async (request, response) => {
           winnerEntryId: row.winnerEntryId,
           reportedVoteCountA:row.reportedVoteCountA==null?null:Number(row.reportedVoteCountA),
           reportedVoteCountB:row.reportedVoteCountB==null?null:Number(row.reportedVoteCountB),
+          tieExplanation: matchupTieExplanation(row, ballotsByMatchup.get(Number(row.matchupId)) ?? [], row.defaultTiePolicy,
+            sessionRows[0] != null && Number(row.roundNumber) >= Number(sessionRows[0].startRoundNumber)),
           randomTiebreakerVoteEntryId: row.winnerEntryId != null && row.randomTiebreakerVoteEntryId != null ? Number(row.randomTiebreakerVoteEntryId) : null,
           ballots: [...(ballotsByMatchup.get(Number(row.matchupId)) ?? []), ...(row.winnerEntryId != null && row.randomTiebreakerVoteEntryId != null ? [{ userId: null, displayName: row.adminTieBreakEntryId != null ? 'Admin tiebreaker' : 'Tiebreaker vote', selectedEntryId: Number(row.randomTiebreakerVoteEntryId) }] : [])],
           winner: row.winnerTitle === null ? null : {

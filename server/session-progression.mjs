@@ -1,5 +1,5 @@
 import {getManagedSessions,validateSessionDates} from './session-management.mjs';
-import {resolveWinner,randomTiebreakerVote} from './tiebreaker.mjs';
+import {resolveWinner,randomTiebreakerVote,decidedTieMethod} from './tiebreaker.mjs';
 import {randomizeReadyRounds,readyRoundSql} from './round-randomization.mjs';
 
 export async function finalizeClosedMatchups(connection,bracketId=null,weekId=null) {
@@ -44,9 +44,10 @@ export async function finalizeClosedMatchups(connection,bracketId=null,weekId=nu
           adminPick:matchup.tieBreakEntryId != null ? Number(matchup.tieBreakEntryId) : matchup.adminPick == null ? null : Number(matchup.adminPick)
         });
         if (winnerEntryId === null) continue;
+        const method = decidedTieMethod({winner: winnerEntryId, votesForA, votesForB, policy: matchup.tiebreakerOption, songASeed: matchup.songASeed, songBSeed: matchup.songBSeed});
         const [updated] = await connection.execute(
-          'UPDATE matchups SET winner_entry_id=?,random_tiebreaker_vote_entry_id=? WHERE matchup_id=? AND bracket_id=? AND winner_entry_id IS NULL',
-          [winnerEntryId, matchup.tiebreakerOption==='admin_pick' && votesForA===votesForB ? winnerEntryId : randomTiebreakerVote({votesForA,votesForB,tiebreakerOption:matchup.tiebreakerOption},winnerEntryId), matchup.matchupId, matchup.bracketId]
+          'UPDATE matchups SET winner_entry_id=?,random_tiebreaker_vote_entry_id=?,decided_tiebreaker=? WHERE matchup_id=? AND bracket_id=? AND winner_entry_id IS NULL',
+          [winnerEntryId, matchup.tiebreakerOption==='admin_pick' && votesForA===votesForB ? winnerEntryId : randomTiebreakerVote({votesForA,votesForB,tiebreakerOption:matchup.tiebreakerOption},winnerEntryId), method, matchup.matchupId, matchup.bracketId]
         );
         if (!updated.affectedRows) continue;
 
