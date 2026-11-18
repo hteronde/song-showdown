@@ -18,8 +18,9 @@ export class VoteDrafts {
   }
 
   select(match: VotingMatchup, entryId: number, saving: boolean): void {
-    if (entryId === match.selectedEntryId && !saving) delete this.picks[match.matchupId];
-    else this.picks[match.matchupId] = entryId;
+    const selection = this.selection(match) === entryId ? null : entryId;
+    if (selection === match.selectedEntryId && !saving) delete this.picks[match.matchupId];
+    else this.picks[match.matchupId] = selection;
   }
 
   editComment(match: VotingMatchup, comment: string, saving: boolean): void {
