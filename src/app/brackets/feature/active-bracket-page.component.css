@@ -207,27 +207,6 @@
   font-weight: 650;
 }
 
-.bracket-scroll-control {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 10px 0 0;
-  color: #646459;
-  font: 11px 'DM Mono', monospace;
-}
-
-.bracket-scroll-control[hidden] {
-  display: none;
-}
-
-.bracket-scroll-control input {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  accent-color: #426d4b;
-  cursor: ew-resize;
-}
-
 .full-tournament-bracket .revealed-result {
   line-height: 1.4;
 }

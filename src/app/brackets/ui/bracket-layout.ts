@@ -26,3 +26,14 @@ export function positionalBracketLinks<Match extends {matchupId: number; drawPen
         drawPending: match.drawPending ?? false
     })));
 }
+
+export function scrollBracket(viewport: HTMLElement, control: HTMLInputElement): void {
+    const scrollDistance = viewport.scrollWidth - viewport.clientWidth;
+    viewport.scrollLeft = scrollDistance * control.valueAsNumber / 100;
+    if (!scrollDistance) control.value = '0';
+}
+
+export function syncBracketScroll(viewport: HTMLElement, control: HTMLInputElement): void {
+    const scrollDistance = viewport.scrollWidth - viewport.clientWidth;
+    control.valueAsNumber = scrollDistance ? viewport.scrollLeft * 100 / scrollDistance : 0;
+}

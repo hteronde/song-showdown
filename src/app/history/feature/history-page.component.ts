@@ -1,4 +1,4 @@
-import { mirrorBracketRounds, positionalBracketLinks } from '../../brackets/ui/bracket-layout';
+import { mirrorBracketRounds, positionalBracketLinks, scrollBracket, syncBracketScroll } from '../../brackets/ui/bracket-layout';
 import { apiErrorMessage } from '../../shared/data-access/api-client';
 import { BracketChampionComponent } from '../../brackets/ui/bracket-champion.component';
 import { BracketConnectorsDirective } from '../../brackets/ui/bracket-connectors.directive';
@@ -42,6 +42,8 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
     }
     trackBracketColumn(index: number, round: PastRound): string { return index + '-' + round.roundNumber; }
     trackMatch(_index: number, match: PastMatch): number { return match.matchupId; }
+    readonly scrollBracket = scrollBracket;
+    readonly syncBracketScroll = syncBracketScroll;
     bracketOverflows = false;
     private bracketResizeObserver?: ResizeObserver;
 

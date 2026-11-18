@@ -1,4 +1,4 @@
-import { mirrorBracketRounds, positionalBracketLinks } from '../ui/bracket-layout';
+import { mirrorBracketRounds, positionalBracketLinks, scrollBracket, syncBracketScroll } from '../ui/bracket-layout';
 import {SessionDateFieldsComponent,EditableSessionRow} from '../ui/session-date-fields.component';
 import {sessionEditorRows,sessionSchedulePayload,sessionDateInput} from './session-schedule';
 import { ResumeBracketDialogComponent } from '../ui/resume-bracket-dialog.component';
@@ -329,6 +329,8 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     }
     firstVisibleRound = 1;
     get visibleRounds(): RevealedRound[] { return this.revealedRounds.filter(round => round.roundNumber >= this.firstVisibleRound); }
+    readonly scrollBracket = scrollBracket;
+    readonly syncBracketScroll = syncBracketScroll;
     bracketOverflows = false;
     private bracketResizeObserver?: ResizeObserver;
 
@@ -347,15 +349,6 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         });
         this.bracketResizeObserver.observe(board);
         this.bracketResizeObserver.observe(viewport);
-    }
-    scrollBracket(viewport: HTMLElement, control: HTMLInputElement): void {
-        const scrollDistance = viewport.scrollWidth - viewport.clientWidth;
-        viewport.scrollLeft = scrollDistance * control.valueAsNumber / 100;
-        if (!scrollDistance) control.value = '0';
-    }
-    syncBracketScroll(viewport: HTMLElement, control: HTMLInputElement): void {
-        const scrollDistance = viewport.scrollWidth - viewport.clientWidth;
-        control.valueAsNumber = scrollDistance ? viewport.scrollLeft * 100 / scrollDistance : 0;
     }
     get bracketColumns(): RevealedRound[] {
         return mirrorBracketRounds(this.visibleRounds, round => round.matchups, (round, matchups) => ({...round, matchups}));

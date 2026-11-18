@@ -59,24 +59,31 @@
     <label class="bracket-round-filter">Show from round
       <select [(ngModel)]="firstVisibleRound" [ngModelOptions]="{standalone:true}"><option *ngFor="let round of historyRounds" [ngValue]="round.roundNumber">{{ round.roundNumber === 1 ? 'All rounds' : round.name }}</option></select>
     </label>
-    <section [class.bracket-scroll]="bracketOverflows" aria-label="Complete tournament bracket" *ngIf="matchupCount">
+    <section aria-label="Complete tournament bracket" *ngIf="matchupCount">
       @let columns = bracketColumns;
-      <div #bracketBoard class="revealed-bracket full-tournament-bracket" [style.--bracket-round-count]="columns.length" [style.--bracket-row-count]="columns[0]?.matches?.length || 1">
-        <div [appBracketConnectors]="connectorMatches"></div>
-        <section class="revealed-round" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
-          <h3>{{ columnIndex === (columns.length - 1) / 2 ? 'Championship' : round.name }}</h3>
-          <div class="revealed-round-games">
-            <article class="revealed-game history-match" *ngFor="let match of round.matches; trackBy: trackMatch"
-              [attr.data-matchup-id]="match.matchupId" [style.grid-row]="'span ' + visibleRoundSpan(round.roundNumber)"
-              [class.finale-ready]="canOpenMatch(match.roundNumber)" role="button" tabindex="0"
-              [attr.aria-label]="'Matchup details: ' + match.left + ' versus ' + match.right"
-              (click)="openHistoryVotes(match)" (keydown.enter)="openHistoryVotes(match)" (keydown.space)="$event.preventDefault(); openHistoryVotes(match)">
-              <div class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId"><span [title]="match.left">{{ match.left }}</span></div>
-              <div class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId"><span [title]="match.right">{{ match.right }}</span></div>
-            </article>
-          </div>
-        </section>
+      <div #bracketViewport [class.bracket-scroll]="bracketOverflows" (scroll)="syncBracketScroll(bracketViewport, bracketScrollControl)">
+        <div #bracketBoard class="revealed-bracket full-tournament-bracket" [style.--bracket-round-count]="columns.length" [style.--bracket-row-count]="columns[0]?.matches?.length || 1">
+          <div [appBracketConnectors]="connectorMatches"></div>
+          <section class="revealed-round" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
+            <h3>{{ columnIndex === (columns.length - 1) / 2 ? 'Championship' : round.name }}</h3>
+            <div class="revealed-round-games">
+              <article class="revealed-game history-match" *ngFor="let match of round.matches; trackBy: trackMatch"
+                [attr.data-matchup-id]="match.matchupId" [style.grid-row]="'span ' + visibleRoundSpan(round.roundNumber)"
+                [class.finale-ready]="canOpenMatch(match.roundNumber)" role="button" tabindex="0"
+                [attr.aria-label]="'Matchup details: ' + match.left + ' versus ' + match.right"
+                (click)="openHistoryVotes(match)" (keydown.enter)="openHistoryVotes(match)" (keydown.space)="$event.preventDefault(); openHistoryVotes(match)">
+                <div class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId"><span [title]="match.left">{{ match.left }}</span></div>
+                <div class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId"><span [title]="match.right">{{ match.right }}</span></div>
+              </article>
+            </div>
+          </section>
+        </div>
       </div>
+      <label class="bracket-scroll-control" [hidden]="!bracketOverflows">
+        Scroll bracket
+        <input #bracketScrollControl type="range" min="0" max="100" step="0.1" value="0"
+          (input)="scrollBracket(bracketViewport, bracketScrollControl)">
+      </label>
     </section>
     <div class="notice-bar" *ngIf="selectedBracket && !matchupCount"><span class="notice-icon">◉</span><span>The bracket songs are linked, but no matchups have been recorded yet.</span></div>
   </section>
