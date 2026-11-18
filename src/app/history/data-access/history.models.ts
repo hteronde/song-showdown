@@ -20,7 +20,6 @@ export interface PastMatch {
   tieExplanation?: string | null;
   randomTiebreakerVoteEntryId: number | null;
   ballots: Array<{ userId: number | null; displayName?: string; selectedEntryId: number }>;
-  span: number;
 }
 
 export interface PastRound {

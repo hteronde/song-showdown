@@ -1,3 +1,4 @@
+import { mirrorBracketRounds, positionalBracketLinks } from '../../brackets/ui/bracket-layout';
 import { apiErrorMessage } from '../../shared/data-access/api-client';
 import { BracketChampionComponent } from '../../brackets/ui/bracket-champion.component';
 import { BracketConnectorsDirective } from '../../brackets/ui/bracket-connectors.directive';
@@ -15,11 +16,10 @@ import { HistoryApiService } from '../data-access/history-api.service';
     standalone: true,
     imports: [BracketChampionComponent, BracketConnectorsDirective, CommonModule, FormsModule, AdminBallotEditorComponent, SongAlbumArtComponent],
     templateUrl: './history-page.component.html',
-    styleUrls: ['./history-page.component.css', '../../brackets/ui/bracket-connectors.css']
+    styleUrls: ['./history-page.component.css', '../../brackets/ui/bracket-layout.css', '../../brackets/ui/bracket-connectors.css']
 })
 export class HistoryPageComponent implements OnInit, OnDestroy {
     constructor(private readonly historyApi: HistoryApiService, private readonly authApi: AuthApiService, private readonly changeDetector: ChangeDetectorRef, private readonly route: ActivatedRoute, private readonly router: Router) { }
-    get hasRandomTies(): boolean { return this.historyRounds.some(round => round.matches.some(match => match.randomTiebreakerVoteEntryId != null)); }
     matchVotes(match: PastMatch, entryId: number): number {
         const reported = entryId === match.leftEntryId ? match.reportedVoteCountA : match.reportedVoteCountB;
         const aggregate = entryId === match.leftEntryId ? match.voteCountA : match.voteCountB;
@@ -30,9 +30,37 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
         return match.winnerEntryId === match.rightEntryId ? `${right}–${left} votes` : `${left}–${right} votes`;
     }
     firstVisibleRound = 1;
-    get visibleRounds(): PastRound[] { return this.historyRounds.filter(round => round.roundNumber >= this.firstVisibleRound); }
+    get visibleRounds(): PastRound[] { return this.historyRounds.filter(round => round.matches.length && round.roundNumber >= this.firstVisibleRound); }
     visibleRoundSpan(roundNumber: number): number { return 2 ** (roundNumber - (this.visibleRounds[0]?.roundNumber ?? 1)); }
-    get connectorMatches(): PastMatch[] { return this.historyRounds.flatMap(round => round.matches); }
+    get bracketColumns(): PastRound[] {
+        return mirrorBracketRounds(this.visibleRounds, round => round.matches, (round, matches) => ({...round, matches}));
+    }
+    get connectorMatches() {
+        return this.selectedBracket?.randomizationMode === 'each_round'
+            ? positionalBracketLinks(this.visibleRounds.map(round => round.matches))
+            : this.visibleRounds.flatMap(round => round.matches);
+    }
+    trackBracketColumn(index: number, round: PastRound): string { return index + '-' + round.roundNumber; }
+    trackMatch(_index: number, match: PastMatch): number { return match.matchupId; }
+    bracketOverflows = false;
+    private bracketResizeObserver?: ResizeObserver;
+
+    @ViewChild('bracketBoard')
+    set bracketBoard(ref: ElementRef<HTMLElement> | undefined) {
+        this.bracketResizeObserver?.disconnect();
+        const board = ref?.nativeElement;
+        const viewport = board?.parentElement;
+        if (!board || !viewport) return;
+
+        this.bracketResizeObserver = new ResizeObserver(() => {
+            const overflows = board.offsetWidth > viewport.clientWidth;
+            if (this.bracketOverflows === overflows) return;
+            this.bracketOverflows = overflows;
+            this.changeDetector.markForCheck();
+        });
+        this.bracketResizeObserver.observe(board);
+        this.bracketResizeObserver.observe(viewport);
+    }
     @ViewChild('historyVotesDialog')
     historyVotesDialog?: ElementRef<HTMLDialogElement>;
     voteHistoryMatch: PastMatch | null = null;
@@ -97,6 +125,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
     private detailController?: AbortController;
     private routeSubscriptions: Array<{unsubscribe(): void}> = [];
     ngOnDestroy(): void {
+        this.bracketResizeObserver?.disconnect();
         this.pageController.abort();
         this.detailController?.abort();
         for (const subscription of this.routeSubscriptions) subscription.unsubscribe();
@@ -218,8 +247,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
                     randomTiebreakerVoteEntryId: match.randomTiebreakerVoteEntryId,
                     selectedEntryId: match.selectedEntryId,
                     ballots: match.ballots,
-                    span: 2 ** (round.roundNumber - 1)
-                }))
+                })).sort((a, b) => a.weekNumber - b.weekNumber || a.matchupNumber - b.matchupNumber)
             }));
             this.isBracketDetailOpen = true;
         }

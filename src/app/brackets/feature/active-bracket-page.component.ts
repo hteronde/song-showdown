@@ -1,3 +1,4 @@
+import { mirrorBracketRounds, positionalBracketLinks } from '../ui/bracket-layout';
 import {SessionDateFieldsComponent,EditableSessionRow} from '../ui/session-date-fields.component';
 import {sessionEditorRows,sessionSchedulePayload,sessionDateInput} from './session-schedule';
 import { ResumeBracketDialogComponent } from '../ui/resume-bracket-dialog.component';
@@ -28,7 +29,7 @@ interface RevealedRound {
 @Component({
     selector: 'app-active-bracket-page', standalone: true, imports: [SessionDateFieldsComponent, ResumeBracketDialogComponent, BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent],
     templateUrl: './active-bracket-page.component.html',
-    styleUrls: ['./active-bracket-page.component.css', '../ui/bracket-connectors.css']
+    styleUrls: ['./active-bracket-page.component.css', '../ui/bracket-layout.css', '../ui/bracket-connectors.css']
 })
 export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     constructor(private readonly route: ActivatedRoute, private readonly router: Router, private readonly api: ActiveBracketApiService, private readonly authApi: AuthApiService, private readonly changeDetector: ChangeDetectorRef) { }
@@ -61,15 +62,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         if (this.data?.bracket.randomizationMode !== 'each_round')
             return (this.data?.weeks ?? []).flatMap(week => week.matchups);
 
-        const rounds = this.visibleRounds;
-        return rounds.flatMap((round, index) => {
-            const nextRound = rounds[index + 1];
-            return round.matchups.map(({matchup}, position) => ({
-                matchupId: matchup.matchupId,
-                nextMatchupId: nextRound?.matchups[Math.floor(position / 2)]?.matchup.matchupId ?? null,
-                drawPending: matchup.drawPending
-            }));
-        });
+        return positionalBracketLinks(this.visibleRounds.map(round => round.matchups.map(({matchup}) => matchup)));
     }
     firstRoundVisibilitySaving = false;
     async setFirstRoundVisibility(event: Event): Promise<void> {
@@ -365,18 +358,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         control.valueAsNumber = scrollDistance ? viewport.scrollLeft * 100 / scrollDistance : 0;
     }
     get bracketColumns(): RevealedRound[] {
-        const rounds = this.visibleRounds;
-        const championship = rounds.at(-1);
-        if (!championship) return [];
-        const earlier = rounds.slice(0, -1).map(round => {
-            const {matchups} = round;
-            const middle = Math.ceil(matchups.length / 2);
-            return {
-                left: { ...round, matchups: matchups.slice(0, middle) },
-                right: { ...round, matchups: matchups.slice(middle) }
-            };
-        });
-        return [...earlier.map(round => round.left), championship, ...earlier.reverse().map(round => round.right)];
+        return mirrorBracketRounds(this.visibleRounds, round => round.matchups, (round, matchups) => ({...round, matchups}));
     }
     bracketRoundSpan(roundNumber: number): number { return 2 ** (roundNumber - (this.visibleRounds[0]?.roundNumber ?? 1)); }
     private matchupStatus(week: VotingWeek, matchup: VotingMatchup): MatchupStatus {
@@ -399,7 +381,7 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
                 round.matchups.push({ matchup, weekNumber: week.weekNumber, status: this.matchupStatus(week, matchup) });
         }
         for (const round of rounds.values())
-            round.matchups.sort((a, b) => a.matchup.matchupNumber - b.matchup.matchupNumber);
+            round.matchups.sort((a, b) => a.weekNumber - b.weekNumber || a.matchup.matchupNumber - b.matchup.matchupNumber);
         return [...rounds.values()].sort((a, b) => a.roundNumber - b.roundNumber);
     }
     ngOnInit(): void {

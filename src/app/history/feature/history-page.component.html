@@ -59,26 +59,26 @@
     <label class="bracket-round-filter">Show from round
       <select [(ngModel)]="firstVisibleRound" [ngModelOptions]="{standalone:true}"><option *ngFor="let round of historyRounds" [ngValue]="round.roundNumber">{{ round.roundNumber === 1 ? 'All rounds' : round.name }}</option></select>
     </label>
-    <section #bracketBoard class="history-tournament" [class.redrawn-rounds]="selectedBracket?.randomizationMode === 'each_round'" aria-label="Complete tournament bracket" *ngIf="matchupCount" [style.grid-template-columns]="'repeat(' + visibleRounds.length + ', minmax(220px, 1fr))'" [style.--history-row-count]="visibleRounds[0]?.matches?.length || 1">
-      <div [appBracketConnectors]="connectorMatches"></div>
-      <div class="history-round" *ngFor="let round of visibleRounds; let roundIndex = index">
-        <h3>{{ round.name }}</h3>
-        <div class="history-round-games">
-          <article class="history-match" [attr.data-matchup-id]="match.matchupId" *ngFor="let match of round.matches" [style.grid-row]="'span ' + visibleRoundSpan(round.roundNumber)" [style.--feeder-offset]="visibleRoundSpan(round.roundNumber) * 60 + 'px'" [class.admin-editable]="canEditHistoryBallots(match)" [class.finale-ready]="canOpenMatch(match.roundNumber)" role="button" tabindex="0" [attr.aria-label]="(canViewBallots ? 'View votes for ' : 'View result for ') + match.left + ' versus ' + match.right" (click)="openHistoryVotes(match)" (keydown.enter)="openHistoryVotes(match)" (keydown.space)="$event.preventDefault(); openHistoryVotes(match)">
-            <div class="history-game-label">{{ matchupWeekLabel(match) }} · MATCHUP {{ match.matchupNumber }}</div>
-            <div class="history-team" [class.game-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId"><span>{{ match.left }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId">✓</b></div>
-            <div class="history-team" [class.game-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId"><span>{{ match.right }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId">✓</b></div>
-            <div class="history-result" *ngIf="match.selectedEntryId != null">Your vote: {{ match.selectedEntryId === match.leftEntryId ? match.left : match.right }}</div>
-            <div class="history-result" *ngIf="match.winnerEntryId">{{ match.winner }} {{ round.roundNumber === historyRounds[historyRounds.length - 1].roundNumber ? 'wins the championship' : 'advances' }}<ng-container *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null"> · {{ matchTally(match) }}</ng-container> <span class="random-tie-badge" *ngIf="match.tieExplanation">TIE</span></div>
-            <p class="random-tie-note" *ngIf="match.tieExplanation">{{ match.tieExplanation }}</p>
-            <div class="history-result pending" *ngIf="!match.winnerEntryId">Winner pending</div>
-            <div class="view-votes-hint">{{ canViewBallots ? 'View votes ↗' : 'View result ↗' }}</div>
-          </article>
-        </div>
+    <section [class.bracket-scroll]="bracketOverflows" aria-label="Complete tournament bracket" *ngIf="matchupCount">
+      @let columns = bracketColumns;
+      <div #bracketBoard class="revealed-bracket full-tournament-bracket" [style.--bracket-round-count]="columns.length" [style.--bracket-row-count]="columns[0]?.matches?.length || 1">
+        <div [appBracketConnectors]="connectorMatches"></div>
+        <section class="revealed-round" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
+          <h3>{{ columnIndex === (columns.length - 1) / 2 ? 'Championship' : round.name }}</h3>
+          <div class="revealed-round-games">
+            <article class="revealed-game history-match" *ngFor="let match of round.matches; trackBy: trackMatch"
+              [attr.data-matchup-id]="match.matchupId" [style.grid-row]="'span ' + visibleRoundSpan(round.roundNumber)"
+              [class.finale-ready]="canOpenMatch(match.roundNumber)" role="button" tabindex="0"
+              [attr.aria-label]="'Matchup details: ' + match.left + ' versus ' + match.right"
+              (click)="openHistoryVotes(match)" (keydown.enter)="openHistoryVotes(match)" (keydown.space)="$event.preventDefault(); openHistoryVotes(match)">
+              <div class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId"><span [title]="match.left">{{ match.left }}</span></div>
+              <div class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId"><span [title]="match.right">{{ match.right }}</span></div>
+            </article>
+          </div>
+        </section>
       </div>
     </section>
     <div class="notice-bar" *ngIf="selectedBracket && !matchupCount"><span class="notice-icon">◉</span><span>The bracket songs are linked, but no matchups have been recorded yet.</span></div>
-    <div class="bracket-key"><span><i></i> Advances to the next round</span><span>Scroll horizontally to follow the bracket</span></div>
   </section>
   <footer class="page-footer"><span>THE SONGS WE STILL ARGUE ABOUT <b>✳</b></span><span>FAMILY BRACKET ARCHIVE</span></footer>
 </div>
@@ -89,7 +89,8 @@
   <ng-container *ngIf="voteHistoryMatch as match">
     <span class="history-votes-label">{{ matchupWeekLabel(match) }} · MATCHUP {{ match.matchupNumber }}</span>
     <p class="no-vote-history" *ngIf="match.selectedEntryId != null">Your vote: {{ match.selectedEntryId === match.leftEntryId ? match.left : match.right }}</p>
-    <h2 id="history-votes-title">{{ canViewBallots ? 'Who voted for each song' : 'Matchup result' }}</h2>
+    <h2 id="history-votes-title">Matchup details</h2>
+    <p class="no-vote-history" *ngIf="match.winnerEntryId == null">Winner pending.</p>
     <div class="history-vote-tally" *ngIf="(match.voteCountA || 0) + (match.voteCountB || 0) > 0 || match.ballots.length || match.reportedVoteCountA != null">{{ matchTally(match) }} <span class="random-tie-badge" *ngIf="match.tieExplanation">TIE</span></div>
     <p class="random-tie-note" *ngIf="match.tieExplanation">{{ match.tieExplanation }}</p>
     <p class="no-vote-history" *ngIf="!canViewBallots">Voting is anonymous. You can see your own vote; other participants’ votes are hidden.</p>

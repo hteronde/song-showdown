@@ -173,36 +173,6 @@
   margin: -8px 0 18px;
 }
 
-.revealed-bracket {
-  display: flex;
-  align-items: flex-start;
-  gap: 18px;
-  overflow-x: auto;
-  padding: 4px 0 18px;
-}
-
-.revealed-round {
-  flex: 0 0 220px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.revealed-round h3 {
-  font: 600 13px 'DM Mono',monospace;
-  letter-spacing: .08em;
-  color: #9a674f;
-  text-transform: uppercase;
-  margin: 0 0 2px;
-}
-
-.revealed-game {
-  background: #fff;
-  border: 1px solid #e5e3db;
-  border-radius: 5px;
-  padding: 10px 12px;
-}
-
 .revealed-game-label {
   font: 8px 'DM Mono',monospace;
   color: #aaa79c;
@@ -210,29 +180,6 @@
   justify-content: space-between;
   gap: 4px;
   margin-bottom: 3px;
-}
-
-.revealed-team {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 0;
-  border-bottom: 1px solid #f0eee8;
-  font-size: 11px;
-  color: #77776e;
-}
-
-.revealed-team:last-of-type {
-  border-bottom: 0;
-}
-
-.revealed-winner {
-  color: #30312b;
-  font-weight: 650;
-}
-
-.revealed-winner b {
-  color: #66816a;
 }
 
 .revealed-result {
@@ -260,12 +207,6 @@
   font-weight: 650;
 }
 
-.revealed-round-games {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .bracket-scroll-control {
   display: flex;
   align-items: center;
@@ -287,92 +228,8 @@
   cursor: ew-resize;
 }
 
-.bracket-scroll {
-  overflow-x: auto;
-  scrollbar-color: #787d6d #e7e6dc;
-}
-
-.full-tournament-bracket {
-  --column-gap: 8px;
-  --column-min: 88px;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-template-rows: auto;
-  column-gap: var(--column-gap);
-  overflow: visible;
-  width: max(100%, calc(var(--bracket-round-count) * (var(--column-min) + var(--column-gap)) - var(--column-gap)));
-}
-
-.full-tournament-bracket .revealed-round {
-  min-width: 0;
-  gap: 0;
-}
-
-.full-tournament-bracket .revealed-round h3 {
-  font-size: clamp(9px, .9vw, 11px);
-  letter-spacing: .04em;
-  overflow-wrap: anywhere;
-  height: 27px;
-  box-sizing: border-box;
-  margin: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  text-align: center;
-}
-
-.full-tournament-bracket .revealed-round-games {
-  display: grid;
-  grid-template-rows: repeat(var(--bracket-row-count),minmax(69px,auto));
-  row-gap: 6px;
-}
-
-.full-tournament-bracket .revealed-game {
-  min-width: 0;
-  width: 100%;
-  overflow-wrap: anywhere;
-  height: auto;
-  min-height: 60px;
-  padding: 4px 5px;
-  box-sizing: border-box;
-  align-self: center;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.full-tournament-bracket .revealed-team>span {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .full-tournament-bracket .revealed-result {
   line-height: 1.4;
-}
-
-.full-tournament-bracket .revealed-round:not(:last-child) .revealed-game:after {
-  content: '';
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  width: var(--connector-half-gap);
-  border-top: 1px solid #cfcbbf;
-}
-
-.full-tournament-bracket .revealed-round:not(:first-child) .revealed-game:before {
-  content: '';
-  position: absolute;
-  right: 100%;
-  top: calc(50% - var(--feeder-offset));
-  width: var(--connector-half-gap);
-  height: calc(2 * var(--feeder-offset));
-  border-left: 1px solid #cfcbbf;
-  background: linear-gradient(#cfcbbf,#cfcbbf) left center/100% 1px no-repeat;
-  pointer-events: none;
 }
 
 .bracket-hold-banner {
@@ -513,23 +370,6 @@
   margin: 8px 0 0;
 }
 
-.full-tournament-bracket.redrawn-rounds .revealed-game:before,.full-tournament-bracket.redrawn-rounds .revealed-game:after {
-  display: none;
-}
-
-.revealed-game {
-  cursor: pointer;
-}
-
-.revealed-game:hover {
-  border-color: #b2c2ae;
-}
-
-.revealed-game:focus-visible {
-  outline: 2px solid #66816a;
-  outline-offset: 2px;
-}
-
 .admin-ballot-entry {
   gap: 8px;
   flex-wrap: wrap;
@@ -656,18 +496,6 @@
   gap: 10px;
   flex-wrap: wrap;
   margin: 4px 0 10px;
-}
-
-.full-tournament-bracket {
-  position: relative;
-}
-
-.full-tournament-bracket .revealed-game:before,.full-tournament-bracket .revealed-game:after {
-  display: none;
-}
-
-.full-tournament-bracket .revealed-game {
-  z-index: 1;
 }
 
 .bracket-connectors {
