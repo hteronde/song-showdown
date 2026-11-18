@@ -288,6 +288,8 @@
 }
 
 .bracket-scroll {
+  width: 100%;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-color: #787d6d #e7e6dc;
 }
@@ -296,11 +298,12 @@
   --column-gap: 8px;
   --column-min: 88px;
   display: grid;
-  grid-template-columns: repeat(var(--bracket-round-count),minmax(var(--column-min), 1fr));
-  gap: var(--column-gap);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-rows: auto;
+  column-gap: var(--column-gap);
   overflow: visible;
-  min-width: calc(var(--bracket-round-count) * (var(--column-min) + var(--column-gap)) - var(--column-gap));
-  width: 100%;
+  width: max(100%, calc(var(--bracket-round-count) * (var(--column-min) + var(--column-gap)) - var(--column-gap)));
 }
 
 .full-tournament-bracket .revealed-round {
