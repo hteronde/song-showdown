@@ -86,7 +86,7 @@
     <h2 id="matchup-details-title">{{ canVoteInMatchup(match) ? 'Submit your vote' : 'Matchup details' }}</h2>
     <p class="details-note" *ngIf="match.selectedEntryId != null">Your vote: {{ songName(match, match.selectedEntryId) }}</p>
     <div class="details-tally" *ngIf="detailsResultsVisible">{{ resultTally(match) }} <span class="random-tie-badge" *ngIf="match.tieExplanation">TIE</span></div>
-    <p class="random-tie-note" *ngIf="match.tieExplanation">{{ match.tieExplanation }}</p>
+    <p class="matchup-tiebreaker" *ngIf="match.tieExplanation"><strong>Tiebreaker</strong> {{ match.tieExplanation }}</p>
     <p class="details-note" *ngIf="!detailsResultsVisible">{{ detailsWeek?.isUpcoming ? 'This matchup is upcoming. Unrevealed songs remain TBD.' : 'Votes remain private until this matchup’s results are released.' }}</p>
     <p class="details-note" *ngIf="detailsResultsVisible && !data?.canViewBallots">Voting is anonymous. You can see your own vote; other participants’ votes are hidden.</p>
     <div class="details-songs">

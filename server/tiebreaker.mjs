@@ -37,10 +37,10 @@ export function matchupTieExplanation(row, ballots, defaultPolicy, inFinale) {
       const count = entryId => ballots.filter(ballot => ballot.selectedEntryId === Number(entryId)).length;
       const a = Number(row.reportedVoteCountA ?? count(row.songAEntryId));
       const b = Number(row.reportedVoteCountB ?? count(row.songBEntryId));
-      if (!a || a !== b) return null;
+      if (a !== b) return null;
       const winnerSeed = Number(row.winnerEntryId) === Number(row.songAEntryId) ? row.songASeed : row.songBSeed;
       const otherSeed = Number(row.winnerEntryId) === Number(row.songAEntryId) ? row.songBSeed : row.songASeed;
-      method = 'unknown';
+      method = a > 0 ? 'unknown' : null;
       if (!inFinale && winnerSeed != null && otherSeed != null) {
         if (defaultPolicy === 'seed' && Number(winnerSeed) < Number(otherSeed)) method = 'seed';
         if (defaultPolicy === 'seed_low' && Number(winnerSeed) > Number(otherSeed)) method = 'seed_low';
@@ -48,10 +48,11 @@ export function matchupTieExplanation(row, ballots, defaultPolicy, inFinale) {
     }
   }
 
+  if (!method) return null;
   const descriptions = {
     random: 'A random draw decided the winner.',
-    seed: 'The higher-ranked seed advanced.',
-    seed_low: 'The lower-ranked seed advanced.',
+    seed: 'The higher-ranked seed won the tiebreaker.',
+    seed_low: 'The lower-ranked seed won the tiebreaker.',
     admin_pick: 'The commissioner or admin decided the winner.',
     unknown: 'The tiebreaker method was not recorded.'
   };

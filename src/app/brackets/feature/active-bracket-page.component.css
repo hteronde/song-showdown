@@ -591,6 +591,20 @@
   color: #77776e;
 }
 
+.matchup-tiebreaker {
+  margin: 10px 0;
+  padding: 8px 10px;
+  border-inline-start: 3px solid #9a674f;
+  background: #f3ede5;
+  color: #4c3f36;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.matchup-tiebreaker strong {
+  display: block;
+}
+
 .details-song ul {
   padding-left: 18px;
   margin: 10px 0 0;

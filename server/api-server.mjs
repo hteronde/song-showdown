@@ -938,8 +938,7 @@ const server = createServer(async (request, response) => {
          JOIN matchups m ON m.bracket_id=v.bracket_id AND m.matchup_id=v.matchup_id
          JOIN bracket_weeks w ON w.bracket_id=m.bracket_id AND w.week_id=m.week_id
          JOIN brackets b ON b.bracket_id=w.bracket_id
-         WHERE v.bracket_id=? AND v.submitted_at IS NOT NULL AND (w.closes_at<=COALESCE(b.paused_at,NOW(6)) OR
-           (m.winner_entry_id IS NOT NULL AND EXISTS (SELECT 1 FROM bracket_finale_sessions fs JOIN bracket_rounds fr ON fr.bracket_id=fs.bracket_id AND fr.round_id=w.round_id WHERE fs.bracket_id=m.bracket_id AND fr.round_number>=fs.start_round_number)))
+         WHERE v.bracket_id=? AND v.submitted_at IS NOT NULL AND (w.closes_at<=COALESCE(b.paused_at,NOW(6)) OR m.winner_entry_id IS NOT NULL)
          ORDER BY v.matchup_id,u.display_name`, [bracketId]);
       const ballotsByMatchup = new Map();
       for (const ballot of ballotRows) {

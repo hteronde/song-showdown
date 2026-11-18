@@ -391,6 +391,29 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       const [writes]=await db.pool.execute('SELECT matchup_id,COUNT(*) AS total FROM integration_winner_writes WHERE matchup_id IN (?,?) GROUP BY matchup_id ORDER BY matchup_id',[br.matches[0],br.matches[1]]);
       assert.equal(writes.length,2);assert.ok(writes.every(row=>Number(row.total)===1));
     });
+    await t.test('commissioners and members see why the higher seed won a decided tie', async () => {
+      const br = await bracket(a);
+      await db.pool.execute("UPDATE brackets SET tiebreaker_option='seed' WHERE bracket_id=?", [br.id]);
+      await db.pool.execute("UPDATE bracket_members SET bracket_role='commissioner' WHERE bracket_id=? AND user_id=?", [br.id, a.member.id]);
+      assert.equal((await vote(br, a.owner, 0, br.entries[0])).status, 200);
+      assert.equal((await vote(br, a.member, 0, br.entries[1])).status, 200);
+      const advanced = await http(`/api/admin/brackets/${br.id}/advance-week`, {
+        cookie: a.member.cookie, method: 'POST', body: {weekId: br.weeks[0], nextClosesAt: null}
+      });
+      assert.equal(advanced.status, 200);
+      // Simulate an older zero-ballot result without a saved method.
+      await db.pool.execute('UPDATE matchups SET decided_tiebreaker=NULL WHERE matchup_id=?', [br.matches[1]]);
+      for (const role of ['commissioner', 'member']) {
+        await db.pool.execute('UPDATE bracket_members SET bracket_role=? WHERE bracket_id=? AND user_id=?', [role, br.id, a.member.id]);
+        const response = await http(`/api/brackets/${br.id}/voting`, {cookie: a.member.cookie});
+        assert.equal(response.body.canManage, role === 'commissioner');
+        assert.equal(response.status, 200);
+        const matchups = response.body.weeks[0].matchups;
+        assert.deepEqual(matchups.map(match => match.winnerEntryId), [br.entries[0], br.entries[2]]);
+        assert.ok(matchups.every(match => match.tieExplanation?.includes('The higher-ranked seed won the tiebreaker.')));
+      }
+    });
+
     await t.test('two HTTP manual advancement requests cannot apply the same week transition twice',async()=>{
       const br=await bracket(a);
       // Keep both matchups tied so the transaction also records one random tiebreak per matchup.
