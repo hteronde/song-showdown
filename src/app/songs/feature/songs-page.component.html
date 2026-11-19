@@ -1,5 +1,5 @@
 <div class="page-wrap admin-page">
-  <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">♫</span> MUSIC CATALOG <span class="eyebrow-divider">·</span> SONGS</div><h1>Keep the catalog<br><em>in tune.</em></h1><p class="hero-subtitle">Manage songs used to build your family's brackets.</p></section>
+  <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">♫</span> MUSIC CATALOG <span class="eyebrow-divider">·</span> SONGS</div><h1>Keep the catalog in tune.</h1><p class="hero-subtitle">Manage songs used to build your family's brackets.</p></section>
   <div class="admin-heading"><div><span class="stat-label">SHARED CATALOG</span><h2>{{ pageMode === 'list' ? 'Songs' : pageMode === 'add' ? 'Add song' : 'Edit song' }}</h2></div><span class="history-count">{{ songs.length }} SONGS</span></div>
   <div class="admin-form-actions"><button class="admin-primary" type="button" *ngIf="pageMode === 'list'" (click)="add()">Add song</button><button class="admin-secondary" type="button" *ngIf="pageMode !== 'list'" (click)="cancelEdit()" [disabled]="saving">← Back to songs</button></div>
   <div class="notice-bar" *ngIf="loading">Loading songs…</div>

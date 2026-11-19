@@ -1,5 +1,5 @@
 <div class="page-wrap admin-page">
-  <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">♫</span> LISTEN ALONG <span class="eyebrow-divider">·</span> PLAYLISTS</div><h1>Set the<br><em>soundtrack.</em></h1><p class="hero-subtitle">Share playlists for a full bracket or a specific week.</p></section>
+  <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">♫</span> LISTEN ALONG <span class="eyebrow-divider">·</span> PLAYLISTS</div><h1>Set the soundtrack.</h1><p class="hero-subtitle">Share playlists for a full bracket or a specific week.</p></section>
   <div class="admin-heading"><div><span class="stat-label">BRACKET MUSIC</span><h2>{{ pageMode === 'list' ? 'Playlists' : pageMode === 'add' ? 'Add playlist' : 'Edit playlist' }}</h2></div><span class="history-count">{{ playlists.length }} PLAYLISTS</span></div>
   <div class="admin-form-actions"><button class="admin-primary" type="button" *ngIf="pageMode === 'list'" (click)="add()">Add playlist</button><button class="admin-secondary" type="button" *ngIf="pageMode !== 'list'" (click)="cancelEdit()" [disabled]="saving">← Back to playlists</button></div>
   <div class="notice-bar" *ngIf="loading">Loading playlists…</div>

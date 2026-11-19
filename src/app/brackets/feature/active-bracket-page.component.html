@@ -7,7 +7,7 @@
   <section class="hero-row">
     <div>
       <div class="eyebrow"><span class="tiny-disc">◉</span> THE FAMILY BRACKET <span class="eyebrow-divider">·</span> {{ isComplete ? 'COMPLETE' : bracketData.bracket.bracketYear || 'ACTIVE' }}</div>
-      <h1>{{ bracketData.bracket.artist }}<br><em>{{ bracketData.bracket.title }}.</em></h1>
+      <h1 [title]="bracketData.bracket.artist + ' · ' + bracketData.bracket.title">{{ bracketData.bracket.artist }} · {{ bracketData.bracket.title }}</h1>
       <p class="hero-subtitle">{{ isComplete ? 'This bracket is complete. Explore every matchup and the final results below.' : awaitingFinale ? 'The online rounds are complete. Follow the upcoming finale matchups below.' : finaleModeActive ? 'Follow the bracket live as the admin records your show-of-hands votes.' : 'Pick your winners and follow the matchups as the bracket unfolds.' }}</p>
     </div>
     <img class="bracket-hero-logo" *ngIf="bracketData.bracket.logoUrl && !failedCoverUrls.has(bracketData.bracket.logoUrl!)" [src]="bracketData.bracket.logoUrl" [alt]="bracketData.bracket.artist + ' logo'" referrerpolicy="no-referrer" (error)="coverFailed(bracketData.bracket.logoUrl!)">

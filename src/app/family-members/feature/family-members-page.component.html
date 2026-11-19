@@ -1,5 +1,5 @@
 <div class="page-wrap admin-page">
-  <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">♙</span> FAMILY SETTINGS <span class="eyebrow-divider">·</span> MEMBERS</div><h1>People in your<br><em>family bracket.</em></h1><p class="hero-subtitle">Add or update the people who can take part in family brackets.</p></section>
+  <section class="history-hero"><div class="eyebrow"><span class="tiny-disc">♙</span> FAMILY SETTINGS <span class="eyebrow-divider">·</span> MEMBERS</div><h1>People in your family bracket.</h1><p class="hero-subtitle">Add or update the people who can take part in family brackets.</p></section>
   <div class="admin-heading"><div><span class="stat-label">MORGAN FAMILY</span><h2>{{ pageMode === 'list' ? 'Family members' : pageMode === 'add' ? 'Add family member' : 'Edit family member' }}</h2></div><span class="history-count">{{ members.length }} MEMBERS</span></div>
   <div class="admin-form-actions"><button class="admin-primary" type="button" *ngIf="pageMode === 'list'" (click)="add()">Add family member</button><button class="admin-secondary" type="button" *ngIf="pageMode !== 'list'" (click)="cancelEdit()" [disabled]="saving">← Back to family members</button></div>
   <div class="notice-bar" *ngIf="loading">Loading family members…</div>

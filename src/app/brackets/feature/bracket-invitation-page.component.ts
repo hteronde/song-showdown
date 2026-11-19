@@ -21,7 +21,7 @@ interface Invitation {
     <p *ngIf="error" role="alert">{{ error }}</p>
     <section class="invitation" *ngIf="invitation && !showBracket">
       <p class="eyebrow">SONG SHOWDOWN · BRACKET INVITATION</p>
-      <h1>You're invited to {{ invitation.title }}</h1>
+      <h1 [title]="'You’re invited to ' + invitation.title">You're invited to {{ invitation.title }}</h1>
       <p><strong>Theme:</strong> {{ invitation.artist }}</p>
       <p><strong>Starts:</strong> {{ invitation.startAt | date:'fullDate' }} at {{ invitation.startAt | date:'shortTime' }} (your local time)</p>
       <ng-container *ngIf="invitation.invitationStatus === 'pending'">
