@@ -51,14 +51,15 @@
           <section class="revealed-round" [class.championship-round]="columnIndex === (columns.length - 1) / 2" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
             <h3>{{ columnIndex === (columns.length - 1) / 2 ? 'Championship' : round.roundName }}</h3>
             <div class="revealed-round-games">
-            <article class="revealed-game" [class.voting-open]="item.status === 'Voting open'" role="button" tabindex="0" [attr.aria-label]="item.status + (item.matchup.selectedEntryId != null ? '. Vote saved' : '') + '. View matchup: ' + item.matchup.bracketSongATitle + ' versus ' + item.matchup.bracketSongBTitle" (click)="openMatchupDetails(item.matchup)" (keydown.enter)="openMatchupDetails(item.matchup)" (keydown.space)="$event.preventDefault(); openMatchupDetails(item.matchup)" *ngFor="let item of round.matchups; trackBy: trackMatch" [attr.data-matchup-id]="item.matchup.matchupId" [style.grid-row]="'span ' + bracketRoundSpan(round.roundNumber)">
+            <button type="button" aria-haspopup="dialog" class="revealed-game" [class.voting-open]="item.status === 'Voting open'" [attr.aria-label]="item.status + (item.matchup.selectedEntryId != null ? '. Vote saved' : '') + (canVoteInMatchup(item.matchup) ? '. Vote in matchup: ' : '. Matchup details: ') + item.matchup.bracketSongATitle + ' versus ' + item.matchup.bracketSongBTitle" (click)="openMatchupDetails(item.matchup)" *ngFor="let item of round.matchups; trackBy: trackMatch" [attr.data-matchup-id]="item.matchup.matchupId" [style.grid-row]="'span ' + bracketRoundSpan(round.roundNumber)">
               @let statusLabel = item.status === 'On hold' || item.status === 'Finale' || item.status === 'Awaiting result' ? item.status : null;
-              <div class="revealed-game-label" *ngIf="statusLabel">
+              <span class="revealed-game-label" *ngIf="statusLabel">
                 <span class="revealed-status">{{ statusLabel }}</span>
-              </div>
-              <div class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId"><span [title]="item.matchup.bracketSongATitle">{{ item.matchup.bracketSongATitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId">✓</b></div>
-              <div class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId"><span [title]="item.matchup.bracketSongBTitle">{{ item.matchup.bracketSongBTitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId">✓</b></div>
-            </article>
+              </span>
+              <span class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId" [appAlbumColors]="item.matchup.bracketSongATitle === item.matchup.songA.title ? item.matchup.songA.albumCoverUrl : null"><span [title]="item.matchup.bracketSongATitle">{{ item.matchup.bracketSongATitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songA.entryId">✓</b></span>
+              <span class="revealed-team" [class.revealed-winner]="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId" [appAlbumColors]="item.matchup.bracketSongBTitle === item.matchup.songB.title ? item.matchup.songB.albumCoverUrl : null"><span [title]="item.matchup.bracketSongBTitle">{{ item.matchup.bracketSongBTitle }}</span><b *ngIf="item.matchup.winnerEntryId !== null && item.matchup.winnerEntryId === item.matchup.songB.entryId">✓</b></span>
+              <span class="matchup-action">{{ canVoteInMatchup(item.matchup) ? 'Vote' : 'Details' }} ›</span>
+            </button>
             </div>
           </section>
         </div>

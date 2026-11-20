@@ -11,44 +11,48 @@
 .revealed-round h3 {
   font: 600 13px 'DM Mono',monospace;
   letter-spacing: .08em;
-  color: #e5b984;
+  color: #66574a;
   text-transform: uppercase;
   margin: 0 0 2px;
 }
 
 .revealed-game {
-  background: #413440;
-  border: 1px solid #806976;
+  background: #fffdf8;
+  border: 1px solid #c8bfb0;
   border-radius: 5px;
   cursor: pointer;
 }
 
 .revealed-team {
+  --song-box-default-fill: #f2eee6;
+  --song-box-default-text: #4e463e;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 4px 0;
-  border-bottom: 1px solid #695562;
+  gap: 4px;
+  min-height: 22px;
+  padding: 3px 5px;
+  border: 1px solid #26221e26;
+  border-radius: 3px;
+  background: var(--song-box-fill, var(--song-box-default-fill));
+  color: var(--song-box-text, var(--song-box-default-text));
   font-size: 11px;
-  color: #f1dec4;
-}
-
-.revealed-team:last-of-type {
-  border-bottom: 0;
+  font-weight: 650;
+  line-height: 1.15;
 }
 
 .revealed-winner {
-  color: #fff2d8;
-  font-weight: 650;
+  --song-box-default-text: #242520;
+  font-weight: 750;
 }
 
 .revealed-winner b {
-  color: #a8d7a9;
+  color: var(--song-box-text, #426d4b);
 }
 
 .bracket-scroll {
   overflow-x: auto;
-  scrollbar-color: #a68b91 #29232c;
+  scrollbar-color: #787d6d #e7e6dc;
 }
 
 .full-tournament-bracket {
@@ -58,8 +62,8 @@
   position: relative;
   padding: 16px 12px 18px;
   border-radius: 9px;
-  box-shadow: inset 0 0 0 1px #6d5861;
-  background: radial-gradient(ellipse at top, #342b35, #241f29 85%);
+  box-shadow: inset 0 0 0 1px #dcd4c7;
+  background: #f1ede5;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   grid-template-rows: auto;
@@ -88,8 +92,8 @@
 
 .full-tournament-bracket .revealed-round-games {
   display: grid;
-  grid-template-rows: repeat(var(--bracket-row-count),minmax(69px,auto));
-  row-gap: 6px;
+  grid-template-rows: repeat(var(--bracket-row-count),minmax(88px,auto));
+  row-gap: 7px;
 }
 
 .full-tournament-bracket .revealed-game {
@@ -97,8 +101,11 @@
   width: 100%;
   overflow-wrap: anywhere;
   height: auto;
-  min-height: 60px;
-  padding: 4px 5px;
+  min-height: 75px;
+  padding: 5px;
+  gap: 4px;
+  text-align: start;
+  appearance: none;
   box-sizing: border-box;
   align-self: center;
   position: relative;
@@ -116,35 +123,49 @@
 }
 
 .full-tournament-bracket .championship-round h3 {
-  color: #ffdc8e;
+  color: #755336;
   font-weight: 700;
 }
 
 .championship-round .revealed-game {
-  background: #473746;
-  border-color: #f3c16b;
-  box-shadow: inset 0 0 0 2px #83613a;
+  background: #fffdf8;
+  border-color: #aa855b;
+  box-shadow: inset 0 0 0 1px #e4d4bf;
 }
 
 .revealed-game.voting-open,
 .revealed-game.voting-open:hover {
-  background: #224736;
-  border-color: #91d29d;
-  box-shadow: inset 4px 0 #91d29d;
+  background: #eaf5ec;
+  border-color: #177544;
+  box-shadow: inset 0 0 0 2px #177544;
 }
 
 .voting-open .revealed-team {
-  color: #ecffe9;
-  border-color: #567d63;
-  font-weight: 650;
+  --song-box-default-fill: #e2eee0;
+  --song-box-default-text: #263e2b;
+}
+
+.matchup-action {
+  align-self: flex-end;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #6f4c36;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.voting-open .matchup-action {
+  background: #17623a;
+  color: #fff;
 }
 
 .revealed-game:hover {
-  border-color: #e5b984;
+  border-color: #8a6c50;
 }
 
 .revealed-game:focus-visible {
-  outline: 2px solid #ffdc8e;
+  outline: 2px solid #755336;
   outline-offset: 2px;
 }
 
@@ -153,7 +174,7 @@
   align-items: center;
   gap: 12px;
   margin: 10px 0 0;
-  color: #625360;
+  color: #646459;
   font: 11px 'DM Mono', monospace;
 }
 
@@ -165,6 +186,6 @@
   flex: 1;
   min-width: 0;
   margin: 0;
-  accent-color: #6f4d66;
+  accent-color: #426d4b;
   cursor: ew-resize;
 }

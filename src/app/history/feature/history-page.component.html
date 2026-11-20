@@ -67,14 +67,15 @@
           <section class="revealed-round" [class.championship-round]="columnIndex === (columns.length - 1) / 2" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
             <h3>{{ columnIndex === (columns.length - 1) / 2 ? 'Championship' : round.name }}</h3>
             <div class="revealed-round-games">
-              <article class="revealed-game history-match" *ngFor="let match of round.matches; trackBy: trackMatch"
+              <button type="button" aria-haspopup="dialog" class="revealed-game history-match" *ngFor="let match of round.matches; trackBy: trackMatch"
                 [attr.data-matchup-id]="match.matchupId" [style.grid-row]="'span ' + visibleRoundSpan(round.roundNumber)"
-                [class.finale-ready]="canOpenMatch(match.roundNumber)" role="button" tabindex="0"
+                [class.finale-ready]="canOpenMatch(match.roundNumber)"
                 [attr.aria-label]="'Matchup details: ' + match.left + ' versus ' + match.right"
-                (click)="openHistoryVotes(match)" (keydown.enter)="openHistoryVotes(match)" (keydown.space)="$event.preventDefault(); openHistoryVotes(match)">
-                <div class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId"><span [title]="match.left">{{ match.left }}</span></div>
-                <div class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId"><span [title]="match.right">{{ match.right }}</span></div>
-              </article>
+                (click)="openHistoryVotes(match)">
+                <span class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId" [appAlbumColors]="match.leftAlbumCoverUrl"><span [title]="match.left">{{ match.left }}</span></span>
+                <span class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId" [appAlbumColors]="match.rightAlbumCoverUrl"><span [title]="match.right">{{ match.right }}</span></span>
+                <span class="matchup-action">Details ›</span>
+              </button>
             </div>
           </section>
         </div>

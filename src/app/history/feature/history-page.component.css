@@ -1,11 +1,11 @@
 .history-match.finale-ready {
   cursor: pointer;
-  outline: 1px solid #a8d7a9;
+  outline: 1px solid #78a17d;
   outline-offset: 1px;
 }
 
 .history-match.finale-ready:hover,.history-match.finale-selected {
-  box-shadow: 0 0 0 2px #a8d7a9;
+  box-shadow: 0 0 0 2px #78a17d;
 }
 
 .history-votes-dialog {
