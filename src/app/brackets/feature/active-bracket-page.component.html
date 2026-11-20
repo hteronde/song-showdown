@@ -46,7 +46,7 @@
     </label>
     <ng-container *ngIf="bracketColumns as columns">
       <div #bracketViewport [class.bracket-scroll]="bracketOverflows" (scroll)="syncBracketScroll(bracketViewport, bracketScrollControl)">
-        <div #bracketBoard class="revealed-bracket full-tournament-bracket" [style.--bracket-round-count]="columns.length" [style.--bracket-row-count]="columns[0]?.matchups?.length || 1" *ngIf="revealedRounds.length">
+        <div #bracketBoard class="revealed-bracket full-tournament-bracket" [appBracketAlbumPalette]="bracketArtwork" [style.--bracket-round-count]="columns.length" [style.--bracket-row-count]="columns[0]?.matchups?.length || 1" *ngIf="revealedRounds.length">
           <div [appBracketConnectors]="connectorMatches"></div>
           <section class="revealed-round" [class.championship-round]="columnIndex === (columns.length - 1) / 2" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
             <h3>{{ columnIndex === (columns.length - 1) / 2 ? 'Championship' : round.roundName }}</h3>

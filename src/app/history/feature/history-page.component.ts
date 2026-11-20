@@ -2,7 +2,7 @@ import { mirrorBracketRounds, positionalBracketLinks, scrollBracket, syncBracket
 import { apiErrorMessage } from '../../shared/data-access/api-client';
 import { BracketChampionComponent } from '../../brackets/ui/bracket-champion.component';
 import { BracketConnectorsDirective } from '../../brackets/ui/bracket-connectors.directive';
-import { AlbumColorsDirective } from '../../brackets/ui/album-colors.directive';
+import { AlbumColorsDirective, BracketAlbumPaletteDirective } from '../../brackets/ui/album-colors.directive';
 import { SongAlbumArtComponent } from '../../brackets/ui/song-album-art.component';
 import { AdminBallotEditorComponent } from '../../brackets/ui/admin-ballot-editor.component';
 import { CommonModule } from '@angular/common';
@@ -15,7 +15,7 @@ import { HistoryApiService } from '../data-access/history-api.service';
 @Component({
     selector: 'app-history-page',
     standalone: true,
-    imports: [BracketChampionComponent, BracketConnectorsDirective, CommonModule, FormsModule, AdminBallotEditorComponent, SongAlbumArtComponent, AlbumColorsDirective],
+    imports: [BracketChampionComponent, BracketConnectorsDirective, CommonModule, FormsModule, AdminBallotEditorComponent, SongAlbumArtComponent, AlbumColorsDirective, BracketAlbumPaletteDirective],
     templateUrl: './history-page.component.html',
     styleUrls: ['./history-page.component.css', '../../brackets/ui/bracket-layout.css', '../../brackets/ui/bracket-connectors.css']
 })
@@ -33,6 +33,9 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
     firstVisibleRound = 1;
     get visibleRounds(): PastRound[] { return this.historyRounds.filter(round => round.matches.length && round.roundNumber >= this.firstVisibleRound); }
     visibleRoundSpan(roundNumber: number): number { return 2 ** (roundNumber - (this.visibleRounds[0]?.roundNumber ?? 1)); }
+    get bracketArtwork(): Array<string | null> {
+        return this.historyRounds.flatMap(round => round.matches.flatMap(match => [match.leftAlbumCoverUrl, match.rightAlbumCoverUrl]));
+    }
     get bracketColumns(): PastRound[] {
         return mirrorBracketRounds(this.visibleRounds, round => round.matches, (round, matches) => ({...round, matches}));
     }

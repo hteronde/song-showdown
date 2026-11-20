@@ -7,7 +7,7 @@ import { ApiError } from '../../shared/data-access/api-client';
 import { BracketRequests, VoteDrafts } from '../state/voting-state';
 import { BracketChampionComponent, BracketChampion } from '../ui/bracket-champion.component';
 import { BracketConnectorsDirective } from '../ui/bracket-connectors.directive';
-import { AlbumColorsDirective } from '../ui/album-colors.directive';
+import { AlbumColorsDirective, BracketAlbumPaletteDirective } from '../ui/album-colors.directive';
 import { SongAlbumArtComponent } from '../ui/song-album-art.component';
 import { AdminBallotEditorComponent } from '../ui/admin-ballot-editor.component';
 import { FormsModule } from '@angular/forms';
@@ -28,7 +28,7 @@ interface RevealedRound {
     }>;
 }
 @Component({
-    selector: 'app-active-bracket-page', standalone: true, imports: [SessionDateFieldsComponent, ResumeBracketDialogComponent, BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent, AlbumColorsDirective],
+    selector: 'app-active-bracket-page', standalone: true, imports: [SessionDateFieldsComponent, ResumeBracketDialogComponent, BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent, AlbumColorsDirective, BracketAlbumPaletteDirective],
     templateUrl: './active-bracket-page.component.html',
     styleUrls: ['./active-bracket-page.component.css', '../ui/bracket-layout.css', '../ui/bracket-connectors.css']
 })
@@ -350,6 +350,12 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
         });
         this.bracketResizeObserver.observe(board);
         this.bracketResizeObserver.observe(viewport);
+    }
+    get bracketArtwork(): Array<string | null> {
+        return (this.data?.weeks ?? []).flatMap(week => week.matchups.flatMap(match => [
+            match.bracketSongATitle === match.songA.title ? match.songA.albumCoverUrl : null,
+            match.bracketSongBTitle === match.songB.title ? match.songB.albumCoverUrl : null
+        ]));
     }
     get bracketColumns(): RevealedRound[] {
         return mirrorBracketRounds(this.visibleRounds, round => round.matchups, (round, matchups) => ({...round, matchups}));
