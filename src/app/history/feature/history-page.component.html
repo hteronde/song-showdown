@@ -70,10 +70,10 @@
               <button type="button" aria-haspopup="dialog" class="revealed-game history-match" *ngFor="let match of round.matches; trackBy: trackMatch"
                 [attr.data-matchup-id]="match.matchupId" [style.grid-row]="'span ' + visibleRoundSpan(round.roundNumber)"
                 [class.finale-ready]="canOpenMatch(match.roundNumber)"
-                [attr.aria-label]="'Matchup details: ' + match.left + ' versus ' + match.right"
+                [attr.aria-label]="'Matchup details: ' + match.left + ' versus ' + match.right + (match.winner ? '. Winner: ' + match.winner : '')"
                 (click)="openHistoryVotes(match)">
-                <span class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId" [appAlbumColors]="match.leftAlbumCoverUrl"><span [title]="match.left">{{ match.left }}</span></span>
-                <span class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId" [appAlbumColors]="match.rightAlbumCoverUrl"><span [title]="match.right">{{ match.right }}</span></span>
+                <span class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId" [appAlbumColors]="match.leftAlbumCoverUrl"><span [title]="match.left">{{ match.left }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId" aria-hidden="true">✓</b></span>
+                <span class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId" [appAlbumColors]="match.rightAlbumCoverUrl"><span [title]="match.right">{{ match.right }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId" aria-hidden="true">✓</b></span>
                 <span class="matchup-action">Details ›</span>
               </button>
             </div>
