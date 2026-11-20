@@ -207,6 +207,21 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
       assert.equal(startedNavigation.body.brackets.find(row=>row.bracketId===br.id).navigationStatus,'active');
     });
 
+    await t.test('completed brackets stay out of sidebar navigation even with a pending invitation', async () => {
+      const br = await bracket(a);
+      await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?", [br.id, a.member.id]);
+      const links = async () => {
+        const response = await http('/api/my/brackets', {cookie: a.member.cookie});
+        assert.equal(response.status, 200);
+        return response.body.brackets;
+      };
+      assert.ok((await links()).some(row => row.bracketId === br.id));
+      await db.pool.execute("UPDATE brackets SET status='complete' WHERE bracket_id=?", [br.id]);
+      assert.ok(!(await links()).some(row => row.bracketId === br.id));
+      await db.pool.execute("UPDATE brackets SET status='active',completed_at=NOW(6) WHERE bracket_id=?", [br.id]);
+      assert.ok(!(await links()).some(row => row.bracketId === br.id));
+    });
+
     await t.test('invitations gate all bracket details until acceptance and removal revokes access',async()=>{
       const br=await bracket(a);
       await db.pool.execute("UPDATE bracket_members SET invitation_status='pending' WHERE bracket_id=? AND user_id=?",[br.id,a.member.id]);
