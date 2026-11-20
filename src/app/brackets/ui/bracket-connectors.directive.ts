@@ -47,7 +47,7 @@ export class BracketConnectorsDirective implements AfterViewChecked, OnDestroy {
     const fragment = document.createDocumentFragment();
     for (const path of paths) {
       const middle = (path.x1 + path.x2) / 2;
-      const border = `1px ${path.pending ? 'dashed' : 'solid'} ${path.pending ? '#c7b8a8' : '#c7c2b5'}`;
+      const border = `1px ${path.pending ? 'dashed' : 'solid'} ${path.pending ? '#a38693' : '#b68e76'}`;
       for (const [left, top, width, height, vertical] of [
         [Math.min(path.x1, middle), path.y1, Math.abs(middle - path.x1), 0, false],
         [middle, Math.min(path.y1, path.y2), 0, Math.abs(path.y2 - path.y1), true],

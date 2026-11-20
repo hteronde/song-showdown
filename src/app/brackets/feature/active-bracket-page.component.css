@@ -190,21 +190,9 @@
 
 .revealed-status {
   align-self: flex-start;
-  color: #646459;
+  color: #dec5ab;
   font: 600 10px 'DM Mono', monospace;
   line-height: 1.4;
-}
-
-.revealed-game.voting-open {
-  background: #edf5e9;
-  border-color: #426d4b;
-  box-shadow: inset 4px 0 #426d4b;
-}
-
-.voting-open .revealed-team {
-  color: #263e2b;
-  border-color: #d3e1cf;
-  font-weight: 650;
 }
 
 .full-tournament-bracket .revealed-result {

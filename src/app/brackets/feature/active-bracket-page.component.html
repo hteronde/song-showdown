@@ -48,7 +48,7 @@
       <div #bracketViewport [class.bracket-scroll]="bracketOverflows" (scroll)="syncBracketScroll(bracketViewport, bracketScrollControl)">
         <div #bracketBoard class="revealed-bracket full-tournament-bracket" [style.--bracket-round-count]="columns.length" [style.--bracket-row-count]="columns[0]?.matchups?.length || 1" *ngIf="revealedRounds.length">
           <div [appBracketConnectors]="connectorMatches"></div>
-          <section class="revealed-round" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
+          <section class="revealed-round" [class.championship-round]="columnIndex === (columns.length - 1) / 2" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
             <h3>{{ columnIndex === (columns.length - 1) / 2 ? 'Championship' : round.roundName }}</h3>
             <div class="revealed-round-games">
             <article class="revealed-game" [class.voting-open]="item.status === 'Voting open'" role="button" tabindex="0" [attr.aria-label]="item.status + (item.matchup.selectedEntryId != null ? '. Vote saved' : '') + '. View matchup: ' + item.matchup.bracketSongATitle + ' versus ' + item.matchup.bracketSongBTitle" (click)="openMatchupDetails(item.matchup)" (keydown.enter)="openMatchupDetails(item.matchup)" (keydown.space)="$event.preventDefault(); openMatchupDetails(item.matchup)" *ngFor="let item of round.matchups; trackBy: trackMatch" [attr.data-matchup-id]="item.matchup.matchupId" [style.grid-row]="'span ' + bracketRoundSpan(round.roundNumber)">
