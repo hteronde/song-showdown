@@ -1239,10 +1239,10 @@ const server = createServer(async (request, response) => {
               m.matchup_number AS matchupNumber,
               a.bracket_song_id AS songAEntryId, a.region_number AS songARegion,
               CASE WHEN historyBracket.seeding_size IS NOT NULL THEN a.assigned_seed ELSE a.seed_number END AS songASeed, sa.title AS songATitle,
-              COALESCE(albumA.title,sa.album) AS songAAlbum,CASE WHEN albumA.bracket_album_id IS NOT NULL THEN albumA.year ELSE sa.year END AS songAYear,CASE WHEN albumA.bracket_album_id IS NOT NULL THEN albumA.album_cover_url ELSE sa.album_cover_url END AS songAAlbumCoverUrl,
+              COALESCE(albumA.title,sa.album) AS songAAlbum,CASE WHEN albumA.bracket_album_id IS NOT NULL THEN albumA.year ELSE sa.year END AS songAYear,sa.youtube_url AS songAYoutubeUrl,sa.spotify_url AS songASpotifyUrl,CASE WHEN albumA.bracket_album_id IS NOT NULL THEN albumA.album_cover_url ELSE sa.album_cover_url END AS songAAlbumCoverUrl,
               b.bracket_song_id AS songBEntryId, b.region_number AS songBRegion,
               CASE WHEN historyBracket.seeding_size IS NOT NULL THEN b.assigned_seed ELSE b.seed_number END AS songBSeed, sb.title AS songBTitle,
-              COALESCE(albumB.title,sb.album) AS songBAlbum,CASE WHEN albumB.bracket_album_id IS NOT NULL THEN albumB.year ELSE sb.year END AS songBYear,CASE WHEN albumB.bracket_album_id IS NOT NULL THEN albumB.album_cover_url ELSE sb.album_cover_url END AS songBAlbumCoverUrl,
+              COALESCE(albumB.title,sb.album) AS songBAlbum,CASE WHEN albumB.bracket_album_id IS NOT NULL THEN albumB.year ELSE sb.year END AS songBYear,sb.youtube_url AS songBYoutubeUrl,sb.spotify_url AS songBSpotifyUrl,CASE WHEN albumB.bracket_album_id IS NOT NULL THEN albumB.album_cover_url ELSE sb.album_cover_url END AS songBAlbumCoverUrl,
               m.winner_entry_id AS winnerEntryId,m.random_tiebreaker_vote_entry_id AS randomTiebreakerVoteEntryId,m.admin_tiebreaker_entry_id AS adminTieBreakEntryId,m.decided_tiebreaker AS tieBreakMethod,historyBracket.tiebreaker_option AS defaultTiePolicy,reported.votes_a AS reportedVoteCountA,reported.votes_b AS reportedVoteCountB,
               sw.title AS winnerTitle,COALESCE(winningAlbum.title,sw.album) AS winnerAlbum,CASE WHEN winningAlbum.bracket_album_id IS NOT NULL THEN winningAlbum.album_cover_url ELSE sw.album_cover_url END AS winnerAlbumCoverUrl,
               CASE WHEN winningAlbum.bracket_album_id IS NOT NULL THEN winningAlbum.year ELSE sw.year END AS winnerYear
@@ -1321,6 +1321,8 @@ const server = createServer(async (request, response) => {
             title: row.songATitle,
             album: row.songAAlbum,
             albumCoverUrl: row.songAAlbumCoverUrl,
+            youtubeUrl: row.songAYoutubeUrl,
+            spotifyUrl: row.songASpotifyUrl,
             year: row.songAYear,
             region: row.songARegion,
             seed: row.songASeed
@@ -1330,6 +1332,8 @@ const server = createServer(async (request, response) => {
             title: row.songBTitle,
             album: row.songBAlbum,
             albumCoverUrl: row.songBAlbumCoverUrl,
+            youtubeUrl: row.songBYoutubeUrl,
+            spotifyUrl: row.songBSpotifyUrl,
             year: row.songBYear,
             region: row.songBRegion,
             seed: row.songBSeed

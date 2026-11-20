@@ -7,7 +7,11 @@ export interface PastMatch {
   matchupNumber: number;
   left: string;
   leftAlbumCoverUrl: string | null;
+  leftYoutubeUrl: string | null;
+  leftSpotifyUrl: string | null;
   rightAlbumCoverUrl: string | null;
+  rightYoutubeUrl: string | null;
+  rightSpotifyUrl: string | null;
   right: string;
   winner: string;
   leftEntryId: number;
@@ -72,8 +76,8 @@ export interface BracketHistoryResponse {
   nextMatchupId: number | null;
       weekNumber: number;
       matchupNumber: number;
-      songA: { title: string; entryId: number; albumCoverUrl: string | null } | null;
-      songB: { title: string; entryId: number; albumCoverUrl: string | null } | null;
+      songA: { title: string; entryId: number; albumCoverUrl: string | null; youtubeUrl: string | null; spotifyUrl: string | null } | null;
+      songB: { title: string; entryId: number; albumCoverUrl: string | null; youtubeUrl: string | null; spotifyUrl: string | null } | null;
       winner: { title: string; albumCoverUrl: string | null } | null;
       winnerEntryId: number | null;
   voteCountA?: number;

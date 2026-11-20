@@ -186,3 +186,13 @@
 .history-vote-song app-song-album-art {
   margin: 0 auto 16px;
 }
+
+.history-vote-song .listen-links {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  height: auto;
+  min-height: 24px;
+  margin-bottom: 6px;
+  font-size: 10px;
+}
