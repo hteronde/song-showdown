@@ -330,11 +330,12 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
         return finaleRound != null && match.roundNumber >= finaleRound ? 'Finale Week' : `Week ${match.weekNumber}`;
     }
     get finaleStartRound(): number { return this.finaleOptions?.session?.startRoundNumber ?? 99; }
-    canOpenMatch(roundNumber: number): boolean {
-        if (!this.isAdmin || !this.finaleSessionActive || roundNumber < this.finaleStartRound || roundNumber < this.ballotEditingRound - 1 || roundNumber > this.ballotEditingRound)
-            return false;
-        return this.historyRounds.filter(round => round.roundNumber >= this.finaleStartRound && round.roundNumber < roundNumber)
-            .every(round => round.matches.every(match => !!match.winnerEntryId));
+    get nextFinaleMatchupId(): number | null {
+        if (!this.isAdmin || !this.finaleSessionActive || this.selectedBracket?.status === 'complete') return null;
+        const round = this.historyRounds.find(round => round.roundNumber >= this.finaleStartRound
+            && round.matches.some(match => match.winnerEntryId == null));
+        if (!round || round.roundNumber > this.ballotEditingRound) return null;
+        return round.matches.find(match => match.winnerEntryId == null && match.leftEntryId > 0 && match.rightEntryId > 0)?.matchupId ?? null;
     }
     async beginFinale(): Promise<void> {
         if (!this.isAdmin || !this.selectedBracket)

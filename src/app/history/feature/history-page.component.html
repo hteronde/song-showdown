@@ -66,6 +66,7 @@
     </label>
     <section aria-label="Complete tournament bracket" *ngIf="matchupCount">
       @let columns = bracketColumns;
+      @let nextFinale = nextFinaleMatchupId;
       <div #bracketViewport [class.bracket-scroll]="bracketOverflows" (scroll)="syncBracketScroll(bracketViewport, bracketScrollControl)">
         <div #bracketBoard class="revealed-bracket full-tournament-bracket" [appBracketAlbumPalette]="bracketArtwork" [style.--bracket-round-count]="columns.length" [style.--bracket-row-count]="columns[0]?.matches?.length || 1">
           <div [appBracketConnectors]="connectorMatches"></div>
@@ -74,8 +75,8 @@
             <div class="revealed-round-games">
               <button type="button" aria-haspopup="dialog" class="revealed-game history-match" *ngFor="let match of round.matches; trackBy: trackMatch"
                 [attr.data-matchup-id]="match.matchupId" [style.grid-row]="'span ' + visibleRoundSpan(round.roundNumber)"
-                [class.finale-ready]="canOpenMatch(match.roundNumber)"
-                [attr.aria-label]="'Matchup details: ' + match.left + ' versus ' + match.right + (match.winner ? '. Winner: ' + match.winner : '')"
+                [class.voting-open]="match.matchupId === nextFinale"
+                [attr.aria-label]="(match.matchupId === nextFinale ? 'Next finale matchup: ' : 'Matchup details: ') + match.left + ' versus ' + match.right + (match.winner ? '. Winner: ' + match.winner : '')"
                 (click)="openHistoryVotes(match)">
                 <span class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId" [appAlbumColors]="match.leftAlbumCoverUrl"><span [title]="match.left">{{ match.left }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.leftEntryId" aria-hidden="true">✓</b></span>
                 <span class="revealed-team" [class.revealed-winner]="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId" [appAlbumColors]="match.rightAlbumCoverUrl"><span [title]="match.right">{{ match.right }}</span><b *ngIf="match.winnerEntryId !== null && match.winnerEntryId === match.rightEntryId" aria-hidden="true">✓</b></span>

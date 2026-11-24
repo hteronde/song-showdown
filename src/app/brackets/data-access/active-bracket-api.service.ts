@@ -59,7 +59,7 @@ export interface ActiveBracketVotingData {
   awaitingFinale: boolean;
   canViewBallots: boolean;
   ballotEditingRound: number | null;
-  bracket: { showFullFirstRound?: boolean | number; automaticEmailsDisabled?:boolean; startAt?: string | null; bracketId: number; title: string; artist: string; logoUrl?: string | null; bracketYear: number | null; status: string; sessionDurationMinutes: number | null; finaleAt: string | null; finaleStartRound: number | null; pausedAt: string | null; randomizationMode: 'none' | 'round1' | 'each_round'; songCount: number };
+  bracket: { showFullFirstRound?: boolean | number; automaticEmailsDisabled?:boolean; startAt?: string | null; bracketId: number; title: string; artist: string; logoUrl?: string | null; bracketYear: number | null; status: string; sessionDurationMinutes: number | null; finaleAt: string | null; finaleStartRound: number | null; finaleSessionStartRound?: number | null; finaleStatus?: string | null; pausedAt: string | null; randomizationMode: 'none' | 'round1' | 'each_round'; songCount: number };
   finaleModeActive: boolean;
   currentWeekNumber: number | null;
   weeks: VotingWeek[];

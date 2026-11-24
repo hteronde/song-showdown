@@ -26,6 +26,17 @@ import { FormsModule } from '@angular/forms';
           <button type="button" class="primary" [disabled]="saving" (click)="close()">Close</button>
           <button type="button" *ngIf="unresolvedTie" [disabled]="saving" (click)="openCurrentBallots()">Resolve tie</button>
         </div>
+        <section class="finale-scoreboard" *ngIf="match.inFinale && !revealing" aria-label="Live finale vote count">
+          @let tally = liveFinaleTally;
+          <div class="finale-scoreboard-heading">
+            <span>Live vote count</span>
+            <span>{{ tally.a + tally.b }} of {{ match.participants.length }} votes entered</span>
+          </div>
+          <div class="finale-scoreboard-scores" aria-live="polite" aria-atomic="true">
+            <div><span>{{ match.songATitle }}</span><strong>{{ tally.a + (tally.tiebreaker === 'A' ? 1 : 0) }}</strong><small *ngIf="tally.tiebreaker === 'A'">Includes tiebreaker</small></div>
+            <div><span>{{ match.songBTitle }}</span><strong>{{ tally.b + (tally.tiebreaker === 'B' ? 1 : 0) }}</strong><small *ngIf="tally.tiebreaker === 'B'">Includes tiebreaker</small></div>
+          </div>
+        </section>
         <p class="help" *ngIf="!revealing">Correct a vote or add a missed vote. Click Save changes to record your selections.</p>
         <p class="message" *ngIf="!match.canEdit">{{ match.editRestriction }}</p>
         <form *ngIf="!revealing" (ngSubmit)="save()">
@@ -70,6 +81,13 @@ import { FormsModule } from '@angular/forms';
   styles:[`
     .admin-ballot-dialog{box-sizing:border-box;width:min(680px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow-y:auto;border:1px solid #e5e3db;border-radius:6px;background:#fcfbf8;color:#30312b;padding:24px;box-shadow:0 20px 70px #24251e33}.admin-ballot-dialog::backdrop{background:#24251e80}h2{font:600 23px 'Space Grotesk',sans-serif;margin:10px 0 18px}.match-label{font:9px 'DM Mono',monospace;color:#9a674f}.songs{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.songs span{color:#aaa79c;font-size:11px}.help,.message{font-size:12px;line-height:1.6;color:#77776e}fieldset{padding:0;border:0;min-width:0}.person{display:grid;grid-template-columns:minmax(100px,1fr) minmax(0,2fr);gap:12px;align-items:center;padding:12px 0;border-top:1px solid #e5e3db;font-size:13px}select{width:100%;padding:10px;border:1px solid #d9d6cb;border-radius:4px;background:#fff;color:#30312b;font:12px 'DM Sans',sans-serif}.tie-choice{display:flex;flex-direction:column;gap:8px;margin:18px 0;font-size:12px}.buttons{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}button{border:1px solid #d9d6cb;background:#fff;border-radius:4px;padding:10px 14px;cursor:pointer;font:11px 'DM Mono',monospace}button.primary{background:#30312b;color:#fff;border-color:#30312b}button:disabled{opacity:.5;cursor:default}.error,.reset-warning{padding:12px;background:#fff0ed;border:1px solid #efc7be;border-radius:4px;color:#9f3324;font-size:12px;line-height:1.6}.reset-warning p{margin:8px 0 0}@media(max-width:420px){.person{grid-template-columns:1fr}}
     .songs{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;margin:16px 0 22px;align-items:start}.song-summary{min-width:0;text-align:center;overflow-wrap:anywhere}.song-summary app-song-album-art{--album-art-size:140px;margin:0 auto 12px}.song-summary strong{display:block;font:600 15px 'Space Grotesk',sans-serif}.song-summary small{display:block;margin-top:5px;color:#77776e;font-size:11px}.songs .song-versus{align-self:center}
+    .finale-scoreboard { position: sticky; top: 0; z-index: 1; padding: 10px 12px; margin: 0 0 14px; border: 1px solid #667b69; border-radius: 6px; background: #334a43; color: #fff8e9; }
+    .finale-scoreboard-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; font: 11px 'DM Mono', monospace; color: #e0e8da; }
+    .finale-scoreboard-scores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+    .finale-scoreboard-scores > div { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; padding: 8px; border-radius: 4px; background: #253832; text-align: center; overflow-wrap: anywhere; }
+    .finale-scoreboard-scores span { font-size: 12px; font-weight: 600; }
+    .finale-scoreboard-scores small { font-size: 11px; color: #e0e8da; }
+    .finale-scoreboard-scores strong { font: 700 30px/1 'Space Grotesk', sans-serif; font-variant-numeric: tabular-nums; color: #f4d69a; }
     .winner-reveal{margin:22px 0 8px;padding:28px 20px;min-height:110px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:#334a43;border:1px solid #bdad83;border-radius:6px;color:#f8f3e9}.winner-reveal>span:first-child{font:500 21px 'Space Grotesk',sans-serif}.winner-reveal strong{font:700 30px 'Space Grotesk',sans-serif;overflow-wrap:anywhere;color:#f4d69a}.reveal-suspense{font-size:28px;color:#f4d69a;animation:reveal-pulse 1s ease-in-out infinite}@keyframes reveal-pulse{50%{opacity:.25;transform:scale(.8)}}@media(prefers-reduced-motion:reduce){.reveal-suspense{animation:none}}
     .vote-options{display:flex;gap:10px;flex-wrap:wrap}.vote-options label{display:flex;align-items:center;gap:5px;padding:8px 9px;border:1px solid #d9d6cb;border-radius:4px;background:#fff;cursor:pointer;font-size:12px}.vote-options label:has(input:checked){border-color:#66816a;background:#edf2ec}.vote-options input{margin:0;accent-color:#334a43}.song-summary .song-letter{font:10px 'DM Mono',monospace;color:#9a674f;margin:0 0 6px}
     .song-summary .listen-links{font-size:9px;height:auto;min-height:26px;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:7px}
@@ -96,6 +114,23 @@ export class AdminBallotEditorComponent implements OnDestroy {
   private bracketId=0;
   private requestVersion=0;
   private requestController?: AbortController;
+  get liveFinaleTally(): {a: number; b: number; tiebreaker: 'A' | 'B' | null} {
+    const tally = {a: 0, b: 0, tiebreaker: null as 'A' | 'B' | null};
+    const match = this.data;
+    if (!match) return tally;
+
+    for (const participant of match.participants) {
+      const selectedEntryId = this.picks[participant.userId];
+      if (selectedEntryId === match.songAEntryId) tally.a++;
+      else if (selectedEntryId === match.songBEntryId) tally.b++;
+    }
+    if (match.inFinale && tally.a === tally.b) {
+      if (this.tiePick === match.songAEntryId) tally.tiebreaker = 'A';
+      else if (this.tiePick === match.songBEntryId) tally.tiebreaker = 'B';
+    }
+    return tally;
+  }
+
   get hasChanges():boolean { return this.data?.participants.some(p=>this.picks[p.userId]!==p.selectedEntryId)??false; }
   async open(bracketId:number,matchupId:number):Promise<void> {
     const requestVersion=++this.requestVersion;
@@ -134,18 +169,15 @@ export class AdminBallotEditorComponent implements OnDestroy {
       const matchupId = this.data.matchupId;
       if (this.data.inFinale) {
         const version = this.requestVersion;
-        const tied = payload.participantVotesA === payload.participantVotesB;
+        const randomTie = this.tiePick === 'random' && payload.winnerEntryId != null
+          && payload.participantVotesA === payload.participantVotesB;
         this.revealVotesA = payload.participantVotesA;
         this.revealVotesB = payload.participantVotesB;
-        this.revealHeading = tied
-          ? payload.winnerEntryId == null ? 'We have a tie!'
-            : this.tiePick === 'random' ? 'We have a tie! Resolving randomly. The winner is...'
-            : 'We have a tie! Applying the tiebreaker. The winner is...'
-          : 'The votes are in!';
+        this.revealHeading = randomTie ? 'We have a tie! Resolving randomly. The winner is...' : 'The votes are in!';
         this.revealedWinner = '';
         this.revealFinalTally = '';
         this.revealing = true;
-        if (tied) {
+        if (randomTie) {
           this.changeDetector.detectChanges();
           await new Promise(resolve => setTimeout(resolve, 3000));
           if (version !== this.requestVersion) return;

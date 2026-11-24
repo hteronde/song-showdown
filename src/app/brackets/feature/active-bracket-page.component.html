@@ -45,13 +45,14 @@
       <select [(ngModel)]="firstVisibleRound" [ngModelOptions]="{standalone:true}"><option *ngFor="let round of revealedRounds; trackBy: trackRound" [ngValue]="round.roundNumber">{{ round.roundNumber === 1 ? 'All rounds' : round.roundName }}</option></select>
     </label>
     <ng-container *ngIf="bracketColumns as columns">
+      @let nextFinale = nextFinaleMatchupId;
       <div #bracketViewport [class.bracket-scroll]="bracketOverflows" (scroll)="syncBracketScroll(bracketViewport, bracketScrollControl)">
         <div #bracketBoard class="revealed-bracket full-tournament-bracket" [appBracketAlbumPalette]="bracketArtwork" [style.--bracket-round-count]="columns.length" [style.--bracket-row-count]="columns[0]?.matchups?.length || 1" *ngIf="revealedRounds.length">
           <div [appBracketConnectors]="connectorMatches"></div>
           <section class="revealed-round" [class.championship-round]="columnIndex === (columns.length - 1) / 2" *ngFor="let round of columns; let columnIndex = index; trackBy: trackBracketColumn">
             <h3>{{ columnIndex === (columns.length - 1) / 2 ? 'Championship' : round.roundName }}</h3>
             <div class="revealed-round-games">
-            <button type="button" aria-haspopup="dialog" class="revealed-game" [class.voting-open]="item.status === 'Voting open'" [attr.aria-label]="item.status + (item.matchup.selectedEntryId != null ? '. Vote saved' : '') + (canVoteInMatchup(item.matchup) ? '. Vote in matchup: ' : '. Matchup details: ') + item.matchup.bracketSongATitle + ' versus ' + item.matchup.bracketSongBTitle" (click)="openMatchupDetails(item.matchup)" *ngFor="let item of round.matchups; trackBy: trackMatch" [attr.data-matchup-id]="item.matchup.matchupId" [style.grid-row]="'span ' + bracketRoundSpan(round.roundNumber)">
+            <button type="button" aria-haspopup="dialog" class="revealed-game" [class.voting-open]="item.status === 'Voting open' || item.matchup.matchupId === nextFinale" [attr.aria-label]="(item.matchup.matchupId === nextFinale ? 'Next finale matchup' : item.status) + (item.matchup.selectedEntryId != null ? '. Vote saved' : '') + (canVoteInMatchup(item.matchup) ? '. Vote in matchup: ' : '. Matchup details: ') + item.matchup.bracketSongATitle + ' versus ' + item.matchup.bracketSongBTitle" (click)="openMatchupDetails(item.matchup)" *ngFor="let item of round.matchups; trackBy: trackMatch" [attr.data-matchup-id]="item.matchup.matchupId" [style.grid-row]="'span ' + bracketRoundSpan(round.roundNumber)">
               @let statusLabel = item.status === 'On hold' || item.status === 'Finale' || item.status === 'Awaiting result' ? item.status : null;
               <span class="revealed-game-label" *ngIf="statusLabel">
                 <span class="revealed-status">{{ statusLabel }}</span>

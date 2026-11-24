@@ -320,6 +320,18 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     get finaleModeActive(): boolean {
         return this.data?.finaleModeActive ?? false;
     }
+    get nextFinaleMatchupId(): number | null {
+        const bracket = this.data?.bracket;
+        const startRound = bracket?.finaleSessionStartRound ?? bracket?.finaleStartRound;
+        if (bracket?.finaleStatus !== 'active' || this.paused || this.isComplete || startRound == null) return null;
+
+        const round = this.revealedRounds.find(round => round.roundNumber >= startRound
+            && round.matchups.some(({matchup}) => matchup.winnerEntryId == null));
+        return round?.matchups.find(({matchup}) => matchup.winnerEntryId == null && !matchup.drawPending
+            && matchup.songA.entryId != null && matchup.songB.entryId != null
+            && matchup.songA.title === matchup.bracketSongATitle && matchup.songB.title === matchup.bracketSongBTitle
+        )?.matchup.matchupId ?? null;
+    }
     async enterFinaleMode(): Promise<void> {
         if (!this.isAdmin || !this.data)
             return;
