@@ -207,12 +207,12 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
             const payload = await this.historyApi.getBracket(bracketId, controller.signal);
             if (controller.signal.aborted) return;
             this.isAdmin = !!payload.canManage;
-            const finaleOptions = await this.historyApi.getFinaleOptions(bracketId, controller.signal);
-            if (controller.signal.aborted) return;
-            if (!this.isAdmin && payload.bracket.status !== 'complete') {
-                await this.router.navigate(this.bracketView === 'analysis' ? ['/brackets', bracketId, 'analysis'] : ['/brackets', bracketId]);
+            if (payload.bracket.status !== 'complete' && (!this.isAdmin || this.bracketView === 'analysis')) {
+                await this.router.navigate([this.isAdmin ? '/history' : '/brackets', bracketId], {replaceUrl: true});
                 return;
             }
+            const finaleOptions = await this.historyApi.getFinaleOptions(bracketId, controller.signal);
+            if (controller.signal.aborted) return;
             if (this.selectedBracket?.bracketId !== payload.bracket.bracketId) {
                 this.firstVisibleRound = 1;
                 this.celebrateChampion = false;
@@ -232,17 +232,19 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
             this.finaleParticipantIds = this.finaleOptions.session
                 ? this.finaleParticipants.map(person => person.userId)
                 : this.finaleOptions.participants.filter(user => user.selectedByDefault).map(user => user.userId);
-            const analysisRounds = payload.rounds.map(round => ({
-                name: bracketRoundLabel(round.name),
-                slotCount: round.matchups.length * 2,
-                songs: round.matchups.flatMap(match => [match.songA, match.songB].filter(song => song != null))
-            }));
-            const winnerEntryId = payload.bracket.status === 'complete' ? payload.rounds.at(-1)?.matchups[0]?.winnerEntryId : null;
-            this.analysisRounds = appendWinnerRound(analysisRounds, winnerEntryId);
-            this.participantAnalysisVotes = payload.canViewBallots
-                ? payload.rounds.flatMap(round => round.matchups.flatMap(match =>
-                    analysisVotes(round.roundNumber, bracketRoundLabel(round.name), match.winnerEntryId, [match.songA, match.songB], match.ballots)))
-                : [];
+            if (this.bracketView === 'analysis') {
+                const analysisRounds = payload.rounds.map(round => ({
+                    name: bracketRoundLabel(round.name),
+                    slotCount: round.matchups.length * 2,
+                    songs: round.matchups.flatMap(match => [match.songA, match.songB].filter(song => song != null))
+                }));
+                const winnerEntryId = payload.rounds.at(-1)?.matchups[0]?.winnerEntryId;
+                this.analysisRounds = appendWinnerRound(analysisRounds, winnerEntryId);
+                this.participantAnalysisVotes = payload.canViewBallots
+                    ? payload.rounds.flatMap(round => round.matchups.flatMap(match =>
+                        analysisVotes(round.roundNumber, bracketRoundLabel(round.name), match.winnerEntryId, [match.songA, match.songB], match.ballots)))
+                    : [];
+            }
             this.historyRounds = payload.rounds.map(round => ({
                 roundNumber: round.roundNumber,
                 name: bracketRoundLabel(round.name),

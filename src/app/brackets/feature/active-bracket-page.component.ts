@@ -1,4 +1,3 @@
-import { analysisVotes, AnalysisVote, appendWinnerRound, AnalysisRound, BracketAnalysisComponent, BracketView, BracketViewToggleComponent } from '../ui/bracket-analysis.component';
 import { bracketRoundLabel, mirrorBracketRounds, positionalBracketLinks, scrollBracket, syncBracketScroll } from '../ui/bracket-layout';
 import {SessionDateFieldsComponent,EditableSessionRow} from '../ui/session-date-fields.component';
 import {sessionEditorRows,sessionSchedulePayload,sessionDateInput} from './session-schedule';
@@ -16,7 +15,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, EventEmitter, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../../auth/data-access/auth-api.service';
-import { AdvanceWeekPlan, ActiveBracketApiService, ActiveBracketVotingData, VotingMatchup, VotingSong, VotingWeek } from '../data-access/active-bracket-api.service';
+import { AdvanceWeekPlan, ActiveBracketApiService, ActiveBracketVotingData, VotingMatchup, VotingWeek } from '../data-access/active-bracket-api.service';
 type MatchupStatus = 'Voting open' | 'Completed' | 'Upcoming' | 'On hold' | 'Finale' | 'Awaiting result';
 
 interface RevealedRound {
@@ -29,7 +28,7 @@ interface RevealedRound {
     }>;
 }
 @Component({
-    selector: 'app-active-bracket-page', standalone: true, imports: [SessionDateFieldsComponent, ResumeBracketDialogComponent, BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent, AlbumColorsDirective, BracketAlbumPaletteDirective, BracketAnalysisComponent, BracketViewToggleComponent],
+    selector: 'app-active-bracket-page', standalone: true, imports: [SessionDateFieldsComponent, ResumeBracketDialogComponent, BracketEmailComposerComponent, RouterLink, FormsModule, BracketChampionComponent, BracketConnectorsDirective, CommonModule, AdminBallotEditorComponent, SongAlbumArtComponent, AlbumColorsDirective, BracketAlbumPaletteDirective],
     templateUrl: './active-bracket-page.component.html',
     styleUrls: ['./active-bracket-page.component.css', '../ui/bracket-layout.css', '../ui/bracket-connectors.css']
 })
@@ -273,7 +272,6 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
             if ((data.awaitingFinale && !this.data?.awaitingFinale) || (data.bracket.status === 'complete' && !this.isComplete))
                 this.firstVisibleRound = 1;
             this.data = data;
-            this.analysisRounds = this.buildAnalysisRounds();
             this.isAdmin = !!data.canManage;
             for (const week of data.weeks)
                 for (const match of week.matchups) {
@@ -330,35 +328,6 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     matchupWeekLabel(roundNumber: number, weekNumber: number | undefined): string {
         const finaleRound = this.data?.bracket.finaleStartRound;
         return finaleRound != null && roundNumber >= finaleRound ? 'Finale Week' : `Week ${weekNumber ?? ''}`;
-    }
-    get bracketView(): BracketView { return this.route.snapshot.data['bracketView'] === 'analysis' ? 'analysis' : 'bracket'; }
-    analysisRounds: AnalysisRound[] = [];
-    participantAnalysisVotes: AnalysisVote[] = [];
-    private buildAnalysisRounds(): AnalysisRound[] {
-        const revealed = this.revealedRounds;
-        this.participantAnalysisVotes = this.data?.canViewBallots
-            ? revealed.flatMap(round => round.matchups.flatMap(({matchup}) => matchup.drawPending ? [] : analysisVotes(
-                round.roundNumber, round.roundName, matchup.winnerEntryId,
-                [
-                    matchup.bracketSongATitle === matchup.songA.title ? matchup.songA : null,
-                    matchup.bracketSongBTitle === matchup.songB.title ? matchup.songB : null
-                ],
-                matchup.ballots
-            )))
-            : [];
-        const rounds = revealed.map(round => ({
-            name: round.roundName,
-            slotCount: round.matchups.length * 2,
-            songs: round.matchups.flatMap(({matchup}) => {
-                if (matchup.drawPending) return [];
-                return [
-                    matchup.bracketSongATitle === matchup.songA.title ? matchup.songA : null,
-                    matchup.bracketSongBTitle === matchup.songB.title ? matchup.songB : null
-                ].filter((song): song is VotingSong => song != null && song.entryId != null);
-            })
-        }));
-        const winnerEntryId = this.isComplete ? revealed.at(-1)?.matchups[0]?.matchup.winnerEntryId : null;
-        return appendWinnerRound(rounds, winnerEntryId);
     }
     firstVisibleRound = 1;
     get visibleRounds(): RevealedRound[] { return this.revealedRounds.filter(round => round.roundNumber >= this.firstVisibleRound); }
@@ -539,7 +508,6 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
                 return;
             this.firstVisibleRound = 1;
             this.data = data;
-            this.analysisRounds = this.buildAnalysisRounds();
             this.isAdmin = !!data.canManage;
             this.currentMemberId = user?.userId ?? null;
             this.isAdmin = !!data.canManage;

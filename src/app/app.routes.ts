@@ -31,7 +31,7 @@ const loadPlaylistsPage = () => import('./playlists/feature/playlists-page.compo
 
 export const appRoutes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'home' },
-  { path: 'brackets/:bracketId/analysis', component: BracketInvitationPageComponent, data: {bracketView: 'analysis'}, title: 'Bracket Analysis' },
+  { path: 'brackets/:bracketId/analysis', pathMatch: 'full', redirectTo: 'brackets/:bracketId' },
   { path: 'brackets/:bracketId', component: BracketInvitationPageComponent },
   { path: 'home', component: HomePageComponent, title: 'Welcome to The Song Showdown' },
   { path: 'brackets', pathMatch: 'full', redirectTo: 'home' },

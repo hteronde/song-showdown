@@ -35,7 +35,7 @@ interface Invitation {
         <p>You declined this invitation. Changed your mind? You can still join the bracket.</p>
         <div class="actions"><button type="button" [disabled]="saving" (click)="respond('accepted')">{{ saving ? 'Joining…' : 'Change my mind — join bracket' }}</button></div>
       </ng-container>
-      <button *ngIf="invitation.canAccess" class="secondary" type="button" (click)="showBracket=true">View bracket as admin</button>
+      <button *ngIf="invitation.canAccess && !isUpcoming" class="secondary" type="button" (click)="showBracket=true">View bracket as admin</button>
     </section>
     <app-active-bracket-page *ngIf="showBracket" (toastMessage)="toastMessage.emit($event)"></app-active-bracket-page>
   `,
@@ -46,6 +46,10 @@ export class BracketInvitationPageComponent implements OnInit, OnDestroy {
   invitation: Invitation | null = null;
   loading = true;
   saving = false;
+  get isUpcoming(): boolean {
+    const startAt = this.invitation?.startAt;
+    return startAt != null && new Date(startAt).getTime() > Date.now();
+  }
   showBracket = false;
   error = '';
   private controller = new AbortController();

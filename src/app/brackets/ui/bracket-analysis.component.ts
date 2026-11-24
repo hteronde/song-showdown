@@ -132,7 +132,6 @@ function chartRows(rounds: readonly AnalysisRound[], field: 'album' | 'category'
             <h2>Bracket analysis</h2>
             <p>Bars show each group’s share of the round. The opening round shows the starting field.</p>
             <p *ngIf="rounds.length">Hover over a bar to preview the songs. Click or tap the bar to keep the list open while you scroll.</p>
-            <p *ngIf="partial">Only revealed songs are counted. Percentages use all slots in the round.</p>
             <p *ngIf="!rounds.length" role="status">Song counts will appear when matchups are available.</p>
 
             <ng-container *ngTemplateOutlet="chartGroup; context: {charts: charts, columns: rounds}"></ng-container>
@@ -258,7 +257,6 @@ export class BracketAnalysisComponent implements OnChanges, OnDestroy {
     constructor(private readonly changeDetector: ChangeDetectorRef) {}
 
     @Input() data: readonly AnalysisRound[] = [];
-    @Input() partial = false;
     @Input() votes: readonly AnalysisVote[] = [];
     participants: Array<{userId: number; displayName: string}> = [];
     selectedUserId: number | null = null;
