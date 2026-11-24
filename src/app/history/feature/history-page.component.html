@@ -7,11 +7,13 @@
   <section class="history-list" *ngIf="!isBracketDetailOpen">
     <article class="history-card" *ngFor="let bracket of historyBrackets">
       <div class="history-card-top">
-        <img class="history-bracket-logo" *ngIf="bracket.logoUrl && !failedAlbumCovers.has(bracket.logoUrl!)" [src]="bracket.logoUrl" [alt]="bracket.artist + ' logo'" loading="lazy" referrerpolicy="no-referrer" (error)="albumCoverFailed(bracket.logoUrl!)">
-        <div class="history-band-icon" *ngIf="!bracket.logoUrl || failedAlbumCovers.has(bracket.logoUrl!)" [class.beatles-icon]="bracket.artist === 'The Beatles'" [class.cake-icon]="bracket.artist === 'Cake'">{{ bracket.artist === 'The Beatles' ? '♫' : (bracket.artist | slice:0:2 | uppercase) }}</div>
+        <a class="history-logo-link" [routerLink]="['/history', bracket.bracketId]" [attr.aria-label]="'View ' + bracket.title">
+          <img class="history-bracket-logo" *ngIf="bracket.logoUrl && !failedAlbumCovers.has(bracket.logoUrl!)" [src]="bracket.logoUrl" alt="" loading="lazy" referrerpolicy="no-referrer" (error)="albumCoverFailed(bracket.logoUrl!)">
+          <div class="history-band-icon" *ngIf="!bracket.logoUrl || failedAlbumCovers.has(bracket.logoUrl!)" [class.beatles-icon]="bracket.artist === 'The Beatles'" [class.cake-icon]="bracket.artist === 'Cake'">{{ bracket.artist === 'The Beatles' ? '♫' : (bracket.artist | slice:0:2 | uppercase) }}</div>
+        </a>
         <div class="history-card-title">
           <span>{{ bracket.artist | uppercase }}</span>
-          <strong>{{ bracket.title }}</strong>
+          <strong><a class="history-title-link" [routerLink]="['/history', bracket.bracketId]">{{ bracket.title }}</a></strong>
           <small>{{ bracket.bracketYear ? bracket.bracketYear + ' · ' : '' }}{{ bracket.songCount }} songs · {{ bracket.roundCount }} rounds · {{ bracket.status | uppercase }}</small>
         </div>
         <span class="archive-status" [class.complete]="bracket.status === 'complete'"><i></i> {{ bracket.status | uppercase }}</span>
@@ -21,6 +23,9 @@
   </section>
   <section class="history-detail" *ngIf="isBracketDetailOpen">
     <button class="back-link" (click)="showAllBrackets()">← All brackets</button>
+    <app-bracket-view-toggle *ngIf="selectedBracket as bracket" [view]="bracketView" [bracketLink]="['/history', bracket.bracketId]"></app-bracket-view-toggle>
+    <app-bracket-analysis *ngIf="bracketView === 'analysis'" [data]="analysisRounds" [votes]="participantAnalysisVotes"></app-bracket-analysis>
+    <div [hidden]="bracketView !== 'bracket'">
     <div class="history-detail-head"><div><div class="eyebrow small-eyebrow">{{ selectedBracket?.artist | uppercase }} <span class="eyebrow-divider">·</span> {{ selectedBracket?.status | uppercase }} BRACKET</div><h2>{{ selectedBracket?.songCount || 0 }} songs. Family favorite.</h2></div><button class="finale-action" *ngIf="isAdmin && (finaleSessionActive || finaleSessionPaused)" [disabled]="finaleSaving" (click)="openParticipantEditor()">Edit participants</button><button class="finale-action" *ngIf="isAdmin && finaleSessionActive" [disabled]="finaleSaving" (click)="exitFinale()">Exit finale mode</button><button class="finale-action" *ngIf="isAdmin && finaleSessionPaused" [disabled]="finaleSaving" (click)="resumeFinale()">Resume finale mode</button><button class="finale-action" *ngIf="isAdmin && !finaleSessionActive && !finaleSessionPaused" (click)="finaleSetupOpen = !finaleSetupOpen">Run finale mode</button><span class="archive-status" [class.complete]="selectedBracket?.status === 'complete'"><i></i> {{ finaleSessionActive ? 'FINALE MODE' : (finaleSessionPaused ? 'FINALE PAUSED' : (selectedBracket?.status | uppercase)) }}</span></div>
     <section class="finale-setup" *ngIf="isAdmin && editParticipantsOpen && finaleOptions">
       <div><span class="stat-label">FINALE ROSTER</span><h3>Edit participants</h3></div>
@@ -87,6 +92,7 @@
       </label>
     </section>
     <div class="notice-bar" *ngIf="selectedBracket && !matchupCount"><span class="notice-icon">◉</span><span>The bracket songs are linked, but no matchups have been recorded yet.</span></div>
+    </div>
   </section>
   <footer class="page-footer"><span>THE SONGS WE STILL ARGUE ABOUT <b>✳</b></span><span>FAMILY BRACKET ARCHIVE</span></footer>
 </div>

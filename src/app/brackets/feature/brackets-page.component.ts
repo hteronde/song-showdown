@@ -6,7 +6,7 @@ import { apiErrorMessage } from '../../shared/data-access/api-client';
 import { BracketFieldErrors, enteredSongCount, validateBracketSettings } from '../state/bracket-settings';
 import { canReorderSong, reorderSong, seedGroupSongs, seedAssignmentError } from '../state/song-editing';
 import { ParticipantEditor } from '../state/participant-editor';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Location } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { SessionSettings, previewSessionSchedule, sessionTimingKey, durationMinutes, sessionDateInput, sessionEditorRows, sessionSchedulePayload, summarizeFinaleSessions } from './session-schedule';
@@ -16,7 +16,7 @@ import { FormsModule } from '@angular/forms';
 import { BracketsApiService, InvitationParticipant } from '../data-access/brackets-api.service';
 import { SessionPlaylist, BracketSession, BracketSessionsData, BracketInput, BracketParticipant, BracketRecord, BracketSong, BracketAlbum, TiebreakerOption, RandomizationMode } from '../data-access/bracket.model';
 @Component({
-    selector: 'app-brackets-page', standalone: true, imports: [SessionDateFieldsComponent, ResumeBracketDialogComponent, CommonModule, FormsModule, BracketEmailComposerComponent],
+    selector: 'app-brackets-page', standalone: true, imports: [RouterLink, SessionDateFieldsComponent, ResumeBracketDialogComponent, CommonModule, FormsModule, BracketEmailComposerComponent],
     templateUrl: './brackets-page.component.html', styleUrls: ['./brackets-page.component.css']
 })
 export class BracketsPageComponent implements OnInit, OnDestroy {
@@ -44,6 +44,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     dismissFormError(): void { this.error = ''; this.validationBannerDismissed = true; }
     fieldErrors: BracketFieldErrors = {};
     logoUrl = '';
+    readonly failedBracketLogos = new Set<string>();
     title = '';
     artist = '';
     songCount = 16;

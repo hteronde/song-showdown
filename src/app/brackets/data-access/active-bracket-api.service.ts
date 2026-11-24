@@ -7,6 +7,7 @@ export interface VotingSong {
   entryId: number | null;
   title: string;
   album: string | null;
+  category?: string | null;
   year: number | null;
   seed: number | null;
   youtubeUrl: string | null;
@@ -33,7 +34,7 @@ export interface VotingMatchup {
   winnerTitle: string | null;
   selectedEntryId: number | null;
   comment: string | null;
-  ballots: Array<{ displayName: string; selectedEntryId: number }>;
+  ballots: Array<{ userId?: number | null; displayName: string; selectedEntryId: number }>;
 }
 
 export interface VotingWeek {

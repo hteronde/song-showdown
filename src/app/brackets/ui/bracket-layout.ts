@@ -37,3 +37,20 @@ export function syncBracketScroll(viewport: HTMLElement, control: HTMLInputEleme
     const scrollDistance = viewport.scrollWidth - viewport.clientWidth;
     control.valueAsNumber = scrollDistance ? viewport.scrollLeft * 100 / scrollDistance : 0;
 }
+
+export function bracketRoundLabel(name: string): string {
+    switch (name.trim().toLowerCase()) {
+        case 'round of 16':
+        case 'sweet 16':
+            return 'Sweet 16';
+        case 'quarterfinals':
+        case 'elite 8':
+            return 'Elite 8';
+        case 'semifinals':
+        case 'final four':
+        case 'final 4':
+            return 'Final 4';
+        default:
+            return name;
+    }
+}

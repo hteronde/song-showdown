@@ -76,8 +76,8 @@ export interface BracketHistoryResponse {
   nextMatchupId: number | null;
       weekNumber: number;
       matchupNumber: number;
-      songA: { title: string; entryId: number; albumCoverUrl: string | null; youtubeUrl: string | null; spotifyUrl: string | null } | null;
-      songB: { title: string; entryId: number; albumCoverUrl: string | null; youtubeUrl: string | null; spotifyUrl: string | null } | null;
+      songA: { title: string; entryId: number; album?: string | null; category?: string | null; albumCoverUrl: string | null; youtubeUrl: string | null; spotifyUrl: string | null } | null;
+      songB: { title: string; entryId: number; album?: string | null; category?: string | null; albumCoverUrl: string | null; youtubeUrl: string | null; spotifyUrl: string | null } | null;
       winner: { title: string; albumCoverUrl: string | null } | null;
       winnerEntryId: number | null;
   voteCountA?: number;

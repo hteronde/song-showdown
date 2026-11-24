@@ -1,4 +1,4 @@
-const hiddenSong=()=>({entryId:null,title:'TBD',album:null,year:null,seed:null,youtubeUrl:null,spotifyUrl:null,albumCoverUrl:null});
+const hiddenSong=()=>({entryId:null,title:'TBD',album:null,category:null,year:null,seed:null,youtubeUrl:null,spotifyUrl:null,albumCoverUrl:null});
 
 export function memberMatchupView(matchup,{isAdmin,roundNumber,isUpcoming,showFullFirstRound=false,revealedEntries,songAPending,songBPending}) {
   if(isAdmin) return matchup;

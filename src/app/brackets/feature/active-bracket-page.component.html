@@ -17,12 +17,15 @@
   <p class="page-error" *ngIf="error" role="alert">{{ error }}</p>
   <p class="page-success" *ngIf="notice" role="status">{{ notice }}</p>
 
+  <app-bracket-view-toggle [view]="bracketView" [bracketLink]="['/brackets', bracketData.bracket.bracketId]"></app-bracket-view-toggle>
+  <app-bracket-analysis *ngIf="bracketView === 'analysis'" [data]="analysisRounds" [votes]="participantAnalysisVotes" [partial]="!isComplete && !isAdmin"></app-bracket-analysis>
+  <div [hidden]="bracketView !== 'bracket'">
   <div class="bracket-hold-banner" *ngIf="paused && !isComplete" role="status"><span class="hold-icon" aria-hidden="true">Ⅱ</span><div><strong>This bracket is on hold.</strong><p>You can still view the current matchups and listen to the songs. Voting is paused and the session timer is frozen until the admin resumes the bracket.</p></div></div>
   <div class="finale-view-banner" *ngIf="finaleModeActive && !isComplete" role="status"><strong>Finale Mode · Vote together in person</strong><p>Follow the bracket here. The admin counts everyone’s votes and records them. Online voting is disabled.</p></div>
   <div class="finale-view-banner" *ngIf="awaitingFinale && !isComplete" role="status"><strong>We'll see you at the finale!</strong><p><time [attr.datetime]="bracketData.bracket.finaleAt">{{ bracketData.bracket.finaleAt | date:'fullDate' }}</time></p><p>Online voting is finished. View the bracket and upcoming matchups below. Votes at the finale will be counted in person by the admin.</p></div>
   <section class="stats-strip" *ngIf="!isComplete">
     <div class="stat-cell"><span class="stat-label">THE FIELD</span><strong>{{ bracketData.bracket.songCount }} <small>songs</small></strong><span class="stat-detail">One champion</span></div>
-    <div class="stat-cell"><span class="stat-label">PLAYING NOW</span><strong>{{ paused ? 'On hold' : awaitingFinale ? 'Finale next' : finaleModeActive ? 'Finale Mode' : currentWeek ? currentWeek.roundName : 'Between rounds' }}</strong><span class="stat-detail">{{ currentWeek ? 'Round ' + currentWeek.roundNumber : 'Check back for the next session' }}</span></div>
+    <div class="stat-cell"><span class="stat-label">PLAYING NOW</span><strong>{{ paused ? 'On hold' : awaitingFinale ? 'Finale next' : finaleModeActive ? 'Finale Mode' : currentWeek ? bracketRoundLabel(currentWeek.roundName) : 'Between rounds' }}</strong><span class="stat-detail">{{ currentWeek ? 'Round ' + currentWeek.roundNumber : 'Check back for the next session' }}</span></div>
     <div class="stat-cell"><span class="stat-label">{{ finaleModeActive || awaitingFinale ? 'VOTING' : 'YOUR PICKS' }}</span><strong *ngIf="finaleModeActive || awaitingFinale">{{ awaitingFinale ? 'At the finale' : 'In person' }}</strong><strong *ngIf="!finaleModeActive && !awaitingFinale">{{ savedPicks }} <small>/ {{ currentWeek?.matchups?.length || 0 }}</small></strong><span class="stat-detail">{{ finaleModeActive || awaitingFinale ? 'Counted and recorded by the admin' : 'Votes saved this week' }}</span></div>
     <div class="stat-cell"><span class="stat-label">{{ awaitingFinale ? 'FINALE DATE' : 'VOTING CLOSES' }}</span><strong>{{ awaitingFinale ? (bracketData.bracket.finaleAt | date:'fullDate') : finaleModeActive ? 'In person' : paused ? frozenTimeRemaining : currentWeek && !currentWeek.closesAt ? 'When everyone has voted' : currentWeek?.closesAt ? (currentWeek.closesAt | date:'short') : '—' }}</strong><span class="stat-detail">{{ awaitingFinale ? 'No more online voting' : finaleModeActive ? 'Follow the live bracket below' : paused ? 'Timer paused' : currentWeek ? 'Submit a pick for each matchup' : 'No open matchups right now' }}</span></div>
   </section>
@@ -73,6 +76,7 @@
     <div class="no-matchups" *ngIf="!revealedRounds.length">No matchups have been scheduled yet.</div>
   </section>
 
+  </div>
   <footer class="page-footer"><span>THE SONGS WE STILL ARGUE ABOUT <b>✳</b></span><span>{{ bracketData.bracket.artist | uppercase }} BRACKET</span></footer>
   </ng-template>
 </div>

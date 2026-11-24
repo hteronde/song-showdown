@@ -329,7 +329,15 @@
   <div class="empty" *ngIf="loading">Loading brackets…</div>
   <div class="empty" *ngIf="pageMode === 'list' && !loading && brackets.length===0">No brackets yet. Create one to get started.</div>
   <div class="list" *ngIf="pageMode === 'list' && !loading && brackets.length">
-    <article class="card" *ngFor="let bracket of brackets"><div><h2>{{ bracket.title }}</h2><div class="muted">{{ bracket.artist }} · {{ bracket.songCount }} songs · {{ bracket.pausedAt ? 'on hold' : bracket.status }}<span *ngIf="bracket.startAt && bracket.status !== 'complete'"> · starts {{ bracket.startAt | date:'medium' }}</span></div><div class="muted">Tiebreaker option: {{ tiebreakerLabels[bracket.tiebreakerOption] }}</div></div><div class="actions"><button *ngIf="bracket.status === 'active'" [disabled]="pauseSavingId === bracket.bracketId" (click)="togglePaused(bracket)">{{ pauseSavingId === bracket.bracketId ? 'Saving…' : bracket.pausedAt ? 'Resume' : 'Pause' }}</button><button (click)="edit(bracket)">Edit</button><button *ngIf="isSuper" (click)="duplicateBracket(bracket)" [disabled]="duplicatingId != null">{{ duplicatingId === bracket.bracketId ? 'Duplicating…' : 'Duplicate' }}</button><button *ngIf="isSuper" (click)="remove(bracket)" aria-haspopup="dialog" aria-controls="delete-bracket-dialog" [disabled]="deletingBracketIds.has(bracket.bracketId)">{{ deletingBracketIds.has(bracket.bracketId) ? 'Deleting…' : 'Delete' }}</button></div></article>
+    <article class="card" *ngFor="let bracket of brackets">
+      <div class="bracket-list-info">
+        <a *ngIf="bracket.logoUrl && !failedBracketLogos.has(bracket.logoUrl)" class="bracket-list-logo"
+          [routerLink]="['/manage/brackets', bracket.bracketId, 'edit']" [attr.aria-label]="'Edit ' + bracket.title">
+          <img [src]="bracket.logoUrl" alt="" loading="lazy" referrerpolicy="no-referrer" (error)="failedBracketLogos.add(bracket.logoUrl!)">
+        </a>
+        <div><h2><a [routerLink]="['/manage/brackets', bracket.bracketId, 'edit']">{{ bracket.title }}</a></h2><div class="muted">{{ bracket.artist }} · {{ bracket.songCount }} songs · {{ bracket.pausedAt ? 'on hold' : bracket.status }}<span *ngIf="bracket.startAt && bracket.status !== 'complete'"> · starts {{ bracket.startAt | date:'medium' }}</span></div><div class="muted">Tiebreaker option: {{ tiebreakerLabels[bracket.tiebreakerOption] }}</div></div>
+      </div>
+      <div class="actions"><button *ngIf="bracket.status === 'active'" [disabled]="pauseSavingId === bracket.bracketId" (click)="togglePaused(bracket)">{{ pauseSavingId === bracket.bracketId ? 'Saving…' : bracket.pausedAt ? 'Resume' : 'Pause' }}</button><button (click)="edit(bracket)">Edit</button><button *ngIf="isSuper" (click)="duplicateBracket(bracket)" [disabled]="duplicatingId != null">{{ duplicatingId === bracket.bracketId ? 'Duplicating…' : 'Duplicate' }}</button><button *ngIf="isSuper" (click)="remove(bracket)" aria-haspopup="dialog" aria-controls="delete-bracket-dialog" [disabled]="deletingBracketIds.has(bracket.bracketId)">{{ deletingBracketIds.has(bracket.bracketId) ? 'Deleting…' : 'Delete' }}</button></div></article>
   </div>
 </section>
 

@@ -3,9 +3,10 @@
   min-height: 65vh;
   display: flex;
   align-items: center;
-  padding: clamp(32px, 7vw, 96px) clamp(24px, 5vw, 72px);
+  padding-block: clamp(32px, 7vw, 96px);
+  padding-inline-start: clamp(24px, 5vw, 72px);
 }
-.welcome-content { min-width: 0; max-width: 800px; }
+.welcome-content { width: 100%; min-width: 0; container-type: inline-size; }
 .welcome-eyebrow {
   margin: 0 0 24px;
   font-family: 'DM Mono', monospace;
@@ -15,10 +16,13 @@
 }
 h1 {
   margin: 0 0 28px;
-  font-size: clamp(18px, 4.1vw, 54px);
+  font-size: clamp(15px, min(4.1vw, 6.2cqi), 54px);
   line-height: 1.12;
   letter-spacing: -0.04em;
   font-weight: 500;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 .welcome-description {
   max-width: 680px;

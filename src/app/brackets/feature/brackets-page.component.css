@@ -44,9 +44,34 @@
   justify-content: space-between;
 }
 
+.bracket-list-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.bracket-list-logo {
+  display: block;
+  flex: none;
+  border-radius: 5px;
+}
+
+.bracket-list-logo img {
+  display: block;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
 .card h2 {
   margin: 0 0 5px;
   font-size: 17px;
+}
+
+.card h2 a {
+  color: inherit;
+  text-underline-offset: 2px;
 }
 
 .muted {

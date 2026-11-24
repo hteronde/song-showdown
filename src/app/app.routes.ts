@@ -31,10 +31,12 @@ const loadPlaylistsPage = () => import('./playlists/feature/playlists-page.compo
 
 export const appRoutes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'home' },
+  { path: 'brackets/:bracketId/analysis', component: BracketInvitationPageComponent, data: {bracketView: 'analysis'}, title: 'Bracket Analysis' },
   { path: 'brackets/:bracketId', component: BracketInvitationPageComponent },
   { path: 'home', component: HomePageComponent, title: 'Welcome to The Song Showdown' },
   { path: 'brackets', pathMatch: 'full', redirectTo: 'home' },
   { path: 'history', component: HistoryPageComponent },
+  { path: 'history/:bracketId/analysis', component: HistoryPageComponent, data: {bracketView: 'analysis'}, title: 'Bracket Analysis' },
   { path: 'history/:bracketId', component: HistoryPageComponent },
   { path: 'manage/brackets/new', loadComponent: loadBracketsPage, canActivate: [adminGuard], data: {pageMode:'add'}, title: 'Add bracket' },
   { path: 'manage/brackets/:id/edit', loadComponent: loadBracketsPage, canActivate: [bracketAdminGuard], data: {pageMode:'edit'}, title: 'Edit bracket' },

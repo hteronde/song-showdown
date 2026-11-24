@@ -1,4 +1,5 @@
-import { mirrorBracketRounds, positionalBracketLinks, scrollBracket, syncBracketScroll } from '../../brackets/ui/bracket-layout';
+import { analysisVotes, AnalysisVote, appendWinnerRound, AnalysisRound, BracketAnalysisComponent, BracketView, BracketViewToggleComponent } from '../../brackets/ui/bracket-analysis.component';
+import { bracketRoundLabel, mirrorBracketRounds, positionalBracketLinks, scrollBracket, syncBracketScroll } from '../../brackets/ui/bracket-layout';
 import { apiErrorMessage } from '../../shared/data-access/api-client';
 import { BracketChampionComponent } from '../../brackets/ui/bracket-champion.component';
 import { BracketConnectorsDirective } from '../../brackets/ui/bracket-connectors.directive';
@@ -8,14 +9,14 @@ import { AdminBallotEditorComponent } from '../../brackets/ui/admin-ballot-edito
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthApiService } from '../../auth/data-access/auth-api.service';
 import { BracketHistoryInfo, BracketHistoryResponse, FinaleOptions, PastMatch, PastRound } from '../data-access/history.models';
 import { HistoryApiService } from '../data-access/history-api.service';
 @Component({
     selector: 'app-history-page',
     standalone: true,
-    imports: [BracketChampionComponent, BracketConnectorsDirective, CommonModule, FormsModule, AdminBallotEditorComponent, SongAlbumArtComponent, AlbumColorsDirective, BracketAlbumPaletteDirective],
+    imports: [RouterLink, BracketChampionComponent, BracketConnectorsDirective, CommonModule, FormsModule, AdminBallotEditorComponent, SongAlbumArtComponent, AlbumColorsDirective, BracketAlbumPaletteDirective, BracketAnalysisComponent, BracketViewToggleComponent],
     templateUrl: './history-page.component.html',
     styleUrls: ['./history-page.component.css', '../../brackets/ui/bracket-layout.css', '../../brackets/ui/bracket-connectors.css']
 })
@@ -30,6 +31,9 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
         const left = this.matchVotes(match, match.leftEntryId), right = this.matchVotes(match, match.rightEntryId);
         return match.winnerEntryId === match.rightEntryId ? `${right}–${left} votes` : `${left}–${right} votes`;
     }
+    get bracketView(): BracketView { return this.route.snapshot.data['bracketView'] === 'analysis' ? 'analysis' : 'bracket'; }
+    analysisRounds: AnalysisRound[] = [];
+    participantAnalysisVotes: AnalysisVote[] = [];
     firstVisibleRound = 1;
     get visibleRounds(): PastRound[] { return this.historyRounds.filter(round => round.matches.length && round.roundNumber >= this.firstVisibleRound); }
     visibleRoundSpan(roundNumber: number): number { return 2 ** (roundNumber - (this.visibleRounds[0]?.roundNumber ?? 1)); }
@@ -206,7 +210,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
             const finaleOptions = await this.historyApi.getFinaleOptions(bracketId, controller.signal);
             if (controller.signal.aborted) return;
             if (!this.isAdmin && payload.bracket.status !== 'complete') {
-                await this.router.navigate(['/brackets', bracketId]);
+                await this.router.navigate(this.bracketView === 'analysis' ? ['/brackets', bracketId, 'analysis'] : ['/brackets', bracketId]);
                 return;
             }
             if (this.selectedBracket?.bracketId !== payload.bracket.bracketId) {
@@ -228,9 +232,20 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
             this.finaleParticipantIds = this.finaleOptions.session
                 ? this.finaleParticipants.map(person => person.userId)
                 : this.finaleOptions.participants.filter(user => user.selectedByDefault).map(user => user.userId);
+            const analysisRounds = payload.rounds.map(round => ({
+                name: bracketRoundLabel(round.name),
+                slotCount: round.matchups.length * 2,
+                songs: round.matchups.flatMap(match => [match.songA, match.songB].filter(song => song != null))
+            }));
+            const winnerEntryId = payload.bracket.status === 'complete' ? payload.rounds.at(-1)?.matchups[0]?.winnerEntryId : null;
+            this.analysisRounds = appendWinnerRound(analysisRounds, winnerEntryId);
+            this.participantAnalysisVotes = payload.canViewBallots
+                ? payload.rounds.flatMap(round => round.matchups.flatMap(match =>
+                    analysisVotes(round.roundNumber, bracketRoundLabel(round.name), match.winnerEntryId, [match.songA, match.songB], match.ballots)))
+                : [];
             this.historyRounds = payload.rounds.map(round => ({
                 roundNumber: round.roundNumber,
-                name: round.name.toUpperCase(),
+                name: bracketRoundLabel(round.name),
                 matches: round.matchups.map(match => ({
                     matchupId: match.matchupId,
                     nextMatchupId: match.nextMatchupId,
