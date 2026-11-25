@@ -10,7 +10,7 @@ export function validateBracketSongs(songs) {
   if (!Array.isArray(songs) || songs.length > 128) throw new Error('Provide up to 128 songs.');
   for (const song of songs) {
     if (!song || typeof song.title !== 'string' || !song.title.trim() || song.title.length > 200) throw new Error('Each song needs a title of up to 200 characters.');
-    for (const [key, max] of Object.entries({category:255,album:200,youtubeUrl:2048,spotifyUrl:2048,albumCoverUrl:2048})) {
+    for (const [key, max] of Object.entries({artist:160,category:255,album:200,youtubeUrl:2048,spotifyUrl:2048,albumCoverUrl:2048})) {
       if (song[key] != null && (typeof song[key] !== 'string' || song[key].length > max)) throw new Error('Invalid song details.');
     }
     if (song.year != null && (!Number.isInteger(song.year) || song.year < 1 || song.year > 9999)) throw new Error('Enter a valid year.');
@@ -83,15 +83,16 @@ export async function saveBracketSongs(connection, { bracketId, familyId, userId
     }
     const previous=existing.find(entry => Number(entry.bracket_song_id) === song.bracketSongId);
     let songId=previous?.song_id;
+    const artist = song.artist?.trim() || bracket.artist;
     if (!songId) {
-      const [matches]=await connection.execute('SELECT song_id FROM songs WHERE artist=? AND title=? LIMIT 1',[bracket.artist,song.title.trim()]);
+      const [matches]=await connection.execute('SELECT song_id FROM songs WHERE artist=? AND title=? LIMIT 1',[artist,song.title.trim()]);
       songId=matches[0]?.song_id;
     }
     const metadata=[song.title.trim(),song.album?.trim()||null,song.year??null,song.category?.trim()||null,song.youtubeUrl?.trim()||null,song.spotifyUrl?.trim()||null,song.albumCoverUrl?.trim()||null];
     if (songId) songId=await isolateBracketSong(connection,bracketId,songId);
-    if (songId) await connection.execute('UPDATE songs SET title=?,album=?,year=?,category=?,youtube_url=?,spotify_url=?,album_cover_url=? WHERE song_id=?',[...metadata,songId]);
+    if (songId) await connection.execute('UPDATE songs SET artist=COALESCE(?,artist),title=?,album=?,year=?,category=?,youtube_url=?,spotify_url=?,album_cover_url=? WHERE song_id=?',[song.artist?.trim()||null,...metadata,songId]);
     else {
-      const [created]=await connection.execute('INSERT INTO songs (title,album,year,category,youtube_url,spotify_url,album_cover_url,artist) VALUES (?,?,?,?,?,?,?,?)',[...metadata,bracket.artist]);
+      const [created]=await connection.execute('INSERT INTO songs (title,album,year,category,youtube_url,spotify_url,album_cover_url,artist) VALUES (?,?,?,?,?,?,?,?)',[...metadata,artist]);
       songId=created.insertId;
     }
     const [entry]=await connection.execute('INSERT INTO bracket_songs (bracket_id,region_number,song_id,seed_number,bracket_album_id,assigned_seed,position) VALUES (?,?,?,?,?,?,?)',[bracketId,Math.floor(i/16)+1,songId,seeds[i],song.albumId??null,previous?.assigned_seed??null,i+1]);

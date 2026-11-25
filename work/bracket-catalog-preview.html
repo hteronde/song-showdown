@@ -1,0 +1,92 @@
+<div id="showdown-catalog-preview">
+  <style>
+    #showdown-catalog-preview { color-scheme: light dark; color: light-dark(#252239,#eeeafa); font: 400 14px/1.45 system-ui,sans-serif; }
+    #showdown-catalog-preview .editors { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:16px; }
+    #showdown-catalog-preview section { min-width:0; background:light-dark(#faf8ff,#201c2c); border:1px solid light-dark(#dad2e8,#433b51); border-radius:14px; padding:16px; }
+    #showdown-catalog-preview h2 { margin:0 0 12px; font-size:18px; font-weight:500; }
+    #showdown-catalog-preview p { margin:0 0 8px; }
+    #showdown-catalog-preview label { display:grid; gap:4px; min-width:0; }
+    #showdown-catalog-preview input, #showdown-catalog-preview button { box-sizing:border-box; width:100%; min-width:0; border:1px solid light-dark(#cfc4dd,#655976); border-radius:8px; padding:8px; color:inherit; background:light-dark(#fff,#2a2538); font:inherit; }
+    #showdown-catalog-preview button { text-align:left; }
+    #showdown-catalog-preview button:hover { background:light-dark(#eee6fb,#38304d); }
+    #showdown-catalog-preview button[aria-pressed="true"] { border-color:light-dark(#62449a,#bd9ffc); background:light-dark(#eee6fb,#38304d); }
+    #showdown-catalog-preview .results { display:grid; gap:5px; margin:10px 0; }
+    #showdown-catalog-preview .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; }
+    #showdown-catalog-preview small { display:block; font-size:12px; }
+    #showdown-catalog-preview .add { margin-top:12px; text-align:center; background:light-dark(#563b88,#d3bbff); color:light-dark(#fff,#25183f); }
+    #showdown-catalog-preview .add:disabled { opacity:.6; }
+    #showdown-catalog-preview .message { margin-top:8px; overflow-wrap:anywhere; }
+  </style>
+  <p>Song Showdown / Edit bracket / Add song</p>
+  <div class="editors"></div>
+  <template>
+    <section>
+      <h2></h2>
+      <label>Search title or artist<input data-search type="search" value="The Distance"></label>
+      <div class="results" aria-label="Sample search results"></div>
+      <div class="fields">
+        <label>Song<input data-field="title"></label>
+        <label>Artist<input data-field="artist"></label>
+        <label>Album<input data-field="album"></label>
+        <label>Release year<input data-field="year"></label>
+        <label>Seed<input type="number" min="1" placeholder="Optional"></label>
+        <label>Category<input placeholder="Optional"></label>
+      </div>
+      <p class="message" data-details aria-live="polite"></p>
+      <button class="add" type="button" disabled>Add to bracket</button>
+      <p class="message" role="status"></p>
+    </section>
+  </template>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('showdown-catalog-preview');
+  const track = { title: 'The Distance', artist: 'CAKE', album: 'Fashion Nugget', year: '1996', art: true };
+  const otherTrack = { title: 'Never There', artist: 'CAKE', album: 'Prolonging the Magic', year: '1998', art: true };
+  const providers = [
+    { name: 'Spotify API', tracks: [track, otherTrack], source: 'Album art from Spotify · Track link filled' },
+    { name: 'MusicBrainz API', tracks: [track, {...track, album: 'Fashion Nugget (alternate release)', year: '', art: false}, otherTrack], source: 'Album art from Cover Art Archive · Spotify link optional' }
+  ];
+  for (const provider of providers) {
+    const panel = root.querySelector('template').content.firstElementChild.cloneNode(true);
+    panel.querySelector('h2').textContent = provider.name;
+    const search = panel.querySelector('[data-search]');
+    const results = panel.querySelector('.results');
+    const details = panel.querySelector('[data-details]');
+    const add = panel.querySelector('.add');
+    const status = panel.querySelector('[role="status"]');
+    const fields = [...panel.querySelectorAll('[data-field]')];
+    const render = () => {
+      results.replaceChildren();
+      const terms = search.value.trim().toLowerCase().split(/\s+/);
+      const matches = provider.tracks.filter(song =>
+        terms.every(term => [song.title, song.artist, song.album].join(' ').toLowerCase().includes(term))
+      );
+      for (const song of matches) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.setAttribute('aria-pressed', 'false');
+        button.append(song.title);
+        const subtitle = document.createElement('small');
+        subtitle.textContent = [song.artist, song.album, song.year].filter(Boolean).join(' · ');
+        button.append(subtitle);
+        button.addEventListener('click', () => {
+          for (const result of results.children) result.setAttribute('aria-pressed', String(result === button));
+          for (const field of fields) field.value = song[field.dataset.field];
+          details.textContent = song.art ? provider.source : 'Cover art unavailable · Add artwork manually';
+          add.disabled = false;
+          status.textContent = '';
+        });
+        results.append(button);
+      }
+      if (!matches.length) results.textContent = 'No matches in the sample catalog.';
+    };
+    search.addEventListener('input', render);
+    add.addEventListener('click', () => {
+      status.textContent = 'Added to preview bracket: ' + (fields[0].value || 'Untitled song');
+    });
+    render();
+    root.querySelector('.editors').append(panel);
+  }
+})();
+</script>

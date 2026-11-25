@@ -1,8 +1,18 @@
 import { apiRequest, ApiRequestOptions } from '../../shared/data-access/api-client';
 import { Injectable } from '@angular/core';
-import { SessionPlaylist, BracketSessionsData, BracketAlbum, BracketSong, BracketDetail, BracketInput, BracketParticipant, BracketRecord } from './bracket.model';
+import { SessionPlaylist, BracketSessionsData, BracketSong, BracketDetail, BracketInput, BracketParticipant, BracketRecord } from './bracket.model';
 
 export interface InvitationParticipant { bracket_role: 'member'|'commissioner'; userId:number; displayName:string; email:string; status:'pending'|'accepted'|'declined'; delivery:'unsent'|'sending'|'sent'|'failed'; sentAt:string|null; }
+export interface SpotifyTrack {
+  spotifyTrackId: string;
+  title: string;
+  artist: string;
+  album: string;
+  year: number | null;
+  albumCoverUrl: string | null;
+  spotifyUrl: string | null;
+}
+
 export interface InvitationDelivery {sent:number;failed:number;}
 
 @Injectable({ providedIn: 'root' })
@@ -65,12 +75,9 @@ export class BracketsApiService {
     return this.request(`${this.baseUrl}${bracketId ? '/' + bracketId : ''}/songs`, { method: 'PUT', body: JSON.stringify({ songs, title, artist, resetHistory, metadataOnly }) });
   }
 
-  async saveAlbum(bracketId: number | null, album: Omit<BracketAlbum,'albumId'> & { albumId?: number }, title: string, artist: string): Promise<{bracketId:number;albums:BracketAlbum[]}> {
-    return this.request(`${this.baseUrl}${bracketId ? '/' + bracketId : ''}/albums${album.albumId ? '/' + album.albumId : ''}`, {method:album.albumId ? 'PUT':'POST',body:JSON.stringify({album,title,artist})});
-  }
-
-  async removeAlbum(bracketId:number,albumId:number):Promise<{albums:BracketAlbum[];affectedSongIds:number[]}> {
-    return this.request(`${this.baseUrl}/${bracketId}/albums/${albumId}`,{method:'DELETE'});
+  searchSpotify(bracketId: number | null, query: string, signal: AbortSignal): Promise<{ tracks: SpotifyTrack[] }> {
+    const path = bracketId === null ? this.baseUrl : `${this.baseUrl}/${bracketId}`;
+    return this.request(`${path}/spotify-search?${new URLSearchParams({ q: query })}`, { signal });
   }
 
   async setPaused(bracketId: number, paused: boolean): Promise<void> {

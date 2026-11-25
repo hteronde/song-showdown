@@ -5,7 +5,7 @@ export interface BracketAlbum { albumId: number; title: string; year: number | n
 
 export type TiebreakerOption = 'random' | 'seed' | 'seed_low' | 'admin_pick';
 
-export interface BracketSong { reorderLocked?: boolean; position?: number; assignedSeed?: number | null; albumId?: number | null; albumCoverUrl?: string; bracketSongId?: number; seed?: number | null; title: string; category: string; album: string; year: number | null; youtubeUrl: string; spotifyUrl: string; }
+export interface BracketSong { artist?: string; reorderLocked?: boolean; position?: number; assignedSeed?: number | null; albumId?: number | null; albumCoverUrl?: string; bracketSongId?: number; seed?: number | null; title: string; category: string; album: string; year: number | null; youtubeUrl: string; spotifyUrl: string; }
 
 export interface BracketRecord {
   sessionPlaylists?:SessionPlaylist[];

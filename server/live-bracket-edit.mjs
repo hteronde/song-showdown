@@ -31,7 +31,7 @@ export async function updateSongDetailsInPlace(c,bracketId,entries,songs,seeds,{
     const song=songs?.[i];
     if(!preserveStructure) await c.execute('UPDATE bracket_songs SET position=? WHERE bracket_id=? AND bracket_song_id=?',[i+1,bracketId,entries[i].bracket_song_id]);
     if(song) entries[i].song_id=await isolateBracketSong(c,bracketId,entries[i].song_id);
-    if(song) await c.execute('UPDATE songs SET title=?,album=?,year=?,category=?,youtube_url=?,spotify_url=?,album_cover_url=? WHERE song_id=?',[song.title.trim(),song.album?.trim()||null,song.year??null,song.category?.trim()||null,song.youtubeUrl?.trim()||null,song.spotifyUrl?.trim()||null,song.albumCoverUrl?.trim()||null,entries[i].song_id]);
+    if(song) await c.execute('UPDATE songs SET artist=COALESCE(?,artist),title=?,album=?,year=?,category=?,youtube_url=?,spotify_url=?,album_cover_url=? WHERE song_id=?',[song.artist?.trim()||null,song.title.trim(),song.album?.trim()||null,song.year??null,song.category?.trim()||null,song.youtubeUrl?.trim()||null,song.spotifyUrl?.trim()||null,song.albumCoverUrl?.trim()||null,entries[i].song_id]);
     if(song && Object.hasOwn(song,'albumId')) await c.execute('UPDATE bracket_songs SET bracket_album_id=? WHERE bracket_id=? AND bracket_song_id=?',[song.albumId??null,bracketId,entries[i].bracket_song_id]);
     if(!preserveStructure && Number(entries[i].seed_number)!==seeds[i]) await c.execute('UPDATE bracket_songs SET seed_number=? WHERE bracket_id=? AND bracket_song_id=?',[seeds[i],bracketId,entries[i].bracket_song_id]);
   }

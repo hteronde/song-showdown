@@ -1,3 +1,4 @@
+import { searchSpotifyTracks, SpotifySearchError } from './spotify-search.mjs';
 import {saveAutomaticEmailSetting} from './bracket-email-settings.mjs';
 import {sendBracketEmail} from './bracket-email.mjs';
 import { processSessionEmails } from './session-emails.mjs';
@@ -312,6 +313,27 @@ const server = createServer(async (request, response) => {
     }
   }
 
+  const spotifySearchPath = url.pathname === '/api/admin/brackets/spotify-search'
+    || /^\/api\/admin\/brackets\/\d+\/spotify-search$/.test(url.pathname);
+  if (request.method === 'GET' && spotifySearchPath) {
+    const query = (url.searchParams.get('q') ?? '').trim();
+
+    if (query.length < 2 || query.length > 200) {
+      send(400, { error: 'Enter a search term between 2 and 200 characters.' });
+      return;
+    }
+
+    try {
+      send(200, { tracks: await searchSpotifyTracks(query) });
+    } catch (error) {
+      if (error instanceof SpotifySearchError) {
+        send(error.status, { error: error.message });
+      } else {
+        send(502, { error: 'Could not reach Spotify. Please try again.' });
+      }
+    }
+    return;
+  }
   if(/^\/api\/(?:family-members|songs|playlists)(?:\/\d+)?$/.test(url.pathname)||url.pathname==='/api/playlist-options') {
     let connection;
     try{
@@ -528,7 +550,7 @@ const server = createServer(async (request, response) => {
            FROM brackets b WHERE b.bracket_id=? AND b.family_id=?`, [id,familyId]);
         if (!rows.length) { send(404, { error:'Bracket not found.' }); return; }
         const [[songs],[members],[rounds]] = await Promise.all([
-          pool.execute('SELECT bs.bracket_song_id AS bracketSongId,bs.position,bs.bracket_album_id AS albumId,bs.seed_number AS seed,bs.assigned_seed AS assignedSeed,s.title,s.category,COALESCE(ba.title,s.album) AS album,CASE WHEN ba.bracket_album_id IS NOT NULL THEN ba.year ELSE s.year END AS year,s.youtube_url AS youtubeUrl,s.spotify_url AS spotifyUrl,CASE WHEN ba.bracket_album_id IS NOT NULL THEN ba.album_cover_url ELSE s.album_cover_url END AS albumCoverUrl FROM bracket_songs bs JOIN songs s ON s.song_id=bs.song_id LEFT JOIN bracket_albums ba ON ba.bracket_id=bs.bracket_id AND ba.bracket_album_id=bs.bracket_album_id WHERE bs.bracket_id=? ORDER BY bs.position,bs.bracket_song_id',[id]),
+          pool.execute('SELECT bs.bracket_song_id AS bracketSongId,bs.position,bs.bracket_album_id AS albumId,bs.seed_number AS seed,bs.assigned_seed AS assignedSeed,s.title,s.artist,s.category,COALESCE(ba.title,s.album) AS album,CASE WHEN ba.bracket_album_id IS NOT NULL THEN ba.year ELSE s.year END AS year,s.youtube_url AS youtubeUrl,s.spotify_url AS spotifyUrl,CASE WHEN ba.bracket_album_id IS NOT NULL THEN ba.album_cover_url ELSE s.album_cover_url END AS albumCoverUrl FROM bracket_songs bs JOIN songs s ON s.song_id=bs.song_id LEFT JOIN bracket_albums ba ON ba.bracket_id=bs.bracket_id AND ba.bracket_album_id=bs.bracket_album_id WHERE bs.bracket_id=? ORDER BY bs.position,bs.bracket_song_id',[id]),
           pool.execute('SELECT user_id AS userId,bracket_role FROM bracket_members WHERE bracket_id=? ORDER BY user_id',[id]),
           pool.execute('SELECT MAX(round_number) AS roundCount FROM bracket_rounds WHERE bracket_id=?',[id])
         ]);
@@ -554,7 +576,7 @@ const server = createServer(async (request, response) => {
         let seedingSize;
         try { seedingSize = input.seedingSize === undefined ? undefined : parseSeedingSize(input.seedingSize,count); } catch(error) {send(400,{error:error.message});return;}
         const songDetails = Array.isArray(input.songs) ? input.songs : null;
-        if (songDetails && songDetails.some(song => !song || typeof song.title !== 'string' || !song.title.trim() || song.title.length > 200 || ['category','album','youtubeUrl','spotifyUrl','albumCoverUrl'].some(key => song[key] != null && typeof song[key] !== 'string') || (song.category?.length ?? 0) > 255 || (song.album?.length ?? 0) > 200 || (song.year != null && (!Number.isInteger(song.year) || song.year < 1 || song.year > 9999)) || ['youtubeUrl','spotifyUrl','albumCoverUrl'].some(key => song[key] && (song[key].length > 2048 || !/^https?:\/\/[^\s]+$/i.test(song[key]))))) {
+        if (songDetails && songDetails.some(song => !song || typeof song.title !== 'string' || !song.title.trim() || song.title.length > 200 || ['artist','category','album','youtubeUrl','spotifyUrl','albumCoverUrl'].some(key => song[key] != null && typeof song[key] !== 'string') || (song.artist?.length ?? 0) > 160 || (song.category?.length ?? 0) > 255 || (song.album?.length ?? 0) > 200 || (song.year != null && (!Number.isInteger(song.year) || song.year < 1 || song.year > 9999)) || ['youtubeUrl','spotifyUrl','albumCoverUrl'].some(key => song[key] && (song[key].length > 2048 || !/^https?:\/\/[^\s]+$/i.test(song[key]))))) {
           send(400, { error: 'Enter valid song details, a year from 1 to 9999, and HTTP or HTTPS song links.' }); return;
         }
         const titles = songDetails ? songDetails.map(song => song.title.trim()) : typeof input.songList === 'string' ? input.songList.split(/\r?\n/).map(s=>s.trim()).filter(Boolean) : [];
@@ -629,14 +651,15 @@ const server = createServer(async (request, response) => {
           const entries=[];
           for (let i=0;i<titles.length;i++) {
             const details = songDetails?.[i];
+            const songArtist = details?.artist?.trim() || String(input.artist).trim();
             const previousSongId=existingSongIds.get(Number(details?.bracketSongId));
-            let songs=previousSongId?[{song_id:previousSongId}]:(await connection.execute('SELECT song_id FROM songs WHERE artist=? AND title=? LIMIT 1',[String(input.artist).trim(),titles[i]]))[0];
+            let songs=previousSongId?[{song_id:previousSongId}]:(await connection.execute('SELECT song_id FROM songs WHERE artist=? AND title=? LIMIT 1',[songArtist,titles[i]]))[0];
             const metadata = details ? [details.album?.trim() || null, details.year ?? null, details.category?.trim() || null, details.youtubeUrl?.trim() || null, details.spotifyUrl?.trim() || null, details.albumCoverUrl?.trim() || null] : [null,null,null,null,null,null];
             if (!songs.length) {
-              const [res]=await connection.execute('INSERT INTO songs (artist,title,album,year,category,youtube_url,spotify_url,album_cover_url) VALUES (?,?,?,?,?,?,?,?)',[String(input.artist).trim(),titles[i],...metadata]); songs=[{song_id:res.insertId}];
+              const [res]=await connection.execute('INSERT INTO songs (artist,title,album,year,category,youtube_url,spotify_url,album_cover_url) VALUES (?,?,?,?,?,?,?,?)',[songArtist,titles[i],...metadata]); songs=[{song_id:res.insertId}];
             } else if (details) {
               songs[0].song_id=await isolateBracketSong(connection,id,songs[0].song_id);
-              await connection.execute('UPDATE songs SET album=COALESCE(?,album),year=COALESCE(?,year),category=COALESCE(?,category),youtube_url=COALESCE(?,youtube_url),spotify_url=COALESCE(?,spotify_url),album_cover_url=COALESCE(?,album_cover_url) WHERE song_id=?',[...metadata,songs[0].song_id]);
+              await connection.execute('UPDATE songs SET album=COALESCE(?,album),year=COALESCE(?,year),category=COALESCE(?,category),youtube_url=COALESCE(?,youtube_url),spotify_url=COALESCE(?,spotify_url),album_cover_url=COALESCE(?,album_cover_url),artist=COALESCE(?,artist) WHERE song_id=?',[...metadata,details.artist?.trim()||null,songs[0].song_id]);
             }
             const region=Math.floor(i/16)+1, seed=seeds[i];
             const [res]=await connection.execute('INSERT INTO bracket_songs (bracket_id,region_number,song_id,seed_number,bracket_album_id,assigned_seed,position) VALUES (?,?,?,?,?,?,?)',[id,region,songs[0].song_id,seed,details?.albumId??null,seedingSize?details?.assignedSeed??null:null,i+1]); entries.push(Number(res.insertId));

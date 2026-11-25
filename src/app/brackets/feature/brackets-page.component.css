@@ -960,33 +960,64 @@
   }
 }
 
-.album-cover-thumb {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-  border-radius: 3px;
-  flex: none;
+.song-detail-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.album-list-info {
+.song-full-row {
+  grid-column: 1 / -1;
+}
+
+.spotify-results {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 250px;
+  overflow: auto;
+}
+
+.spotify-results li, .spotify-track {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+}
+
+.spotify-track {
+  flex: 1;
   min-width: 0;
+  text-align: left;
 }
 
-.album-list-info strong {
-  font-size: 13px;
+.spotify-track span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.album-preview {
-  width: 120px;
-  max-width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  border-radius: 4px;
-  margin-top: 14px;
+.spotify-track small {
+  display: block;
 }
+
+.song-artwork {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spotify-track img, .song-artwork img {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+@media (max-width: 420px) {
+  .song-detail-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 .anonymous-field label {
   display: flex;

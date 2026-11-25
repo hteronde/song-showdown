@@ -13,8 +13,8 @@ import { SessionSettings, previewSessionSchedule, sessionTimingKey, durationMinu
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { BracketsApiService, InvitationParticipant } from '../data-access/brackets-api.service';
-import { SessionPlaylist, BracketSession, BracketSessionsData, BracketInput, BracketParticipant, BracketRecord, BracketSong, BracketAlbum, TiebreakerOption, RandomizationMode } from '../data-access/bracket.model';
+import { BracketsApiService, InvitationParticipant, SpotifyTrack } from '../data-access/brackets-api.service';
+import { SessionPlaylist, BracketSession, BracketSessionsData, BracketInput, BracketParticipant, BracketRecord, BracketSong, TiebreakerOption, RandomizationMode } from '../data-access/bracket.model';
 @Component({
     selector: 'app-brackets-page', standalone: true, imports: [RouterLink, SessionDateFieldsComponent, ResumeBracketDialogComponent, CommonModule, FormsModule, BracketEmailComposerComponent],
     templateUrl: './brackets-page.component.html', styleUrls: ['./brackets-page.component.css']
@@ -49,93 +49,6 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     artist = '';
     songCount = 16;
     songList = '';
-    albums: BracketAlbum[] = [];
-    albumDraft: Omit<BracketAlbum, 'albumId'> & {
-        albumId?: number;
-    } = { title: '', year: null, albumCoverUrl: '' };
-    albumSaving = false;
-    albumError = '';
-    @ViewChild('albumsManagerDialog')
-    albumsManagerDialog?: ElementRef<HTMLDialogElement>;
-    openAlbumsManager(): void { this.albumsManagerDialog?.nativeElement.showModal(); }
-    closeAlbumsManager(): void {
-        if (!this.albumSaving && !this.albumRemoving)
-            this.albumsManagerDialog?.nativeElement.close();
-    }
-    albumToRemove: BracketAlbum | null = null;
-    albumRemoving = false;
-    albumRemovalError = '';
-    @ViewChild('removeAlbumDialog')
-    removeAlbumDialog?: ElementRef<HTMLDialogElement>;
-    removeAlbum(album: BracketAlbum): void { this.albumToRemove = album; this.albumRemovalError = ''; this.removeAlbumDialog?.nativeElement.showModal(); }
-    closeAlbumRemoval(): void {
-        if (!this.albumRemoving) {
-            this.removeAlbumDialog?.nativeElement.close();
-            this.albumToRemove = null;
-        }
-    }
-    async confirmRemoveAlbum(): Promise<void> {
-        if (!this.editingId || !this.albumToRemove || this.albumRemoving)
-            return;
-        this.albumRemoving = true;
-        this.albumRemovalError = '';
-        try {
-            const result = await this.bracketsApi.removeAlbum(this.editingId, this.albumToRemove.albumId);
-            this.albums = result.albums;
-            const affected = new Set(result.affectedSongIds);
-            this.songs = this.songs.map(song => song.bracketSongId != null && affected.has(song.bracketSongId) ? { ...song, albumId: null, album: '', year: null, albumCoverUrl: '' } : song);
-            this.syncSongs();
-            this.removeAlbumDialog?.nativeElement.close();
-            this.albumToRemove = null;
-            this.showSessionToast('Album Removed', 'success');
-            this.success = 'Album removed.';
-        }
-        catch (error) {
-            this.albumRemovalError = this.message(error);
-        }
-        finally {
-            this.albumRemoving = false;
-            this.changeDetector.markForCheck();
-        }
-    }
-    @ViewChild('albumDialog')
-    albumDialog?: ElementRef<HTMLDialogElement>;
-    openAlbumModal(album?: BracketAlbum): void {
-        this.albumDraft = album ? { ...album } : { title: '', year: null, albumCoverUrl: '' };
-        this.albumError = '';
-        this.albumDialog?.nativeElement.showModal();
-    }
-    closeAlbumModal(): void {
-        if (!this.albumSaving)
-            this.albumDialog?.nativeElement.close();
-    }
-    async saveAlbum(): Promise<void> {
-        if (this.albumSaving)
-            return;
-        this.albumSaving = true;
-        this.albumError = '';
-        try {
-            const result = await this.bracketsApi.saveAlbum(this.editingId, this.albumDraft, this.title, this.artist);
-            this.editingId = result.bracketId;
-            this.albums = result.albums;
-            this.songs = this.songs.map(song => this.songWithAlbum(song));
-            this.syncSongs();
-            this.albumDialog?.nativeElement.close();
-            this.showSessionToast('Album Saved', 'success');
-            this.success = 'Album saved. Its details are shared by every linked song in this bracket.';
-        }
-        catch (error) {
-            this.albumError = this.message(error);
-        }
-        finally {
-            this.albumSaving = false;
-            this.changeDetector.markForCheck();
-        }
-    }
-    private songWithAlbum(song: BracketSong): BracketSong {
-        const album = this.albums.find(album => album.albumId === song.albumId);
-        return album ? { ...song, album: album.title, year: album.year, albumCoverUrl: album.albumCoverUrl ?? '' } : song;
-    }
     @ViewChild('seedHelpDialog')
     seedHelpDialog?: ElementRef<HTMLDialogElement>;
     openSeedHelp(): void { this.seedHelpDialog?.nativeElement.showModal(); }
@@ -314,8 +227,9 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     @ViewChild('songDialog')
     songDialog?: ElementRef<HTMLDialogElement>;
     openSongModal(index: number | null = null): void {
+        this.updateSpotifyQuery('');
         this.editingSongIndex = index;
-        this.songDraft = index === null ? this.emptySong() : { ...this.songs[index] };
+        this.songDraft = index === null ? { ...this.emptySong(), artist: this.artist } : { ...this.songs[index] };
         this.songError = '';
         this.songDialog?.nativeElement.showModal();
     }
@@ -324,10 +238,71 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.songDialog?.nativeElement.close();
     }
     onSongModalClosed(): void {
+        this.updateSpotifyQuery('');
         this.songDraft = this.emptySong();
         this.editingSongIndex = null;
         this.songError = '';
     }
+    spotifyQuery = '';
+    spotifyTracks: SpotifyTrack[] = [];
+    spotifySearching = false;
+    spotifySearchError = '';
+    spotifyNoResults = false;
+    private spotifySearchController?: AbortController;
+    private spotifySearchTimer?: ReturnType<typeof setTimeout>;
+
+    updateSpotifyQuery(query: string): void {
+        clearTimeout(this.spotifySearchTimer);
+        this.spotifySearchController?.abort();
+        this.spotifyQuery = query;
+        this.spotifyTracks = [];
+        this.spotifySearching = false;
+        this.spotifySearchError = '';
+        this.spotifyNoResults = false;
+        if (query.trim().length >= 2) {
+            this.spotifySearchTimer = setTimeout(() => void this.searchSpotify(), 400);
+        }
+    }
+
+    async searchSpotify(): Promise<void> {
+        const query = this.spotifyQuery.trim();
+        if (query.length < 2 || this.spotifySearching || this.songSaving) return;
+        clearTimeout(this.spotifySearchTimer);
+        this.spotifySearchError = '';
+        this.spotifyNoResults = false;
+        const controller = new AbortController();
+        this.spotifySearchController = controller;
+        this.spotifySearching = true;
+        this.changeDetector.markForCheck();
+        try {
+            const { tracks } = await this.bracketsApi.searchSpotify(this.editingId, query, controller.signal);
+            if (controller.signal.aborted) return;
+            this.spotifyTracks = tracks;
+            this.spotifyNoResults = tracks.length === 0;
+        } catch (error) {
+            if (!controller.signal.aborted) this.spotifySearchError = this.message(error);
+        } finally {
+            if (!controller.signal.aborted) {
+                this.spotifySearchController = undefined;
+                this.spotifySearching = false;
+                this.changeDetector.markForCheck();
+            }
+        }
+    }
+
+    selectSpotifyTrack(track: SpotifyTrack): void {
+        this.songDraft = {
+            ...this.songDraft,
+            title: track.title,
+            artist: track.artist.slice(0, 160),
+            album: track.album,
+            year: track.year,
+            albumCoverUrl: track.albumCoverUrl ?? '',
+            spotifyUrl: track.spotifyUrl ?? ''
+        };
+        this.updateSpotifyQuery('');
+    }
+
     private emptySong(): BracketSong { return { assignedSeed: null, albumId: null, albumCoverUrl: '', seed: null, title: '', category: '', album: '', year: null, youtubeUrl: '', spotifyUrl: '' }; }
     seedKeydown(event: KeyboardEvent): void {
         if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1 && !/^[0-9]$/.test(event.key))
@@ -346,7 +321,11 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         if (this.songSaving)
             return;
         this.songError = '';
-        const song = this.songWithAlbum({ ...this.songDraft, title: this.songDraft.title.trim() });
+        const song = { ...this.songDraft, title: this.songDraft.title.trim() };
+        const previous = this.editingSongIndex === null ? undefined : this.songs[this.editingSongIndex];
+        if (previous && (song.album !== previous.album || song.year !== previous.year || song.albumCoverUrl !== previous.albumCoverUrl)) {
+            song.albumId = null;
+        }
         if (song.seed != null && (!Number.isInteger(song.seed) || song.seed < 1 || song.seed > 16)) {
             this.songError = 'Seed must be a whole number from 1 to 16, or left blank.';
             return;
@@ -625,7 +604,6 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.randomizeSongs = this.randomizationMode !== 'none';
             this.automaticEmailsDisabled = !!item.automaticEmailsDisabled;
             this.anonymous = !!item.anonymous;
-            this.albums = item.albums ?? [];
             this.sessionPlaylists = item.sessionPlaylists ?? [];
             this.tiebreakerOption = item.tiebreakerOption ?? 'admin_pick';
             this.editingStatus = item.status;
@@ -953,6 +931,8 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.sessionToastTimer = setTimeout(() => { this.sessionToastMessage = ''; this.changeDetector.markForCheck(); }, 5000);
     }
     ngOnDestroy(): void {
+        clearTimeout(this.spotifySearchTimer);
+        this.spotifySearchController?.abort();
         this.readController.abort();
         this.routeSubscription?.unsubscribe();
         if (this.sessionToastTimer)
@@ -1233,7 +1213,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         if (!this.participantIds.some(id=>this.participantRoles[id]==='commissioner'))this.fieldErrors.participants='Select at least one participant with the Commissioner role.';
         return Object.keys(this.fieldErrors).length === 0;
     }
-    private resetForm(): void { this.participantRoles = {}; this.invitations = []; this.invitationNotice = ''; this.editingId = null; this.sessionPlaylists = []; this.playlistDraft = []; this.sessionStoredDraft = false; this.savedSessions = []; this.scheduleBaseline = null; this.lastPreviewTimingKey = ''; this.sessions = []; this.sessionsError = ''; this.sessionsNotice = ''; this.sessionsRevision = ''; this.editingStatus = null; this.useSeeds = false; this.seedingSize = 4; this.randomizationMode = 'none'; this.randomizeSongs = false; this.anonymous = false; this.automaticEmailsDisabled = false; this.albums = []; this.tiebreakerOption = 'admin_pick'; this.title = ''; this.artist = ''; this.logoUrl = ''; this.songCount = 16; this.songList = ''; this.songs = []; this.songDraft = this.emptySong(); this.songError = ''; this.participantIds = []; this.startAt = ''; this.finaleDate = ''; this.finaleStartRound = null; this.songsPerSession = 2; this.noSessionTimer = false; this.durationValue = 1; this.durationUnit = 'weeks'; this.error = ''; this.success = ''; this.showValidationErrors = false; this.fieldErrors = {}; }
+    private resetForm(): void { this.updateSpotifyQuery(''); this.participantRoles = {}; this.invitations = []; this.invitationNotice = ''; this.editingId = null; this.sessionPlaylists = []; this.playlistDraft = []; this.sessionStoredDraft = false; this.savedSessions = []; this.scheduleBaseline = null; this.lastPreviewTimingKey = ''; this.sessions = []; this.sessionsError = ''; this.sessionsNotice = ''; this.sessionsRevision = ''; this.editingStatus = null; this.useSeeds = false; this.seedingSize = 4; this.randomizationMode = 'none'; this.randomizeSongs = false; this.anonymous = false; this.automaticEmailsDisabled = false; this.tiebreakerOption = 'admin_pick'; this.title = ''; this.artist = ''; this.logoUrl = ''; this.songCount = 16; this.songList = ''; this.songs = []; this.songDraft = this.emptySong(); this.songError = ''; this.participantIds = []; this.startAt = ''; this.finaleDate = ''; this.finaleStartRound = null; this.songsPerSession = 2; this.noSessionTimer = false; this.durationValue = 1; this.durationUnit = 'weeks'; this.error = ''; this.success = ''; this.showValidationErrors = false; this.fieldErrors = {}; }
     private setDuration(minutes: number): void {
         if (minutes % 10080 === 0) {
             this.durationUnit = 'weeks';

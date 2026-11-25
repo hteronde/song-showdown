@@ -11,11 +11,11 @@ test('songs inherit canonical album fields and cannot forge their own copies',as
   const [song]=await resolveSongAlbums(c,6,[{title:'Song',albumId:10,album:'Forged',year:2026,albumCoverUrl:'https://example.com/wrong.jpg'}]);
   assert.equal(song.album,'Shared album');assert.equal(song.year,1999);assert.equal(song.albumCoverUrl,'https://example.com/cover.jpg');
 });
-test('albums from other brackets are rejected and No album clears inherited fields',async()=>{
+test('albums from other brackets are rejected and unlinked songs retain their own release details',async()=>{
   const c={async execute(){return [[]];}};
   await assert.rejects(resolveSongAlbums(c,6,[{albumId:99,title:'Song'}]),{status:400});
   const [song]=await resolveSongAlbums(c,6,[{albumId:null,title:'Song',album:'Old',year:1999,albumCoverUrl:'https://old.example/art.jpg'}]);
-  assert.equal(song.album,'');assert.equal(song.year,null);assert.equal(song.albumCoverUrl,'');
+  assert.equal(song.album,'Old');assert.equal(song.year,1999);assert.equal(song.albumCoverUrl,'https://old.example/art.jpg');
 });
 
 test('album removal verifies family and album ownership before making changes',async()=>{

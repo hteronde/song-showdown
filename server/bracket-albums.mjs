@@ -11,11 +11,10 @@ export async function getBracketAlbums(c,bracketId) {
 }
 export async function resolveSongAlbums(c,bracketId,songs) {
   if(!Array.isArray(songs)) return songs;
-  if(!songs.some(song=>song&&Object.hasOwn(song,'albumId'))) return songs;
+  if(!songs.some(song=>song?.albumId != null)) return songs;
   const albums=await getBracketAlbums(c,bracketId);
   return songs.map(song=>{
-    if(!Object.hasOwn(song,'albumId')) return song; // Existing import clients retain their metadata.
-    if(song.albumId==null) return {...song,album:'',year:null,albumCoverUrl:''};
+    if(song.albumId==null) return song; // Unlinked songs carry their own release details.
     if(!Number.isSafeInteger(song.albumId)) throw invalid('Select a valid album from this bracket.');
     const album=albums.find(album=>Number(album.albumId)===song.albumId);
     if(!album) throw invalid('The selected album does not belong to this bracket.');
