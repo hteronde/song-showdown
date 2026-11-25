@@ -216,7 +216,7 @@
       <p class="hint" *ngIf="editingSongIndex !== null">Update song details here. Saving keeps the bracket order, seeds, matchups, and votes unchanged.</p>
       <form ngNativeValidate (ngSubmit)="addSong()">
         <div class="song-fields song-detail-fields">
-          <label class="song-full-row">Search title<input name="spotifyQuery" type="search" [ngModel]="spotifyQuery" (ngModelChange)="updateSpotifyQuery($event)" (keydown.enter)="$event.preventDefault(); searchSpotify()" maxlength="200" placeholder="Song title or artist" autofocus></label>
+          <label class="song-full-row">Search Title or Artist<input name="spotifyQuery" type="search" [ngModel]="spotifyQuery" (ngModelChange)="updateSpotifyQuery($event)" (keydown.enter)="$event.preventDefault(); searchSpotify()" maxlength="200" placeholder="Song title or artist" autofocus></label>
           <p class="hint song-full-row" *ngIf="spotifySearching" role="status">Searching Spotify…</p>
           <p class="field-error song-full-row" *ngIf="spotifySearchError" role="alert">{{ spotifySearchError }}</p>
           <p class="hint song-full-row" *ngIf="spotifyNoResults" role="status">No matching tracks found.</p>
