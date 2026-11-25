@@ -13,6 +13,12 @@ export interface SpotifyTrack {
   spotifyUrl: string | null;
 }
 
+export interface YouTubeVideo {
+  title: string;
+  channel: string;
+  url: string;
+}
+
 export interface InvitationDelivery {sent:number;failed:number;}
 
 @Injectable({ providedIn: 'root' })
@@ -78,6 +84,11 @@ export class BracketsApiService {
   searchSpotify(bracketId: number | null, query: string, signal: AbortSignal): Promise<{ tracks: SpotifyTrack[] }> {
     const path = bracketId === null ? this.baseUrl : `${this.baseUrl}/${bracketId}`;
     return this.request(`${path}/spotify-search?${new URLSearchParams({ q: query })}`, { signal });
+  }
+
+  searchYouTube(bracketId: number | null, title: string, artist: string, signal: AbortSignal): Promise<{ videos: YouTubeVideo[]; suggestedUrl: string | null }> {
+    const path = bracketId === null ? this.baseUrl : `${this.baseUrl}/${bracketId}`;
+    return this.request(`${path}/youtube-search?${new URLSearchParams({ title, artist })}`, { signal });
   }
 
   async setPaused(bracketId: number, paused: boolean): Promise<void> {

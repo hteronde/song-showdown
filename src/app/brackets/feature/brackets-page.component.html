@@ -220,9 +220,9 @@
           <p class="hint song-full-row" *ngIf="spotifySearching" role="status">Searching Spotify…</p>
           <p class="field-error song-full-row" *ngIf="spotifySearchError" role="alert">{{ spotifySearchError }}</p>
           <p class="hint song-full-row" *ngIf="spotifyNoResults" role="status">No matching tracks found.</p>
-          <ul class="spotify-results song-full-row" *ngIf="spotifyTracks.length" aria-label="Spotify results">
+          <ul class="song-search-results song-full-row" *ngIf="spotifyTracks.length" aria-label="Spotify results">
             <li *ngFor="let track of spotifyTracks">
-              <button class="cancel spotify-track" type="button" (click)="selectSpotifyTrack(track)" [disabled]="songSaving">
+              <button class="cancel song-search-result" type="button" (click)="selectSpotifyTrack(track)" [disabled]="songSaving">
                 <img *ngIf="track.albumCoverUrl" [src]="track.albumCoverUrl" alt="" referrerpolicy="no-referrer">
                 <span><strong>{{ track.title }}</strong><small>{{ track.artist }} · {{ track.album }}{{ track.year ? ' · ' + track.year : '' }}</small></span>
               </button>
@@ -235,8 +235,17 @@
           <label>Release year<input name="songYear" [(ngModel)]="songDraft.year" type="number" min="1" max="9999" step="1"></label>
           <label *ngIf="!useSeeds && editingSongIndex === null">Seed (optional)<input name="songSeed" [(ngModel)]="songDraft.seed" type="number" inputmode="numeric" min="1" max="16" step="1" (keydown)="seedKeydown($event)" (beforeinput)="seedBeforeInput($event)" (paste)="seedPaste($event)" placeholder="Auto" title="Whole number from 1 to 16; leave blank for automatic seeding"></label>
           <label>Category<input name="songCategory" [(ngModel)]="songDraft.category" maxlength="255"></label>
-          <label>YouTube URL<input name="songYoutube" [(ngModel)]="songDraft.youtubeUrl" type="url" maxlength="2048" placeholder="https://youtube.com/watch?v=…"></label>
+          <label>YouTube URL<input name="songYoutube" [ngModel]="songDraft.youtubeUrl" (ngModelChange)="updateYouTubeUrl($event)" type="url" maxlength="2048" placeholder="https://youtube.com/watch?v=…"></label>
           <label>Spotify URL<input name="songSpotify" [(ngModel)]="songDraft.spotifyUrl" type="url" maxlength="2048" placeholder="https://open.spotify.com/track/…"></label>
+          <p class="hint song-full-row" *ngIf="youtubeLookupMessage" role="status">{{ youtubeLookupMessage }}</p>
+          <ul class="song-search-results song-full-row" *ngIf="youtubeVideos.length" aria-label="YouTube results">
+            <li *ngFor="let video of youtubeVideos">
+              <button class="cancel song-search-result" type="button" (click)="updateYouTubeUrl(video.url)" [disabled]="songSaving">
+                <span><strong>{{ video.title }}</strong><small>{{ video.channel }}</small></span>
+              </button>
+              <a [href]="video.url" target="_blank" rel="noopener noreferrer" [attr.aria-label]="'Open ' + video.title + ' on YouTube'">YouTube ↗</a>
+            </li>
+          </ul>
           <label class="song-full-row">Album cover URL<input name="songCover" [(ngModel)]="songDraft.albumCoverUrl" type="url" maxlength="2048"></label>
           <div *ngIf="songDraft.albumCoverUrl" class="song-artwork song-full-row">
             <img [src]="songDraft.albumCoverUrl" alt="Album cover" referrerpolicy="no-referrer">

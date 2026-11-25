@@ -13,7 +13,7 @@ import { SessionSettings, previewSessionSchedule, sessionTimingKey, durationMinu
 import { CommonModule } from '@angular/common';
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { BracketsApiService, InvitationParticipant, SpotifyTrack } from '../data-access/brackets-api.service';
+import { BracketsApiService, InvitationParticipant, SpotifyTrack, YouTubeVideo } from '../data-access/brackets-api.service';
 import { SessionPlaylist, BracketSession, BracketSessionsData, BracketInput, BracketParticipant, BracketRecord, BracketSong, TiebreakerOption, RandomizationMode } from '../data-access/bracket.model';
 @Component({
     selector: 'app-brackets-page', standalone: true, imports: [RouterLink, SessionDateFieldsComponent, ResumeBracketDialogComponent, CommonModule, FormsModule, BracketEmailComposerComponent],
@@ -228,6 +228,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     songDialog?: ElementRef<HTMLDialogElement>;
     openSongModal(index: number | null = null): void {
         this.updateSpotifyQuery('');
+        this.resetYouTubeLookup();
         this.editingSongIndex = index;
         this.songDraft = index === null ? { ...this.emptySong(), artist: this.artist } : { ...this.songs[index] };
         this.songError = '';
@@ -239,6 +240,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     }
     onSongModalClosed(): void {
         this.updateSpotifyQuery('');
+        this.resetYouTubeLookup();
         this.songDraft = this.emptySong();
         this.editingSongIndex = null;
         this.songError = '';
@@ -291,6 +293,8 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
     }
 
     selectSpotifyTrack(track: SpotifyTrack): void {
+        const youtubeUrl = this.songDraft.youtubeUrl === this.autofilledYouTubeUrl ? '' : this.songDraft.youtubeUrl;
+        this.resetYouTubeLookup();
         this.songDraft = {
             ...this.songDraft,
             title: track.title,
@@ -298,9 +302,59 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             album: track.album,
             year: track.year,
             albumCoverUrl: track.albumCoverUrl ?? '',
-            spotifyUrl: track.spotifyUrl ?? ''
+            spotifyUrl: track.spotifyUrl ?? '',
+            youtubeUrl
         };
         this.updateSpotifyQuery('');
+        if (!youtubeUrl?.trim()) void this.lookupYouTube(this.songDraft.title, this.songDraft.artist ?? '');
+    }
+
+    youtubeVideos: YouTubeVideo[] = [];
+    youtubeLookupMessage = '';
+    private youtubeLookupController?: AbortController;
+    private autofilledYouTubeUrl?: string;
+
+    private resetYouTubeLookup(): void {
+        this.youtubeLookupController?.abort();
+        this.youtubeLookupController = undefined;
+        this.autofilledYouTubeUrl = undefined;
+        this.youtubeVideos = [];
+        this.youtubeLookupMessage = '';
+    }
+
+    updateYouTubeUrl(url: string): void {
+        this.resetYouTubeLookup();
+        this.songDraft.youtubeUrl = url;
+    }
+
+    private async lookupYouTube(title: string, artist: string): Promise<void> {
+        if (!title || !artist) return;
+        const controller = new AbortController();
+        this.youtubeLookupController = controller;
+        this.youtubeLookupMessage = 'Looking up a YouTube video…';
+        try {
+            const { videos, suggestedUrl } = await this.bracketsApi.searchYouTube(this.editingId, title, artist, controller.signal);
+            if (controller.signal.aborted) return;
+            if (this.songDraft.title !== title || this.songDraft.artist !== artist || this.songSaving) {
+                this.youtubeLookupMessage = '';
+                return;
+            }
+            if (suggestedUrl) {
+                this.songDraft.youtubeUrl = suggestedUrl;
+                this.autofilledYouTubeUrl = suggestedUrl;
+                this.youtubeLookupMessage = 'YouTube URL filled in. You can edit it before saving.';
+            } else {
+                this.youtubeVideos = videos;
+                this.youtubeLookupMessage = videos.length ? 'Choose a YouTube video or enter a URL.' : 'No YouTube matches found. You can enter a URL manually.';
+            }
+        } catch (error) {
+            if (!controller.signal.aborted) this.youtubeLookupMessage = this.message(error);
+        } finally {
+            if (!controller.signal.aborted) {
+                this.youtubeLookupController = undefined;
+                this.changeDetector.markForCheck();
+            }
+        }
     }
 
     private emptySong(): BracketSong { return { assignedSeed: null, albumId: null, albumCoverUrl: '', seed: null, title: '', category: '', album: '', year: null, youtubeUrl: '', spotifyUrl: '' }; }
@@ -931,6 +985,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             this.sessionToastTimer = setTimeout(() => { this.sessionToastMessage = ''; this.changeDetector.markForCheck(); }, 5000);
     }
     ngOnDestroy(): void {
+        this.youtubeLookupController?.abort();
         clearTimeout(this.spotifySearchTimer);
         this.spotifySearchController?.abort();
         this.readController.abort();
@@ -1213,7 +1268,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         if (!this.participantIds.some(id=>this.participantRoles[id]==='commissioner'))this.fieldErrors.participants='Select at least one participant with the Commissioner role.';
         return Object.keys(this.fieldErrors).length === 0;
     }
-    private resetForm(): void { this.updateSpotifyQuery(''); this.participantRoles = {}; this.invitations = []; this.invitationNotice = ''; this.editingId = null; this.sessionPlaylists = []; this.playlistDraft = []; this.sessionStoredDraft = false; this.savedSessions = []; this.scheduleBaseline = null; this.lastPreviewTimingKey = ''; this.sessions = []; this.sessionsError = ''; this.sessionsNotice = ''; this.sessionsRevision = ''; this.editingStatus = null; this.useSeeds = false; this.seedingSize = 4; this.randomizationMode = 'none'; this.randomizeSongs = false; this.anonymous = false; this.automaticEmailsDisabled = false; this.tiebreakerOption = 'admin_pick'; this.title = ''; this.artist = ''; this.logoUrl = ''; this.songCount = 16; this.songList = ''; this.songs = []; this.songDraft = this.emptySong(); this.songError = ''; this.participantIds = []; this.startAt = ''; this.finaleDate = ''; this.finaleStartRound = null; this.songsPerSession = 2; this.noSessionTimer = false; this.durationValue = 1; this.durationUnit = 'weeks'; this.error = ''; this.success = ''; this.showValidationErrors = false; this.fieldErrors = {}; }
+    private resetForm(): void { this.updateSpotifyQuery(''); this.resetYouTubeLookup(); this.participantRoles = {}; this.invitations = []; this.invitationNotice = ''; this.editingId = null; this.sessionPlaylists = []; this.playlistDraft = []; this.sessionStoredDraft = false; this.savedSessions = []; this.scheduleBaseline = null; this.lastPreviewTimingKey = ''; this.sessions = []; this.sessionsError = ''; this.sessionsNotice = ''; this.sessionsRevision = ''; this.editingStatus = null; this.useSeeds = false; this.seedingSize = 4; this.randomizationMode = 'none'; this.randomizeSongs = false; this.anonymous = false; this.automaticEmailsDisabled = false; this.tiebreakerOption = 'admin_pick'; this.title = ''; this.artist = ''; this.logoUrl = ''; this.songCount = 16; this.songList = ''; this.songs = []; this.songDraft = this.emptySong(); this.songError = ''; this.participantIds = []; this.startAt = ''; this.finaleDate = ''; this.finaleStartRound = null; this.songsPerSession = 2; this.noSessionTimer = false; this.durationValue = 1; this.durationUnit = 'weeks'; this.error = ''; this.success = ''; this.showValidationErrors = false; this.fieldErrors = {}; }
     private setDuration(minutes: number): void {
         if (minutes % 10080 === 0) {
             this.durationUnit = 'weeks';

@@ -1,3 +1,4 @@
+import { searchYouTubeVideos, YouTubeSearchError } from './youtube-search.mjs';
 import { searchSpotifyTracks, SpotifySearchError } from './spotify-search.mjs';
 import {saveAutomaticEmailSetting} from './bracket-email-settings.mjs';
 import {sendBracketEmail} from './bracket-email.mjs';
@@ -330,6 +331,24 @@ const server = createServer(async (request, response) => {
         send(error.status, { error: error.message });
       } else {
         send(502, { error: 'Could not reach Spotify. Please try again.' });
+      }
+    }
+    return;
+  }
+  if (request.method === 'GET' && /^\/api\/admin\/brackets(?:\/\d+)?\/youtube-search$/.test(url.pathname)) {
+    const title = (url.searchParams.get('title') ?? '').trim();
+    const artist = (url.searchParams.get('artist') ?? '').trim();
+    if (!title || title.length > 200 || !artist || artist.length > 160) {
+      send(400, { error: 'Enter a valid song title and artist.' });
+      return;
+    }
+    try {
+      send(200, await searchYouTubeVideos(title, artist));
+    } catch (error) {
+      if (error instanceof YouTubeSearchError) {
+        send(error.status, { error: error.message });
+      } else {
+        send(502, { error: 'Could not reach YouTube. You can enter a URL manually.' });
       }
     }
     return;

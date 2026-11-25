@@ -968,7 +968,7 @@
   grid-column: 1 / -1;
 }
 
-.spotify-results {
+.song-search-results {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -978,24 +978,24 @@
   overflow: auto;
 }
 
-.spotify-results li, .spotify-track {
+.song-search-results li, .song-search-result {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.spotify-track {
+.song-search-result {
   flex: 1;
   min-width: 0;
   text-align: left;
 }
 
-.spotify-track span {
+.song-search-result span {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.spotify-track small {
+.song-search-result small {
   display: block;
 }
 
@@ -1005,7 +1005,7 @@
   gap: 8px;
 }
 
-.spotify-track img, .song-artwork img {
+.song-search-result img, .song-artwork img {
   flex: none;
   width: 40px;
   height: 40px;
