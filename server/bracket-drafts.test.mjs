@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {prepareBracketDraft,restoreBracketDraft,saveBracketDraft,saveDraftSessionSettings} from './bracket-drafts.mjs';
+import {bracketListRecord,prepareBracketDraft,restoreBracketDraft,saveBracketDraft,saveDraftSessionSettings} from './bracket-drafts.mjs';
 test('drafts require only title and theme, allow unfinished fields, and ignore control fields',()=>{
  assert.deepEqual(prepareBracketDraft({title:'  A bracket ',artist:' Rock ',status:'complete',familyId:9,songCount:32,songs:[],participantIds:[],startAt:null,finaleAt:'2027-01-01',finaleStartRound:null,seedingSize:8}),{title:'A bracket',artist:'Rock',settings:{songCount:32,songs:[],participantIds:[],startAt:null,finaleAt:'2027-01-01',finaleStartRound:null,seedingSize:8}});
  for(const input of [null,{},[],{title:'A',artist:''},{title:'',artist:'B'},{title:'a'.repeat(161),artist:'B'}])assert.throws(()=>prepareBracketDraft(input));
@@ -10,6 +10,15 @@ test('draft restoration keeps the latest song metadata while recovering unfinish
  const row={status:'draft',draftSettings:JSON.stringify({songCount:32,startAt:null,songs:[{bracketSongId:1,title:'Old title',assignedSeed:null},{bracketSongId:2,title:'Removed song',assignedSeed:2}]})};
  assert.deepEqual(restoreBracketDraft(row,songs),{settings:{songCount:32,startAt:null},songs:[{...songs[0],assignedSeed:null},songs[1]]});
  assert.deepEqual(restoreBracketDraft({...row,status:'active'},songs),{settings:{},songs});
+});
+test('the bracket list uses saved draft logos and tiebreakers, including logo removal',()=>{
+ const base={bracketId:5,status:'draft',songCount:16,logoUrl:'https://example.com/old.png',tiebreakerOption:'admin_pick'};
+ const saved={...base,songCount:32,logoUrl:'https://example.com/new.png',tiebreakerOption:'random'};
+ const draftSettings=JSON.stringify({songCount:saved.songCount,logoUrl:saved.logoUrl,tiebreakerOption:saved.tiebreakerOption,participantIds:[2]});
+ assert.deepEqual(bracketListRecord({...base,draftSettings}),saved);
+ assert.deepEqual(bracketListRecord({...base,draftSettings:null}),base);
+ assert.deepEqual(bracketListRecord({...base,draftSettings:{logoUrl:null}}),{...base,logoUrl:null});
+ assert.deepEqual(bracketListRecord({...base,status:'complete',draftSettings}),{...base,status:'complete'});
 });
 test('draft creation stores form settings without creating a schedule or participants',async()=>{
  const calls=[];const c={async execute(sql,args){calls.push({sql,args});return [{insertId:5}];}};

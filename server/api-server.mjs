@@ -20,7 +20,7 @@ import { readJson } from './request-json.mjs';
 import {duplicateBracket} from './duplicate-bracket.mjs';
 import {getManagedSessions,saveManagedSessions,applySubmittedSessionSchedule} from './session-management.mjs';
 import {closeFullyVotedWeeks,finalizeClosedMatchups,openNextUntimedWeeks,priorSessionsReadySql,getAdvanceWeekPlan,advanceWeek} from './session-progression.mjs';
-import { saveBracketDraft, saveDraftSessionSettings, restoreBracketDraft, parseDraftSettings } from './bracket-drafts.mjs';
+import { saveBracketDraft, saveDraftSessionSettings, restoreBracketDraft, bracketListRecord } from './bracket-drafts.mjs';
 import { parseSeedingSize, validateAssignedSeeds, seededOrder } from './bracket-seeding.mjs';
 import { saveParticipantEmails } from './participant-emails.mjs';
 import { parseFinalePlan, awaitingFinaleSql } from './finale-plan.mjs';
@@ -559,7 +559,7 @@ const server = createServer(async (request, response) => {
                   COUNT(DISTINCT bs.bracket_song_id) AS songCount
            FROM brackets b LEFT JOIN bracket_songs bs ON bs.bracket_id=b.bracket_id
            WHERE b.family_id=? AND (?='super' OR EXISTS (SELECT 1 FROM bracket_members cm WHERE cm.bracket_id=b.bracket_id AND cm.user_id=? AND cm.bracket_role='commissioner' AND cm.invitation_status='accepted')) GROUP BY b.bracket_id ORDER BY b.created_at DESC`, [familyId,authenticatedUser.user_role,authenticatedUser.userId]);
-        send(200, { brackets: rows.map(({draftSettings,...row})=>({...row,songCount:row.status==='draft' ? parseDraftSettings(draftSettings).songCount??row.songCount : row.songCount})) }); return;
+        send(200, { brackets: rows.map(bracketListRecord) }); return;
       }
       if (request.method === 'GET' && /^\/api\/admin\/brackets\/\d+$/.test(url.pathname)) {
         const id = Number(url.pathname.split('/').at(-1));

@@ -7,6 +7,16 @@ export function parseDraftSettings(value) {
   if(!value)return {};
   return typeof value==='string'?JSON.parse(value):value;
 }
+export function bracketListRecord({draftSettings,...row}) {
+  if(row.status!=='draft')return row;
+  const settings=parseDraftSettings(draftSettings);
+  return {
+    ...row,
+    songCount:settings.songCount??row.songCount,
+    logoUrl:Object.hasOwn(settings,'logoUrl')?settings.logoUrl:row.logoUrl,
+    tiebreakerOption:settings.tiebreakerOption??row.tiebreakerOption
+  };
+}
 export function prepareBracketDraft(input) {
   if(!input || typeof input!=='object' || Array.isArray(input))throw fail(400,'Enter a Title and Theme to save a draft.');
   const title=typeof input.title==='string'?input.title.trim():'',artist=typeof input.artist==='string'?input.artist.trim():'';
