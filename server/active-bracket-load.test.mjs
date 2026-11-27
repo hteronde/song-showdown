@@ -24,6 +24,24 @@ function fixture(){
   return {component,requests,saves,get checks(){return checks;}};
 }
 
+test('the entire-bracket playlist stays visible across weekly voting, gaps, and the finale',()=>{
+  const {component}=fixture();
+  const playlists=[null,1,2,2].map((weekNumber,index)=>({weekNumber,playlistName:`Playlist ${index}`}));
+  const payload=data(1);
+  payload.bracket.finaleStartRound=2;
+  payload.weeks=[{weekNumber:1,roundNumber:1,isCurrent:true},{weekNumber:2,roundNumber:2}];
+  payload.playlists=playlists;
+  component.data=payload;
+  assert.deepEqual(component.sessionPlaylists,playlists.slice(0,2));
+  payload.weeks[0].isCurrent=false;
+  assert.deepEqual(component.sessionPlaylists,playlists.slice(0,1));
+  payload.awaitingFinale=true;
+  assert.deepEqual(component.sessionPlaylists,[playlists[0],...playlists.slice(2)]);
+  payload.awaitingFinale=false;
+  payload.finaleModeActive=true;
+  assert.deepEqual(component.sessionPlaylists,[playlists[0],...playlists.slice(2)]);
+});
+
 test('a slow A response cannot overwrite B data, user state, picks, or comments',async()=>{
   const {component:c,requests}=fixture();
   const a=c.load(1),b=c.load(2);

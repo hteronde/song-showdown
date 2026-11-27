@@ -915,7 +915,7 @@ const server = createServer(async (request, response) => {
       }
 
       if (bracketRows[0].isUpcoming) {
-        send(200, { bracket: bracketRows[0], isUpcoming: true, weeks: [], playlists: [],
+        send(200, { bracket: bracketRows[0], isUpcoming: true, weeks: [], playlists: (await getSessionPlaylists(pool,bracketId)).filter(playlist=>playlist.weekNumber===null),
           finaleModeActive: false, awaitingFinale: false, canViewBallots: false,
           currentWeekNumber: null, canManage:!!bracketAccess?.canManage, isCommissioner:!!Number(bracketAccess?.isCommissioner), ballotEditingRound: null });
         return;
@@ -1044,7 +1044,7 @@ const server = createServer(async (request, response) => {
       for(const week of weeks) week.matchups=week.matchups.map(match=>applyBallotPrivacy(match,!!bracketRows[0].anonymous,!!bracketAccess?.canManage,authenticatedUser.userId));
       const activeWeek = weeks.find(week => week.isCurrent);
       const assignedPlaylists=await getSessionPlaylists(pool,bracketId);
-      const playlists=assignedPlaylists.filter(playlist=>weeks.some(week=>week.weekNumber===playlist.weekNumber && (!!bracketAccess?.canManage||week.isCurrent||week.isClosed||((finaleModeActive||awaitingFinale)&&week.roundNumber>=Number(bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound??999)))));
+      const playlists=assignedPlaylists.filter(playlist=>playlist.weekNumber===null||weeks.some(week=>week.weekNumber===playlist.weekNumber && (!!bracketAccess?.canManage||week.isCurrent||week.isClosed||((finaleModeActive||awaitingFinale)&&week.roundNumber>=Number(bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound??999)))));
       send(200, { playlists, canParticipateOnline, bracket: {...bracketRows[0],finaleStartRound:bracketRows[0].finaleStartRound??bracketRows[0].finaleSessionStartRound}, finaleModeActive, awaitingFinale, canViewBallots, currentWeekNumber: activeWeek?.weekNumber ?? null, weeks, canManage:!!bracketAccess?.canManage, isCommissioner:!!Number(bracketAccess?.isCommissioner), ballotEditingRound:!!bracketAccess?.canManage ? await getBallotEditingRound(pool,bracketId) : null });
     } catch (error) {
       console.error('Weekly bracket request failed:', error.message);

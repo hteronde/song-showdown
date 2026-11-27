@@ -950,8 +950,11 @@
 }
 
 .playlist-session .song-fields {
-  grid-template-columns: 1fr 2fr;
-  margin-top: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+
+.playlist-session .song-fields label:last-child {
+  grid-column: 1 / -1;
 }
 
 @media (max-width:600px) {

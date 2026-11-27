@@ -1,3 +1,4 @@
+import type { SessionPlaylist } from './bracket.model';
 import {BracketSession} from './bracket.model';
 import { apiRequest } from '../../shared/data-access/api-client';
 import { Injectable } from '@angular/core';
@@ -55,7 +56,7 @@ export interface ActiveBracketVotingData {
   isCommissioner?:boolean;
   canParticipateOnline?: boolean;
   isUpcoming?: boolean;
-  playlists?:Array<{weekNumber:number;playlistName:string;playlistUrl:string}>;
+  playlists?:SessionPlaylist[];
   awaitingFinale: boolean;
   canViewBallots: boolean;
   ballotEditingRound: number | null;

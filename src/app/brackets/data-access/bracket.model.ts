@@ -1,4 +1,4 @@
-export interface SessionPlaylist {weekNumber:number;playlistName:string;playlistUrl:string;}
+export interface SessionPlaylist {weekNumber:number|null;playlistName:string;playlistUrl:string;}
 export type RandomizationMode = 'none' | 'round1' | 'each_round';
 
 export interface BracketAlbum { albumId: number; title: string; year: number | null; albumCoverUrl: string | null; }

@@ -52,27 +52,53 @@
       <p class="field-error" *ngIf="fieldErrors.songList" role="alert">{{ fieldErrors.songList }}</p>
     </section>
     <section class="song-entry" aria-labelledby="playlists-summary-heading">
-      <span class="stat-label">SESSION MUSIC</span><h3 id="playlists-summary-heading">Playlists</h3>
+      <span class="stat-label">LISTEN ALONG</span><h3 id="playlists-summary-heading">Playlists</h3>
       <div class="participant-summary"><span>{{ assignedPlaylistCount }} {{ assignedPlaylistCount === 1 ? 'playlist assigned' : 'playlists assigned' }}</span><button class="cancel" type="button" aria-haspopup="dialog" aria-controls="playlists-dialog" (click)="openPlaylists()">Manage Playlists</button></div>
-      <p class="hint">Share a playlist containing each session’s songs so members can listen together.</p>
+      <p class="hint">Share playlists for specific weeks or for the entire bracket.</p>
     </section>
     <dialog #playlistsDialog id="playlists-dialog" class="song-dialog" aria-labelledby="playlists-title" (cancel)="(playlistsSaving || !!modalSaving) && $event.preventDefault()">
       <h3 id="playlists-title">Manage Playlists</h3>
-      <p class="hint">Add a Spotify, YouTube, or other playlist link for each session. {{ playlistsSaveImmediately ? 'Save Changes saves playlist links immediately without changing the bracket or its votes.' : 'Save Changes saves these links immediately.' }} Clear a URL to remove its playlist.</p>
-      <p class="hint" *ngIf="!playlistDraft.length">Set up your schedule in Manage Sessions first to assign session playlists.</p>
-      <p class="hint" *ngIf="playlistSongsLoading" role="status">Loading session songs…</p>
-      <p class="field-error" *ngIf="playlistSongsError" role="alert">Could not load saved matchups: {{ playlistSongsError }}</p>
-      <p class="hint">TBD means the advancing song or randomized matchup has not been determined yet.</p>
+      <p class="hint">Add as many playlist links as you need. Multiple playlists can share a week. The entire-bracket playlist stays visible to participants throughout the bracket.</p>
+      <p class="hint" *ngIf="!playlistWeeks.length">Set up your schedule in Manage Sessions to assign playlists to specific weeks.</p>
       <p class="field-error" *ngIf="modalErrors['playlists']" role="alert">{{ modalErrors['playlists'] }}</p>
       <p class="field-error" *ngIf="playlistsError" role="alert">{{ playlistsError }}</p>
       <form ngNativeValidate (ngSubmit)="applyPlaylists()">
-        <section class="playlist-session" *ngFor="let row of playlistDraft"><h4>{{ row.label }}</h4><span class="hint">{{ row.matchupCount }} matchups · {{ row.matchupCount * 2 }} song appearances</span>
-          <ul class="playlist-song-list"><li *ngFor="let match of row.matchups"><small>{{ match.label }}</small><span>{{ match.songA || 'TBD' }}</span><span class="versus">vs.</span><span>{{ match.songB || 'TBD' }}</span></li></ul>
-          <div class="song-fields"><label>Playlist name<input [name]="'playlist-name-'+row.weekNumber" [(ngModel)]="row.playlistName" maxlength="160" placeholder="Optional playlist name"></label><label>Playlist URL<input [name]="'playlist-url-'+row.weekNumber" [(ngModel)]="row.playlistUrl" type="url" pattern="https?://.*" maxlength="2048" placeholder="https://open.spotify.com/playlist/…"></label></div>
-          <p *ngIf="row.playlistUrl"><a [href]="row.playlistUrl" target="_blank" rel="noopener noreferrer">Open playlist ↗</a></p>
+        <p class="hint" *ngIf="!playlistDraft.length">No playlists added yet.</p>
+        <section class="playlist-session" *ngFor="let row of playlistDraft; let i = index" [attr.aria-label]="'Playlist ' + (i + 1)">
+          <div class="song-fields">
+            <label>Playlist name<input [name]="'playlist-name-' + i" [(ngModel)]="row.playlistName" maxlength="160" placeholder="Optional"></label>
+            <label>Playlist URL<input [name]="'playlist-url-' + i" [(ngModel)]="row.playlistUrl" type="url" pattern="[hH][tT][tT][pP][sS]?://.*" maxlength="2048" placeholder="https://open.spotify.com/playlist/…" required></label>
+            <label>Show during
+              <select [name]="'playlist-week-' + i" [(ngModel)]="row.weekNumber">
+                <option [ngValue]="null" [disabled]="hasBracketPlaylist && row.weekNumber !== null">Entire bracket</option>
+                <option *ngIf="row.weekNumber !== null && !hasPlaylistWeek(row.weekNumber)" [ngValue]="row.weekNumber">Week {{ row.weekNumber }} (unavailable)</option>
+                <option *ngFor="let week of playlistWeeks" [ngValue]="week.weekNumber">{{ week.label }}</option>
+              </select>
+            </label>
+          </div>
+          <div class="song-modal-actions">
+            <a *ngIf="row.playlistUrl" [href]="row.playlistUrl" target="_blank" rel="noopener noreferrer">Open playlist ↗</a>
+            <button class="cancel" type="button" (click)="removePlaylist(i)" [attr.aria-label]="'Remove playlist ' + (i + 1)" [disabled]="playlistsSaving || !!modalSaving">Remove</button>
+          </div>
         </section>
-        <div class="song-modal-actions"><button class="add-song" type="submit" [disabled]="playlistsSaving || playlistSongsLoading || !!modalSaving">{{ playlistsSaving ? 'SAVING…' : 'Save Changes' }}</button><button class="cancel" type="button" (click)="closePlaylists()" [disabled]="playlistsSaving || !!modalSaving">Cancel</button></div>
+        <div class="song-modal-actions">
+          <button class="cancel" type="button" (click)="addPlaylist()" [disabled]="playlistsSaving || !!modalSaving || (!playlistWeeks.length && hasBracketPlaylist)">Add Playlist</button>
+          <button class="add-song" type="submit" [disabled]="playlistsSaving || !!modalSaving">{{ playlistsSaving ? 'SAVING…' : 'Save Changes' }}</button>
+          <button class="cancel" type="button" (click)="closePlaylists()" [disabled]="playlistsSaving || !!modalSaving">Cancel</button>
+        </div>
       </form>
+      <details class="playlist-session" *ngIf="playlistWeeks.length">
+        <summary>View matchups by week</summary>
+        <p class="hint" *ngIf="playlistSongsLoading" role="status">Loading session songs…</p>
+        <p class="field-error" *ngIf="playlistSongsError" role="alert">Could not load saved matchups: {{ playlistSongsError }}</p>
+        <ng-container *ngIf="!playlistSongsLoading">
+          <p class="hint">TBD appears where a matchup song is still undecided.</p>
+          <section *ngFor="let week of playlistWeeks">
+            <h4>{{ week.label }}</h4>
+            <ul class="playlist-song-list"><li *ngFor="let match of week.matchups"><small>{{ match.label }}</small><span>{{ match.songA || 'TBD' }}</span><span class="versus">vs.</span><span>{{ match.songB || 'TBD' }}</span></li></ul>
+          </section>
+        </ng-container>
+      </details>
     </dialog>
     <dialog #songsManagerDialog id="songs-manager-dialog" class="song-dialog" aria-labelledby="songs-manager-title" (cancel)="$event.preventDefault();closeSongsManager()">
       <ng-container *ngTemplateOutlet="sessionToastTemplate"></ng-container>

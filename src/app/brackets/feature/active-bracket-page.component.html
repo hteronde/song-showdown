@@ -2,7 +2,11 @@
   <section class="upcoming-bracket-message" *ngIf="bracketData.isUpcoming; else startedBracket" aria-live="polite">
     <h1>We look forward to you participating in this bracket!</h1>
     <p>Please come back on <time [attr.datetime]="bracketData.bracket.startAt">{{ bracketData.bracket.startAt | date:'fullDate' }} at {{ bracketData.bracket.startAt | date:'shortTime' }}</time> (your local time) and cast your first vote.</p>
+    <ng-container *ngTemplateOutlet="playlistLinks"></ng-container>
   </section>
+  <ng-template #playlistLinks>
+  <div class="notice-bar" *ngIf="sessionPlaylists.length && !isComplete"><span class="notice-icon">♫</span><span>Listen along: <ng-container *ngFor="let playlist of sessionPlaylists; let last=last"><a [href]="playlist.playlistUrl" target="_blank" rel="noopener noreferrer">{{ playlist.playlistName }} ↗</a><span *ngIf="!last"> · </span></ng-container></span></div>
+  </ng-template>
   <ng-template #startedBracket>
   <section class="hero-row">
     <div>
@@ -31,7 +35,7 @@
   <label *ngIf="bracketData.canManage && !isComplete" class="automatic-email-setting"><input type="checkbox" [checked]="!!bracketData.bracket.showFullFirstRound" (change)="setFirstRoundVisibility($event)" [disabled]="firstRoundVisibilitySaving"> Show all first-round matchups to participants <span *ngIf="firstRoundVisibilitySaving">Saving…</span></label>
   <div class="admin-finale-entry" *ngIf="isAdmin"><a [routerLink]="['/manage/brackets', bracketData.bracket.bracketId, 'edit']">Edit bracket ↗</a><button type="button" *ngIf="canAdvanceWeek" (click)="openAdvanceWeek()">Advance week</button><button type="button" *ngIf="bracketData.bracket.status === 'active'" (click)="togglePaused()" [disabled]="pauseSaving">{{ pauseSaving ? 'Saving…' : paused ? 'Resume bracket' : 'Pause bracket' }}</button><button type="button" *ngIf="!isComplete" (click)="enterFinaleMode()" [disabled]="paused">{{ finaleModeActive ? 'Manage Finale Mode ↗' : 'Enter Finale Mode ↗' }}</button><button type="button" (click)="openWriteEmail()">Write email</button></div>
 
-  <div class="notice-bar" *ngIf="sessionPlaylists.length && !isComplete"><span class="notice-icon">♫</span><span>Listen to this session’s songs: <ng-container *ngFor="let playlist of sessionPlaylists; let last=last"><a [href]="playlist.playlistUrl" target="_blank" rel="noopener noreferrer">{{ playlist.playlistName }} ↗</a><span *ngIf="!last"> · </span></ng-container></span></div>
+  <ng-container *ngTemplateOutlet="playlistLinks"></ng-container>
   <app-bracket-champion [bracketId]="bracketData.bracket.bracketId" [champion]="champion"></app-bracket-champion>
   <section class="week-section">
     <div class="section-heading"><div><div class="eyebrow small-eyebrow">THE TOURNAMENT SO FAR</div><h2>The full bracket.</h2></div></div>

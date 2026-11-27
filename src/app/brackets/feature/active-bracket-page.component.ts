@@ -38,7 +38,12 @@ export class ActiveBracketPageComponent implements OnInit, OnDestroy {
     private readonly requests = new BracketRequests();
     data: ActiveBracketVotingData | null = null;
     get sessionPlaylists(): NonNullable<ActiveBracketVotingData['playlists']> {
-        return (this.data?.playlists ?? []).filter(row => this.finaleModeActive || this.awaitingFinale ? this.data?.weeks.some(week => week.weekNumber === row.weekNumber && week.roundNumber >= (this.data?.bracket.finaleStartRound ?? 999)) : row.weekNumber === this.currentWeek?.weekNumber);
+        const data = this.data;
+        if (!data) return [];
+        const visibleWeeks = this.finaleModeActive || this.awaitingFinale
+            ? data.weeks.filter(week => week.roundNumber >= (data.bracket.finaleStartRound ?? Infinity)).map(week => week.weekNumber)
+            : [this.currentWeek?.weekNumber];
+        return (data.playlists ?? []).filter(playlist => playlist.weekNumber === null || visibleWeeks.includes(playlist.weekNumber));
     }
     currentMemberId: number | null = null;
     isAdmin = false;

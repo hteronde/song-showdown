@@ -796,24 +796,17 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         return this.saveModalSettings('songs', 'Song Settings', { songCount: this.songCount, seedingSize: this.useSeeds ? this.seedingSize : null, randomizationMode: this.randomizationMode, tiebreakerOption: this.tiebreakerOption, songs: this.songs }, this.songsManagerDialog?.nativeElement);
     }
     sessionPlaylists: SessionPlaylist[] = [];
-    playlistDraft: Array<SessionPlaylist & {
-        label: string;
-        matchupCount: number;
-        matchups: Array<{
-            label: string;
-            songA: string | null;
-            songB: string | null;
-        }>;
-    }> = [];
+    playlistDraft: SessionPlaylist[] = [];
+    playlistWeeks: Array<{ weekNumber: number; label: string; matchups: Array<{ label: string; songA: string | null; songB: string | null }> }> = [];
+    get hasBracketPlaylist(): boolean { return this.playlistDraft.some(row => row.weekNumber === null); }
     @ViewChild('playlistsDialog')
     playlistsDialog?: ElementRef<HTMLDialogElement>;
     get assignedPlaylistCount(): number { return this.sessionPlaylists.filter(row => row.playlistUrl.trim()).length; }
     private sessionPlaylistsPayload(): SessionPlaylist[] {
-        return this.sessionPlaylists.filter(row => !this.sessions.length || this.sessions.some(session => session.weekNumber === row.weekNumber));
+        return this.sessionPlaylists.filter(row => row.weekNumber === null || !this.sessions.length || this.sessions.some(session => session.weekNumber === row.weekNumber));
     }
     playlistsSaving = false;
     playlistsError = '';
-    get playlistsSaveImmediately(): boolean { return true; }
     playlistSongsLoading = false;
     playlistSongsError = '';
     async openPlaylists(): Promise<void> {
@@ -821,41 +814,52 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         this.modalErrors['playlists'] = '';
         this.playlistsError = '';
         this.playlistSongsError = '';
-        this.playlistSongsLoading = !!this.editingId;
-        const firstFinale = this.sessions.find(session => session.isFinale);
-        const sessions = this.sessions.filter(session => !session.isFinale || session === firstFinale);
-        this.playlistDraft = sessions.map(session => {
-            const saved = this.sessionPlaylists.find(row => row.weekNumber === session.weekNumber);
-            return { weekNumber: session.weekNumber, playlistName: saved?.playlistName ?? '', playlistUrl: saved?.playlistUrl ?? '', label: session.isFinale ? `Finale Week · ${this.finaleSessionSummary?.roundRange}` : `Week ${session.weekNumber} · ${session.roundName}`, matchupCount: session.isFinale ? this.finaleSessionSummary?.matchupCount ?? 0 : session.matchupCount, matchups: [] };
-        });
+        const isLive = !!this.editingId && !this.sessionStoredDraft;
+        this.playlistSongsLoading = isLive;
+        const availableWeeks = isLive ? this.savedSessions : this.sessions;
+        this.playlistDraft = this.sessionPlaylists.filter(row => row.playlistUrl.trim()).map(row => ({ ...row }));
+        this.playlistWeeks = availableWeeks.map(session => ({
+            weekNumber: session.weekNumber,
+            label: `Week ${session.weekNumber} · ${session.roundName}${session.isFinale ? ' (Finale)' : ''}`,
+            matchups: []
+        }));
         this.playlistsDialog?.nativeElement.showModal();
         let stored: BracketSession[] = [];
         try {
-            if (this.editingId) {
+            if (isLive && this.editingId) {
                 const data = await this.bracketsApi.getSessions(this.editingId);
                 stored = data.sessions;
-                this.sessionStoredDraft = !!data.isDraft;
             }
         }
         catch (error) {
             this.playlistSongsError = this.message(error);
         }
-        const sameStructure = !!this.scheduleBaseline && this.scheduleBaseline.songCount === this.songCount && this.scheduleBaseline.matchups === this.songsPerSession;
-        for (const row of this.playlistDraft) {
-            const session = this.sessions.find(session => session.weekNumber === row.weekNumber)!;
-            const included = session.isFinale ? this.sessions.filter(item => item.isFinale) : [session];
-            row.matchups = included.flatMap(item => {
-                const saved = sameStructure ? stored.find(saved => saved.weekNumber === item.weekNumber)?.matchups : undefined;
-                const firstRoundOffset = this.sessions.filter(previous => previous.roundNumber === 1 && previous.weekNumber < item.weekNumber).reduce((total, previous) => total + previous.matchupCount * 2, 0);
-                return Array.from({ length: item.matchupCount }, (_, index) => {
-                    const actual = saved?.[index];
-                    const canPreview = item.roundNumber === 1 && !this.useSeeds && !this.randomizeSongs;
-                    return { label: `${session.isFinale ? item.roundName + ' · ' : ''}Matchup ${actual?.matchupNumber ?? index + 1}`, songA: canPreview ? this.songs[firstRoundOffset + index * 2]?.title ?? null : actual?.songA ?? null, songB: canPreview ? this.songs[firstRoundOffset + index * 2 + 1]?.title ?? null : actual?.songB ?? null };
-                });
+        for (const row of this.playlistWeeks) {
+            const session = availableWeeks.find(week => week.weekNumber === row.weekNumber)!;
+            const saved = stored.find(week => week.weekNumber === row.weekNumber)?.matchups;
+            const firstRoundOffset = availableWeeks.filter(week => week.roundNumber === 1 && week.weekNumber < row.weekNumber).reduce((total, week) => total + week.matchupCount * 2, 0);
+            row.matchups = Array.from({ length: session.matchupCount }, (_, index) => {
+                const actual = saved?.[index];
+                const canPreview = !isLive && session.roundNumber === 1 && !this.useSeeds && !this.randomizeSongs;
+                return {
+                    label: `Matchup ${actual?.matchupNumber ?? index + 1}`,
+                    songA: canPreview ? this.songs[firstRoundOffset + index * 2]?.title ?? null : actual?.songA ?? null,
+                    songB: canPreview ? this.songs[firstRoundOffset + index * 2 + 1]?.title ?? null : actual?.songB ?? null
+                };
             });
         }
         this.playlistSongsLoading = false;
         this.changeDetector.markForCheck();
+    }
+    hasPlaylistWeek(weekNumber: number): boolean { return this.playlistWeeks.some(week => week.weekNumber === weekNumber); }
+    addPlaylist(): void {
+        const firstWeek = this.playlistWeeks[0];
+        if (!firstWeek && this.hasBracketPlaylist)
+            return;
+        this.playlistDraft.push({ weekNumber: firstWeek?.weekNumber ?? null, playlistName: '', playlistUrl: '' });
+    }
+    removePlaylist(index: number): void {
+        this.playlistDraft.splice(index, 1);
     }
     closePlaylists(): void {
         if (!this.playlistsSaving && !this.modalSaving)
@@ -865,13 +869,8 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
         if (this.playlistsSaving || this.modalSaving)
             return;
         this.playlistsError = '';
-        const updated = new Set(this.playlistDraft.map(row => row.weekNumber));
         const changes = this.playlistDraft.map(({ weekNumber, playlistName, playlistUrl }) => ({ weekNumber, playlistName: playlistName.trim(), playlistUrl: playlistUrl.trim() }));
         if (this.editingId && !this.sessionStoredDraft) {
-            if (!this.scheduleBaseline || this.scheduleBaseline.songCount !== this.songCount || this.scheduleBaseline.matchups !== this.songsPerSession) {
-                this.playlistsError = 'Save the bracket’s song count and matchups per session before assigning playlists to the new sessions.';
-                return;
-            }
             this.playlistsSaving = true;
             try {
                 const result = await this.bracketsApi.saveSessionPlaylists(this.editingId, changes);
@@ -890,8 +889,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             }
         }
         else {
-            const playlists = [...this.sessionPlaylists.filter(row => !updated.has(row.weekNumber)), ...changes];
-            await this.saveModalSettings('playlists', 'Playlists', { sessionPlaylists: playlists }, this.playlistsDialog?.nativeElement, () => { this.sessionPlaylists = playlists; });
+            await this.saveModalSettings('playlists', 'Playlists', { sessionPlaylists: changes }, this.playlistsDialog?.nativeElement, () => { this.sessionPlaylists = changes; });
         }
     }
     @ViewChild('sessionSettingsDialog')
@@ -1011,7 +1009,7 @@ export class BracketsPageComponent implements OnInit, OnDestroy {
             }
             else if (this.sessionSettingsNeedSaving) {
                 const stored = await this.bracketsApi.get(this.editingId);
-                const payload = { ...stored, ...this.sessionSettingsPayload(), resetHistory, sessionPlaylists: stored.sessionPlaylists?.filter(row => this.sessions.some(session => session.weekNumber === row.weekNumber)), startAt: this.startAt ? new Date(this.startAt).toISOString() : '', anonymous: !!stored.anonymous, sessionScheduleRevision: this.sessionsRevision } as BracketInput;
+                const payload = { ...stored, ...this.sessionSettingsPayload(), resetHistory, sessionPlaylists: stored.sessionPlaylists?.filter(row => row.weekNumber === null || this.sessions.some(session => session.weekNumber === row.weekNumber)), startAt: this.startAt ? new Date(this.startAt).toISOString() : '', anonymous: !!stored.anonymous, sessionScheduleRevision: this.sessionsRevision } as BracketInput;
                 await this.bracketsApi.update(this.editingId, payload);
                 const data = await this.bracketsApi.getSessions(this.editingId);
                 this.setSessionData(data);
