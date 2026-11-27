@@ -31,6 +31,7 @@ export class BracketViewToggleComponent {
 export interface AnalysisSong {
     entryId: number | null;
     title: string;
+    artist?: string | null;
     album?: string | null;
     category?: string | null;
     opponentTitle?: string | null;
@@ -81,7 +82,7 @@ interface TooltipSong {title: string; opponentTitle?: string | null;}
 interface ChartBar { count: number; share: number; tooltip: TooltipSong[]; description: string; kind: 'for' | 'against' | null; }
 interface ChartRow { label: string; cells: ChartBar[][]; }
 
-function chartRows(rounds: readonly AnalysisRound[], field: 'album' | 'category', fallback: string): ChartRow[] {
+function chartRows(rounds: readonly AnalysisRound[], field: 'album' | 'category' | 'artist', fallback: string): ChartRow[] {
     const rows = new Map<string, {label: string; byRound: Array<{picked: TooltipSong[]; opposed: TooltipSong[]}>}>();
     for (const [index, round] of rounds.entries()) {
         const groups = [
@@ -258,6 +259,7 @@ export class BracketAnalysisComponent implements OnChanges, OnDestroy {
 
     @Input() data: readonly AnalysisRound[] = [];
     @Input() votes: readonly AnalysisVote[] = [];
+    @Input() showArtistVotes = false;
     participants: Array<{userId: number; displayName: string}> = [];
     selectedUserId: number | null = null;
     participantCharts: AnalysisChart[] = [];
@@ -394,6 +396,13 @@ export class BracketAnalysisComponent implements OnChanges, OnDestroy {
         this.participantColumns = [...rounds.entries()].sort(([a], [b]) => a - b)
             .map(([, round]) => ({...round, slotCount: round.songs.length}));
         this.participantCharts = userId == null ? [] : this.makeCharts(this.participantColumns, 'Votes');
+        if (userId != null && this.showArtistVotes) {
+            this.participantCharts.unshift({
+                title: 'Votes by artist',
+                group: 'Artist',
+                rows: chartRows(this.participantColumns, 'artist', 'Unknown artist')
+            });
+        }
     }
 
     private makeCharts(rounds: readonly AnalysisRound[], title: string): AnalysisChart[] {

@@ -1280,7 +1280,7 @@ const server = createServer(async (request, response) => {
               w.week_number AS weekNumber, m.matchup_id AS matchupId,m.next_matchup_id AS nextMatchupId,
               m.matchup_number AS matchupNumber,
               a.bracket_song_id AS songAEntryId, a.region_number AS songARegion,
-              CASE WHEN historyBracket.seeding_size IS NOT NULL THEN a.assigned_seed ELSE a.seed_number END AS songASeed, sa.title AS songATitle,
+              CASE WHEN historyBracket.seeding_size IS NOT NULL THEN a.assigned_seed ELSE a.seed_number END AS songASeed, sa.title AS songATitle, sa.artist AS songAArtist,
               COALESCE(albumA.title,sa.album) AS songAAlbum,sa.category AS songACategory,CASE WHEN albumA.bracket_album_id IS NOT NULL THEN albumA.year ELSE sa.year END AS songAYear,sa.youtube_url AS songAYoutubeUrl,sa.spotify_url AS songASpotifyUrl,CASE WHEN albumA.bracket_album_id IS NOT NULL THEN albumA.album_cover_url ELSE sa.album_cover_url END AS songAAlbumCoverUrl,
               b.bracket_song_id AS songBEntryId, b.region_number AS songBRegion,
               CASE WHEN historyBracket.seeding_size IS NOT NULL THEN b.assigned_seed ELSE b.seed_number END AS songBSeed, sb.title AS songBTitle,
@@ -1314,7 +1314,7 @@ const server = createServer(async (request, response) => {
     );
 
     const [songRows] = await pool.execute(
-      `SELECT s.title
+      `SELECT s.title, s.artist
        FROM bracket_songs bs
        JOIN songs s ON s.song_id = bs.song_id
        WHERE bs.bracket_id = ?
@@ -1361,6 +1361,7 @@ const server = createServer(async (request, response) => {
           songA: row.songAEntryId === null ? null : {
             entryId: row.songAEntryId,
             title: row.songATitle,
+            artist: row.songAArtist,
             album: row.songAAlbum,
             category: row.songACategory,
             albumCoverUrl: row.songAAlbumCoverUrl,
@@ -1373,6 +1374,7 @@ const server = createServer(async (request, response) => {
           songB: row.songBEntryId === null ? null : {
             entryId: row.songBEntryId,
             title: row.songBTitle,
+            artist: row.songBArtist,
             album: row.songBAlbum,
             category: row.songBCategory,
             albumCoverUrl: row.songBAlbumCoverUrl,
@@ -1408,6 +1410,7 @@ const server = createServer(async (request, response) => {
       canViewBallots,
       canManage:!!bracketAccess?.canManage, isCommissioner:!!Number(bracketAccess?.isCommissioner), ballotEditingRound:!!bracketAccess?.canManage ? await getBallotEditingRound(pool,bracketId) : null,
       songs: songRows.map(row => row.title),
+      hasMultipleArtists: new Set(songRows.map(row=>row.artist?.trim().toLowerCase()).filter(Boolean)).size > 1,
       champion: championship?.winner ?? null,
       playlists: playlistRows,
       participants: participantRows,

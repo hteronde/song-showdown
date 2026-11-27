@@ -34,6 +34,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
     get bracketView(): BracketView { return this.route.snapshot.data['bracketView'] === 'analysis' ? 'analysis' : 'bracket'; }
     analysisRounds: AnalysisRound[] = [];
     participantAnalysisVotes: AnalysisVote[] = [];
+    hasMultipleArtists = false;
     firstVisibleRound = 1;
     get visibleRounds(): PastRound[] { return this.historyRounds.filter(round => round.matches.length && round.roundNumber >= this.firstVisibleRound); }
     visibleRoundSpan(roundNumber: number): number { return 2 ** (roundNumber - (this.visibleRounds[0]?.roundNumber ?? 1)); }
@@ -233,6 +234,7 @@ export class HistoryPageComponent implements OnInit, OnDestroy {
                 ? this.finaleParticipants.map(person => person.userId)
                 : this.finaleOptions.participants.filter(user => user.selectedByDefault).map(user => user.userId);
             if (this.bracketView === 'analysis') {
+                this.hasMultipleArtists = payload.hasMultipleArtists === true;
                 const analysisRounds = payload.rounds.map(round => ({
                     name: bracketRoundLabel(round.name),
                     slotCount: round.matchups.length * 2,
