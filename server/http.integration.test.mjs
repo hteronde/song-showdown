@@ -71,6 +71,22 @@ test('HTTP + disposable MySQL integration', {skip: !enabled, timeout: 120000}, a
     const a=families[0],b=families[1];
     const vote=(br,user,index=0,entry=br.entries[index*2])=>http(`/api/matchups/${br.matches[index]}/votes`,{cookie:user.cookie,method:'POST',body:{userId:user.id,selectedEntryId:entry,comment:'Test vote'}});
 
+    await t.test('bracket history returns the assigned artist for both sides of a matchup',async()=>{
+      const br=await bracket(a,{complete:true});
+      const path=`/api/brackets/${br.id}`;
+      const singleArtist=await http(path,{cookie:a.owner.cookie});
+      assert.equal(singleArtist.status,200);
+      assert.equal(singleArtist.body.hasMultipleArtists,false);
+
+      await db.pool.execute('UPDATE songs s JOIN bracket_songs bs ON bs.song_id=s.song_id SET s.artist=? WHERE bs.bracket_song_id=?',['Cover artist',br.entries[1]]);
+      const history=await http(path,{cookie:a.owner.cookie});
+      assert.equal(history.status,200);
+      assert.equal(history.body.hasMultipleArtists,true);
+      const [firstMatch]=history.body.rounds[0].matchups;
+      assert.equal(firstMatch.songA.artist,'Test artist');
+      assert.equal(firstMatch.songB.artist,'Cover artist');
+    });
+
     await t.test('custom bracket email is scoped to managers and accepted participants',async()=>{
       const family=families[0], other=families[1], br=await bracket(family);
       const path=`/api/admin/brackets/${br.id}/email`;

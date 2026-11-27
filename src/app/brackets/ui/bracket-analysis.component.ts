@@ -259,7 +259,7 @@ export class BracketAnalysisComponent implements OnChanges, OnDestroy {
 
     @Input() data: readonly AnalysisRound[] = [];
     @Input() votes: readonly AnalysisVote[] = [];
-    @Input() showArtistVotes = false;
+    @Input() showArtistCharts = false;
     participants: Array<{userId: number; displayName: string}> = [];
     selectedUserId: number | null = null;
     participantCharts: AnalysisChart[] = [];
@@ -396,17 +396,14 @@ export class BracketAnalysisComponent implements OnChanges, OnDestroy {
         this.participantColumns = [...rounds.entries()].sort(([a], [b]) => a - b)
             .map(([, round]) => ({...round, slotCount: round.songs.length}));
         this.participantCharts = userId == null ? [] : this.makeCharts(this.participantColumns, 'Votes');
-        if (userId != null && this.showArtistVotes) {
-            this.participantCharts.unshift({
-                title: 'Votes by artist',
-                group: 'Artist',
-                rows: chartRows(this.participantColumns, 'artist', 'Unknown artist')
-            });
-        }
     }
 
-    private makeCharts(rounds: readonly AnalysisRound[], title: string): AnalysisChart[] {
-        const charts = [{title: title + ' by album', group: 'Album', rows: chartRows(rounds, 'album', 'Unknown album')}];
+    private makeCharts(rounds: readonly AnalysisRound[], title: 'Songs' | 'Votes'): AnalysisChart[] {
+        const charts: AnalysisChart[] = [];
+        if (this.showArtistCharts) {
+            charts.push({title: title + ' by artist', group: 'Artist', rows: chartRows(rounds, 'artist', 'Unknown artist')});
+        }
+        charts.push({title: title + ' by album', group: 'Album', rows: chartRows(rounds, 'album', 'Unknown album')});
         if (rounds.some(round => [...round.songs, ...(round.againstSongs ?? [])].some(song => !!song.category?.trim()))) {
             charts.push({title: title + ' by category', group: 'Category', rows: chartRows(rounds, 'category', 'Uncategorized')});
         }
